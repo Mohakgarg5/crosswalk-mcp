@@ -1,6 +1,13 @@
 import type { ATSAdapter, NormalizedJob } from './types.ts';
 import { registerAdapter } from './adapter.ts';
 
+function withinSinceDays(postedAt: string | undefined, sinceDays: number | undefined): boolean {
+  if (sinceDays === undefined) return true;
+  if (!postedAt) return true;
+  const cutoff = Date.now() - sinceDays * 86400_000;
+  return new Date(postedAt).getTime() >= cutoff;
+}
+
 type GhRaw = {
   jobs: Array<{
     id: number;
@@ -36,12 +43,12 @@ function inferLocationType(loc: string | undefined): NormalizedJob['locationType
 
 export const greenhouse: ATSAdapter = {
   name: 'greenhouse',
-  async listJobs(orgSlug: string): Promise<NormalizedJob[]> {
+  async listJobs(orgSlug: string, opts?: { sinceDays?: number }): Promise<NormalizedJob[]> {
     const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(orgSlug)}/jobs?content=true`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`greenhouse ${orgSlug}: HTTP ${res.status}`);
     const data = (await res.json()) as GhRaw;
-    return data.jobs.map(j => ({
+    const all: NormalizedJob[] = data.jobs.map(j => ({
       externalId: String(j.id),
       title: j.title,
       dept: j.departments?.[0]?.name,
@@ -52,6 +59,7 @@ export const greenhouse: ATSAdapter = {
       postedAt: j.updated_at,
       raw: j as unknown as Record<string, unknown>
     }));
+    return all.filter(j => withinSinceDays(j.postedAt, opts?.sinceDays));
   }
 };
 

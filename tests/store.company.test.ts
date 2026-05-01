@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { openDb } from '../src/store/db.ts';
-import { upsertCompany, listCompaniesByAts, seedCompaniesFrom } from '../src/store/company.ts';
+import { upsertCompany, listCompaniesByAts, seedCompaniesFrom, getCompany } from '../src/store/company.ts';
 
 describe('store/company', () => {
   let db: ReturnType<typeof openDb>;
@@ -19,5 +19,11 @@ describe('store/company', () => {
     ]);
     expect(listCompaniesByAts(db, 'greenhouse')).toHaveLength(1);
     expect(listCompaniesByAts(db, 'lever')).toHaveLength(1);
+  });
+
+  it('looks up a company by id', () => {
+    upsertCompany(db, { id: 'c1', name: 'Acme', ats: 'greenhouse', atsOrgSlug: 'acme' });
+    expect(getCompany(db, 'c1')?.name).toBe('Acme');
+    expect(getCompany(db, 'missing')).toBeNull();
   });
 });

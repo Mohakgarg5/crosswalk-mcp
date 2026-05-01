@@ -1,6 +1,6 @@
 {
   "name": "crosswalk-mcp",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "An AI-native, MCP-first career copilot. Local-first, zero API keys.",
   "type": "module",
   "bin": {
@@ -18,11 +18,18 @@
     "node": ">=24"
   },
   "license": "MIT",
-  "files": ["dist/", "registry/", "README.md", "LICENSE"],
+  "files": [
+    "dist/",
+    "registry/",
+    "README.md",
+    "LICENSE"
+  ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "better-sqlite3": "^11.0.0",
+    "docx": "^9.6.1",
     "mammoth": "^1.8.0",
+    "marked": "^18.0.2",
     "pdf-parse": "^1.1.1",
     "zod": "^3.23.0",
     "zod-to-json-schema": "^3.25.2"

@@ -1,6 +1,13 @@
 import type { ATSAdapter, NormalizedJob } from './types.ts';
 import { registerAdapter } from './adapter.ts';
 
+function withinSinceDays(postedAt: string | undefined, sinceDays: number | undefined): boolean {
+  if (sinceDays === undefined) return true;
+  if (!postedAt) return true;
+  const cutoff = Date.now() - sinceDays * 86400_000;
+  return new Date(postedAt).getTime() >= cutoff;
+}
+
 type LvRaw = Array<{
   id: string;
   text: string;
@@ -20,12 +27,12 @@ function inferLocationType(loc?: string): NormalizedJob['locationType'] {
 
 export const lever: ATSAdapter = {
   name: 'lever',
-  async listJobs(orgSlug: string): Promise<NormalizedJob[]> {
+  async listJobs(orgSlug: string, opts?: { sinceDays?: number }): Promise<NormalizedJob[]> {
     const url = `https://api.lever.co/v0/postings/${encodeURIComponent(orgSlug)}?mode=json`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`lever ${orgSlug}: HTTP ${res.status}`);
     const data = (await res.json()) as LvRaw;
-    return data.map(j => ({
+    const all: NormalizedJob[] = data.map(j => ({
       externalId: j.id,
       title: j.text,
       dept: j.categories?.team,
@@ -36,6 +43,7 @@ export const lever: ATSAdapter = {
       postedAt: j.createdAt ? new Date(j.createdAt).toISOString() : undefined,
       raw: j as unknown as Record<string, unknown>
     }));
+    return all.filter(j => withinSinceDays(j.postedAt, opts?.sinceDays));
   }
 };
 

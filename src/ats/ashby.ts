@@ -1,6 +1,13 @@
 import type { ATSAdapter, NormalizedJob } from './types.ts';
 import { registerAdapter } from './adapter.ts';
 
+function withinSinceDays(postedAt: string | undefined, sinceDays: number | undefined): boolean {
+  if (sinceDays === undefined) return true;
+  if (!postedAt) return true;
+  const cutoff = Date.now() - sinceDays * 86400_000;
+  return new Date(postedAt).getTime() >= cutoff;
+}
+
 type AbRaw = {
   jobs: Array<{
     id: string;
@@ -39,12 +46,12 @@ function parseSalary(s?: string): { min?: number; max?: number; currency?: strin
 
 export const ashby: ATSAdapter = {
   name: 'ashby',
-  async listJobs(orgSlug: string): Promise<NormalizedJob[]> {
+  async listJobs(orgSlug: string, opts?: { sinceDays?: number }): Promise<NormalizedJob[]> {
     const url = `https://api.ashbyhq.com/posting-api/job-board/${encodeURIComponent(orgSlug)}?includeCompensation=true`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`ashby ${orgSlug}: HTTP ${res.status}`);
     const data = (await res.json()) as AbRaw;
-    return data.jobs.map(j => {
+    const all: NormalizedJob[] = data.jobs.map(j => {
       const sal = parseSalary(j.compensationTierSummary);
       return {
         externalId: j.id,
@@ -61,6 +68,7 @@ export const ashby: ATSAdapter = {
         raw: j as unknown as Record<string, unknown>
       };
     });
+    return all.filter(j => withinSinceDays(j.postedAt, opts?.sinceDays));
   }
 };
 

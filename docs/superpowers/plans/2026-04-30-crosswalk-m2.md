@@ -204,8 +204,8 @@ For `tests/ats.greenhouse.test.ts`, add (after the existing tests, inside the ex
       ok: true, status: 200, json: async () => fixture
     }));
     // Fixture has updated_at: 2026-04-25 and 2026-04-20.
-    // System date is 2026-04-30; sinceDays=7 includes both, sinceDays=3 excludes both.
-    const recent = await greenhouse.listJobs('stripe', { sinceDays: 7 });
+    // System date is 2026-04-30; sinceDays=14 includes both, sinceDays=3 excludes both.
+    const recent = await greenhouse.listJobs('stripe', { sinceDays: 14 });
     expect(recent).toHaveLength(2);
     const veryRecent = await greenhouse.listJobs('stripe', { sinceDays: 3 });
     expect(veryRecent).toHaveLength(0);
