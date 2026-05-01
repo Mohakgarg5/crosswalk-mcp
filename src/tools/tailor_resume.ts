@@ -1,9 +1,8 @@
 import { z } from 'zod';
 import type { Db } from '../store/db.ts';
 import { getJob } from '../store/job.ts';
-import { listResumes, getResume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
-import { pickBestResume } from '../services/pickResume.ts';
+import { resolveResume } from '../services/resolveResume.ts';
 import { tailorResume } from '../services/tailorResume.ts';
 import { mdToPrintHtml } from '../exporters/html.ts';
 import { mdToDocxBuffer } from '../exporters/docx.ts';
@@ -33,28 +32,11 @@ export async function tailorResumeTool(
   const job = getJob(ctx.db, input.jobId);
   if (!job) throw new Error(`unknown job: ${input.jobId}`);
 
-  const resumes = listResumes(ctx.db);
-  if (resumes.length === 0) throw new Error('no resumes stored — call add_resume first');
-
-  let chosenResumeId: string;
-  let pickedReason: string;
-  if (input.resumeId) {
-    const r = getResume(ctx.db, input.resumeId);
-    if (!r) throw new Error(`unknown resume: ${input.resumeId}`);
-    chosenResumeId = r.id;
-    pickedReason = 'caller-supplied';
-  } else {
-    const picked = await pickBestResume(
-      { jobTitle: job.title, jobDescription: job.descriptionMd ?? '' },
-      resumes.map(r => ({ id: r.id, label: r.label, parsed: r.parsed })),
-      ctx.sampling
-    );
-    chosenResumeId = picked.resumeId;
-    pickedReason = picked.reason;
-  }
-
-  const resume = getResume(ctx.db, chosenResumeId);
-  if (!resume) throw new Error(`internal: lost resume ${chosenResumeId}`);
+  const { resumeId: chosenResumeId, resume, pickedReason } = await resolveResume({
+    db: ctx.db, sampling: ctx.sampling,
+    jobTitle: job.title, jobDescription: job.descriptionMd ?? '',
+    resumeId: input.resumeId
+  });
 
   const profile = getProfile(ctx.db);
 

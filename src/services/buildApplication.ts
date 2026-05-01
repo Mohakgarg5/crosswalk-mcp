@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type { Db } from '../store/db.ts';
 import { getJob } from '../store/job.ts';
-import { listResumes, getResume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
 import { getCompany } from '../store/company.ts';
 import { createApplication } from '../store/application.ts';
-import { pickBestResume } from './pickResume.ts';
+import { resolveResume } from './resolveResume.ts';
 import { tailorResume } from './tailorResume.ts';
 import { draftCoverLetter } from './coverLetter.ts';
 import type { SamplingClient } from '../sampling/client.ts';
@@ -33,28 +32,11 @@ export async function buildApplication(
   const job = getJob(ctx.db, input.jobId);
   if (!job) throw new Error(`unknown job: ${input.jobId}`);
 
-  const resumes = listResumes(ctx.db);
-  if (resumes.length === 0) throw new Error('no resumes stored — call add_resume first');
-
-  let chosenResumeId: string;
-  let pickedReason: string;
-  if (input.resumeId) {
-    const explicit = getResume(ctx.db, input.resumeId);
-    if (!explicit) throw new Error(`unknown resume: ${input.resumeId}`);
-    chosenResumeId = explicit.id;
-    pickedReason = 'caller-supplied';
-  } else {
-    const picked = await pickBestResume(
-      { jobTitle: job.title, jobDescription: job.descriptionMd ?? '' },
-      resumes.map(r => ({ id: r.id, label: r.label, parsed: r.parsed })),
-      ctx.sampling
-    );
-    chosenResumeId = picked.resumeId;
-    pickedReason = picked.reason;
-  }
-
-  const resume = getResume(ctx.db, chosenResumeId);
-  if (!resume) throw new Error(`internal: lost resume ${chosenResumeId}`);
+  const { resumeId: chosenResumeId, resume, pickedReason } = await resolveResume({
+    db: ctx.db, sampling: ctx.sampling,
+    jobTitle: job.title, jobDescription: job.descriptionMd ?? '',
+    resumeId: input.resumeId
+  });
 
   const profile = getProfile(ctx.db);
   const company = getCompany(ctx.db, job.companyId);
