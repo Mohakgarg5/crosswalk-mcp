@@ -5,10 +5,33 @@ export type HtmlOpts = { title: string };
 // marked v9+ does not escape raw HTML by default. Use a local Marked instance
 // with a renderer that escapes raw HTML tokens so untrusted markdown cannot
 // inject <script> or other tags.
+const ALLOWED_URL_PREFIX = /^(https?:\/\/|mailto:|\/|#|[^:]+$|[^:]+\/[^:]+)/i;
+
+function safeUrl(href: string): string {
+  // Reject anything that looks like a URI scheme we don't allow.
+  // The regex above accepts http(s)://, mailto:, root-absolute (/...), fragment (#...),
+  // or no-scheme paths (no colon before first slash). Everything else → '#'.
+  return ALLOWED_URL_PREFIX.test(href) ? href : '#';
+}
+
 const markedInstance = new Marked({
   renderer: {
     html(token: { text: string }): string {
       return escapeHtml(token.text);
+    },
+    link(token: { href: string; title?: string | null; tokens?: unknown[]; text?: string }): string {
+      const href = escapeHtml(safeUrl(token.href));
+      const title = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      // Use the parser to render inner tokens; fall back to text.
+      const inner = (this as unknown as { parser: { parseInline: (t: unknown[]) => string } })
+        .parser.parseInline(token.tokens ?? []);
+      return `<a href="${href}"${title}>${inner || escapeHtml(token.text ?? '')}</a>`;
+    },
+    image(token: { href: string; title?: string | null; text?: string }): string {
+      const src = escapeHtml(safeUrl(token.href));
+      const alt = escapeHtml(token.text ?? '');
+      const title = token.title ? ` title="${escapeHtml(token.title)}"` : '';
+      return `<img src="${src}" alt="${alt}"${title}>`;
     }
   }
 });

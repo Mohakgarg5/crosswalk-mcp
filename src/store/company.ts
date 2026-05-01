@@ -21,6 +21,15 @@ export function upsertCompany(db: Db, c: Company): void {
          c.h1bLastSeen ?? null, new Date().toISOString());
 }
 
+export function getCompany(db: Db, id: string): Company | null {
+  const r = db.prepare(`
+    SELECT id, name, ats, ats_org_slug AS atsOrgSlug,
+           h1b_confidence AS h1bConfidence, h1b_last_seen AS h1bLastSeen
+    FROM company WHERE id = ?
+  `).get(id) as Company | undefined;
+  return r ?? null;
+}
+
 export function listCompaniesByAts(db: Db, ats: Company['ats']): Company[] {
   return (db.prepare(`
     SELECT id, name, ats, ats_org_slug AS atsOrgSlug,

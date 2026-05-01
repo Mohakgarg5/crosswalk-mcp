@@ -3,7 +3,7 @@ import type { Db } from '../store/db.ts';
 import { getJob } from '../store/job.ts';
 import { listResumes, getResume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
-import { listAllCompanies } from '../store/company.ts';
+import { getCompany } from '../store/company.ts';
 import { createApplication } from '../store/application.ts';
 import { pickBestResume } from './pickResume.ts';
 import { tailorResume } from './tailorResume.ts';
@@ -57,7 +57,7 @@ export async function buildApplication(
   if (!resume) throw new Error(`internal: lost resume ${chosenResumeId}`);
 
   const profile = getProfile(ctx.db);
-  const company = listAllCompanies(ctx.db).find(c => c.id === job.companyId);
+  const company = getCompany(ctx.db, job.companyId);
   const companyName = company?.name ?? 'this company';
 
   const tailored = await tailorResume({
