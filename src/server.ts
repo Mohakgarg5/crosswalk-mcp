@@ -12,6 +12,7 @@ import { seedRegistryIfEmpty } from './registryBoot.ts';
 import { SamplingClient } from './sampling/client.ts';
 import { toolDefinitions, type ToolCtx } from './tools/index.ts';
 import { listResources, readResource } from './resources/index.ts';
+import { pathToFileURL } from 'node:url';
 // Adapters self-register on import
 import './ats/greenhouse.ts';
 import './ats/lever.ts';
@@ -63,6 +64,6 @@ export async function main() {
   await server.connect(transport);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   void main();
 }

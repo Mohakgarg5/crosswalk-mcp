@@ -2,6 +2,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import * as os from 'node:os';
+import { pathToFileURL } from 'node:url';
 
 function defaultClaudeConfigPath(): string {
   if (process.platform === 'darwin') {
@@ -43,16 +44,40 @@ export async function installClaudeDesktop(opts: { configPath?: string } = {}): 
 
 async function main() {
   const cmd = process.argv[2];
+
+  if (cmd === undefined) {
+    // No args — act as the MCP server (this is what Claude Desktop spawns).
+    const { main: runServer } = await import('./server.ts');
+    await runServer();
+    return;
+  }
+
   if (cmd === 'install') {
     const { configPath } = await installClaudeDesktop();
     console.log(`✓ Installed crosswalk-mcp into Claude Desktop at:\n  ${configPath}\n`);
     console.log(`Restart Claude Desktop to activate. State will live in ${process.env.CROSSWALK_HOME ?? '~/.crosswalk/'}.`);
     return;
   }
-  console.log(`Usage:\n  crosswalk-mcp install   # add this MCP to Claude Desktop`);
-  process.exit(cmd ? 1 : 0);
+
+  if (cmd === '--version' || cmd === '-v') {
+    const { SERVER_VERSION } = await import('./server.ts');
+    console.log(SERVER_VERSION);
+    return;
+  }
+
+  if (cmd === '--help' || cmd === '-h') {
+    console.log(`Usage:
+  crosswalk-mcp                 # run as MCP server (used by Claude Desktop)
+  crosswalk-mcp install         # add to Claude Desktop config
+  crosswalk-mcp --version       # print version
+  crosswalk-mcp --help          # show this message`);
+    return;
+  }
+
+  console.error(`Unknown command: ${cmd}\nRun \`crosswalk-mcp --help\` for usage.`);
+  process.exit(1);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   void main();
 }
