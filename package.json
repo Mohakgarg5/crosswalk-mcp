@@ -9,7 +9,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "tsup src/server.ts src/cli.ts --format esm --dts --clean",
+    "build": "tsup src/server.ts src/cli.ts --format esm --clean",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
