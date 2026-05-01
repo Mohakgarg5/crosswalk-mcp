@@ -613,7 +613,7 @@ export function listResumes(db: Db): Resume[] {
   return (db.prepare(`
     SELECT id, label, source_path AS sourcePath, raw_text AS rawText,
            parsed_json, created_at AS createdAt
-    FROM resume ORDER BY created_at DESC
+    FROM resume ORDER BY created_at DESC, rowid DESC
   `).all() as Array<Resume & { parsed_json: string }>).map(r => ({
     id: r.id, label: r.label, sourcePath: r.sourcePath ?? undefined,
     rawText: r.rawText, parsed: JSON.parse(r.parsed_json) as Record<string, unknown>,
