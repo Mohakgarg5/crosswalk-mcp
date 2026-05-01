@@ -1,0 +1,24 @@
+{
+  "jobs": [
+    {
+      "id": 5523112004,
+      "title": "Product Manager, Payments",
+      "updated_at": "2026-04-25T12:00:00Z",
+      "location": { "name": "San Francisco, CA" },
+      "departments": [{ "name": "Product" }],
+      "offices": [{ "name": "San Francisco" }],
+      "absolute_url": "https://boards.greenhouse.io/stripe/jobs/5523112004",
+      "content": "<p>Help build the next generation of payments.</p>"
+    },
+    {
+      "id": 5523112005,
+      "title": "Senior Software Engineer, Connect",
+      "updated_at": "2026-04-20T12:00:00Z",
+      "location": { "name": "Remote, US" },
+      "departments": [{ "name": "Engineering" }],
+      "offices": [],
+      "absolute_url": "https://boards.greenhouse.io/stripe/jobs/5523112005",
+      "content": "<p>Stripe Connect is...</p>"
+    }
+  ]
+}
