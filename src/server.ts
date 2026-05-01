@@ -3,12 +3,15 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   ListToolsRequestSchema,
-  CallToolRequestSchema
+  CallToolRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { openDb } from './store/db.ts';
 import { seedRegistryIfEmpty } from './registryBoot.ts';
 import { SamplingClient } from './sampling/client.ts';
 import { toolDefinitions, type ToolCtx } from './tools/index.ts';
+import { listResources, readResource } from './resources/index.ts';
 // Adapters self-register on import
 import './ats/greenhouse.ts';
 import './ats/lever.ts';
@@ -40,6 +43,15 @@ export function bootstrap() {
     if (!def) throw new Error(`unknown tool: ${req.params.name}`);
     const result = await def.run(req.params.arguments ?? {}, ctx);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
+
+  server.setRequestHandler(ListResourcesRequestSchema, () => ({
+    resources: listResources()
+  }));
+
+  server.setRequestHandler(ReadResourceRequestSchema, async req => {
+    const out = await readResource(req.params.uri, { db });
+    return { contents: [{ uri: req.params.uri, mimeType: 'application/json', text: out.text }] };
   });
 
   return { db, server, sampling };
