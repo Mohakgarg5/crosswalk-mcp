@@ -1,0 +1,12 @@
+[
+  { "id": "stripe",        "name": "Stripe",        "ats": "greenhouse", "atsOrgSlug": "stripe" },
+  { "id": "airbnb",        "name": "Airbnb",        "ats": "greenhouse", "atsOrgSlug": "airbnb" },
+  { "id": "discord",       "name": "Discord",       "ats": "greenhouse", "atsOrgSlug": "discord" },
+  { "id": "anthropic",     "name": "Anthropic",     "ats": "greenhouse", "atsOrgSlug": "anthropic" },
+  { "id": "vercel",        "name": "Vercel",        "ats": "greenhouse", "atsOrgSlug": "vercel" },
+  { "id": "netflix",       "name": "Netflix",       "ats": "lever",      "atsOrgSlug": "netflix" },
+  { "id": "spotify",       "name": "Spotify",       "ats": "lever",      "atsOrgSlug": "spotify" },
+  { "id": "shopify",       "name": "Shopify",       "ats": "lever",      "atsOrgSlug": "shopify" },
+  { "id": "openai",        "name": "OpenAI",        "ats": "ashby",      "atsOrgSlug": "openai" },
+  { "id": "ramp",          "name": "Ramp",          "ats": "ashby",      "atsOrgSlug": "ramp" }
+]

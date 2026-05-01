@@ -1,0 +1,10 @@
+Mohak Garg
+Product Manager · Northwestern University
+
+EXPERIENCE
+Acme Corp — APM (2024–2025)
+  • Shipped feature X to 1M users.
+  • Led roadmap for vertical Y.
+
+SKILLS
+Python, SQL, Figma, Mixpanel

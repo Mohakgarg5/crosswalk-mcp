@@ -1,0 +1,18 @@
+[
+  {
+    "id": "abc-123",
+    "text": "Senior Backend Engineer",
+    "hostedUrl": "https://jobs.lever.co/netflix/abc-123",
+    "categories": { "team": "Engineering", "location": "Los Gatos, CA", "commitment": "Full-time" },
+    "createdAt": 1745539200000,
+    "descriptionPlain": "Join the Netflix backend team..."
+  },
+  {
+    "id": "def-456",
+    "text": "Staff Designer",
+    "hostedUrl": "https://jobs.lever.co/netflix/def-456",
+    "categories": { "team": "Design", "location": "Remote, US", "commitment": "Full-time" },
+    "createdAt": 1745366400000,
+    "descriptionPlain": "Design the future of streaming..."
+  }
+]

@@ -1,0 +1,25 @@
+{
+  "jobs": [
+    {
+      "id": "uuid-1",
+      "title": "Member of Technical Staff",
+      "departmentName": "Research",
+      "locationName": "San Francisco",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/openai/uuid-1",
+      "publishedDate": "2026-04-28T00:00:00Z",
+      "descriptionHtml": "<p>Push the frontier of AI research.</p>",
+      "compensationTierSummary": "$300K – $500K • USD"
+    },
+    {
+      "id": "uuid-2",
+      "title": "Software Engineer, Infra",
+      "departmentName": "Engineering",
+      "locationName": "Remote (US)",
+      "employmentType": "FullTime",
+      "jobUrl": "https://jobs.ashbyhq.com/openai/uuid-2",
+      "publishedDate": "2026-04-22T00:00:00Z",
+      "descriptionHtml": "<p>Scale our training infra.</p>"
+    }
+  ]
+}

@@ -613,7 +613,7 @@ export function listResumes(db: Db): Resume[] {
   return (db.prepare(`
     SELECT id, label, source_path AS sourcePath, raw_text AS rawText,
            parsed_json, created_at AS createdAt
-    FROM resume ORDER BY created_at DESC
+    FROM resume ORDER BY created_at DESC, rowid DESC
   `).all() as Array<Resume & { parsed_json: string }>).map(r => ({
     id: r.id, label: r.label, sourcePath: r.sourcePath ?? undefined,
     rawText: r.rawText, parsed: JSON.parse(r.parsed_json) as Record<string, unknown>,
@@ -1555,7 +1555,7 @@ describe('sampling/client', () => {
       createMessage: vi.fn().mockResolvedValue({
         content: { type: 'text', text: 'hello world' }
       })
-    } as unknown as Parameters<typeof SamplingClient>[0];
+    } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     const out = await c.complete({ prompt: 'say hi', maxTokens: 32 });
     expect(out).toBe('hello world');
@@ -1566,7 +1566,7 @@ describe('sampling/client', () => {
       createMessage: vi.fn().mockResolvedValue({
         content: { type: 'text', text: '```json\n{"score": 0.8}\n```' }
       })
-    } as unknown as Parameters<typeof SamplingClient>[0];
+    } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     const out = await c.completeJson<{ score: number }>({ prompt: 'score', maxTokens: 64 });
     expect(out.score).toBe(0.8);
@@ -1576,7 +1576,7 @@ describe('sampling/client', () => {
     const create = vi.fn()
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValue({ content: { type: 'text', text: 'ok' } });
-    const fakeServer = { createMessage: create } as unknown as Parameters<typeof SamplingClient>[0];
+    const fakeServer = { createMessage: create } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     expect(await c.complete({ prompt: 'x', maxTokens: 8 })).toBe('ok');
     expect(create).toHaveBeenCalledTimes(2);
@@ -1871,9 +1871,9 @@ export function bootstrap() {
   seedRegistryIfEmpty(db);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {}, resources: {}, sampling: {} } }
+    { capabilities: { tools: {}, resources: {} } } // `sampling` is a CLIENT capability in MCP; servers consume it via createMessage
   );
-  const sampling = new SamplingClient(server as unknown as ConstructorParameters<typeof SamplingClient>[0]);
+  const sampling = new SamplingClient(server as unknown as ConstructorConstructorParameters<typeof SamplingClient>[0]);
   return { db, server, sampling };
 }
 
@@ -2749,9 +2749,9 @@ export function bootstrap() {
   seedRegistryIfEmpty(db);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {}, resources: {}, sampling: {} } }
+    { capabilities: { tools: {}, resources: {} } } // `sampling` is a CLIENT capability in MCP; servers consume it via createMessage
   );
-  const sampling = new SamplingClient(server as unknown as ConstructorParameters<typeof SamplingClient>[0]);
+  const sampling = new SamplingClient(server as unknown as ConstructorConstructorParameters<typeof SamplingClient>[0]);
   const ctx: ToolCtx = { db, sampling };
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
