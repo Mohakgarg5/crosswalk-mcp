@@ -1,0 +1,31 @@
+{
+  "content": [
+    {
+      "id": "abc-123",
+      "name": "Staff Software Engineer",
+      "ref": "https://jobs.smartrecruiters.com/example/abc-123",
+      "releasedDate": "2026-04-26T00:00:00.000Z",
+      "location": { "city": "Berlin", "country": "de", "fullLocation": "Berlin, Germany" },
+      "department": { "label": "Engineering" },
+      "jobAd": {
+        "sections": {
+          "jobDescription": { "text": "Build distributed systems." },
+          "qualifications": { "text": "5+ years experience." }
+        }
+      }
+    },
+    {
+      "id": "def-456",
+      "name": "Remote Product Manager",
+      "ref": "https://jobs.smartrecruiters.com/example/def-456",
+      "releasedDate": "2026-04-22T00:00:00.000Z",
+      "location": { "city": "Remote", "country": "us", "fullLocation": "Remote (US)" },
+      "department": { "label": "Product" },
+      "jobAd": {
+        "sections": {
+          "jobDescription": { "text": "Drive PM strategy." }
+        }
+      }
+    }
+  ]
+}
