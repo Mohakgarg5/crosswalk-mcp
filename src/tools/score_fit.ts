@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Db } from '../store/db.ts';
-import { listJobs } from '../store/job.ts';
+import { getJob } from '../store/job.ts';
 import { listResumes, getResume, type Resume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
 import type { SamplingClient } from '../sampling/client.ts';
@@ -21,7 +21,7 @@ export async function scoreFit(
   input: z.infer<typeof scoreFitInput>,
   ctx: { db: Db; sampling: SamplingClient }
 ): Promise<{ score: number; topStrengths: string[]; topGaps: string[]; jobId: string; resumeId: string }> {
-  const job = listJobs(ctx.db, { limit: 5000 }).find(j => j.id === input.jobId);
+  const job = getJob(ctx.db, input.jobId);
   if (!job) throw new Error(`unknown job: ${input.jobId}`);
 
   let resume: Resume | null = null;

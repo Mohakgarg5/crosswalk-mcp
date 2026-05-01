@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Db } from '../store/db.ts';
-import { listJobs } from '../store/job.ts';
+import { getJob } from '../store/job.ts';
 import { listResumes, getResume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
 import type { SamplingClient } from '../sampling/client.ts';
@@ -23,7 +23,7 @@ export async function explainFit(
   input: z.infer<typeof explainFitInput>,
   ctx: { db: Db; sampling: SamplingClient }
 ): Promise<{ narrativeMd: string; jobId: string; resumeId: string }> {
-  const job = listJobs(ctx.db, { limit: 5000 }).find(j => j.id === input.jobId);
+  const job = getJob(ctx.db, input.jobId);
   if (!job) throw new Error(`unknown job: ${input.jobId}`);
 
   const resume = input.resumeId

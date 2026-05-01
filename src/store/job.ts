@@ -51,6 +51,27 @@ export function upsertJobs(db: Db, jobs: StoredJob[]): void {
   tx(jobs);
 }
 
+export function getJob(db: Db, id: string): StoredJob | null {
+  const r = db.prepare(`
+    SELECT id, company_id AS companyId, title, dept, location,
+           location_type AS locationType, salary_min AS salaryMin,
+           salary_max AS salaryMax, currency, description_md AS descriptionMd,
+           url, posted_at AS postedAt, raw_json
+    FROM job WHERE id = ?
+  `).get(id) as (StoredJob & { raw_json: string }) | undefined;
+  if (!r) return null;
+  return {
+    id: r.id, companyId: r.companyId, title: r.title,
+    dept: r.dept ?? undefined, location: r.location ?? undefined,
+    locationType: r.locationType ?? undefined,
+    salaryMin: r.salaryMin ?? undefined, salaryMax: r.salaryMax ?? undefined,
+    currency: r.currency ?? undefined,
+    descriptionMd: r.descriptionMd ?? undefined,
+    url: r.url, postedAt: r.postedAt ?? undefined,
+    raw: JSON.parse(r.raw_json) as Record<string, unknown>
+  };
+}
+
 export function listJobs(db: Db, f: JobFilters = {}): StoredJob[] {
   const where: string[] = [];
   const args: unknown[] = [];
