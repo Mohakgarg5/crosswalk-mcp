@@ -81,6 +81,11 @@ export function listDueWorkflows(db: Db): Workflow[] {
   return rows.map(rowToWorkflow);
 }
 
+export function deleteWorkflow(db: Db, id: string): boolean {
+  const result = db.prepare(`DELETE FROM workflow WHERE id = ?`).run(id);
+  return result.changes > 0;
+}
+
 export function recordWorkflowRun(
   db: Db,
   id: string,

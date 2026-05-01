@@ -21,7 +21,7 @@ describe('services/guardrail', () => {
     expect(out.allowed).toBe(true);
   });
 
-  it('blocks when weekly cap is reached', () => {
+  it('blocks when weekly cap is reached', async () => {
     // Use distinct jobIds so the duplicate check doesn't fire first.
     upsertJobs(db, Array.from({ length: WEEKLY_CAP }, (_, i) => ({
       id: `j${i}`, companyId: 'stripe', title: `J${i}`, url: 'https://x', raw: {}
@@ -31,6 +31,10 @@ describe('services/guardrail', () => {
         id: `a${i}`, jobId: `j${i}`, resumeId: 'r1',
         tailoredResumeMd: 'x', coverLetterMd: 'x', answerPack: {}, deepLink: 'https://x'
       });
+    }
+    const { updateApplicationStatus } = await import('../src/store/application.ts');
+    for (let i = 0; i < WEEKLY_CAP; i++) {
+      updateApplicationStatus(db, `a${i}`, 'submitted');
     }
     const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1' });
     expect(out.allowed).toBe(false);

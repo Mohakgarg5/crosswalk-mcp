@@ -16,6 +16,8 @@ import { addNote, addNoteInput } from './add_note.ts';
 import { listPipeline, listPipelineInput } from './list_pipeline.ts';
 import { scheduleWorkflow, scheduleWorkflowInput } from './schedule_workflow.ts';
 import { runWorkflow, runWorkflowInput } from './run_workflow.ts';
+import { listWorkflowsTool, listWorkflowsInput } from './list_workflows.ts';
+import { deleteWorkflowTool, deleteWorkflowInput } from './delete_workflow.ts';
 
 export type ToolCtx = { db: Db; sampling: SamplingClient };
 
@@ -110,5 +112,17 @@ export const toolDefinitions: ToolDef[] = [
     description: 'Manually run a previously scheduled workflow now.',
     inputSchema: zodToJsonSchema(runWorkflowInput),
     run: (i, c) => runWorkflow(runWorkflowInput.parse(i), c)
+  },
+  {
+    name: 'list_workflows',
+    description: 'List all scheduled workflows.',
+    inputSchema: zodToJsonSchema(listWorkflowsInput),
+    run: (i, c) => listWorkflowsTool(listWorkflowsInput.parse(i), c)
+  },
+  {
+    name: 'delete_workflow',
+    description: 'Delete a scheduled workflow by id.',
+    inputSchema: zodToJsonSchema(deleteWorkflowInput),
+    run: (i, c) => deleteWorkflowTool(deleteWorkflowInput.parse(i), c)
   }
 ];

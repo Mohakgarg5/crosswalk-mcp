@@ -36,6 +36,8 @@ Restart Claude Desktop. Then say:
 | `list_pipeline` | List your applications with company + job context, optionally filtered by status. |
 | `schedule_workflow` | Schedule a non-sampling recurring workflow (job-cache refresh, old-job pruning) via cron expression. |
 | `run_workflow` | Manually run a scheduled workflow now. |
+| `list_workflows` | List all scheduled workflows. |
+| `delete_workflow` | Delete a scheduled workflow by id. |
 
 ## Why it's different
 

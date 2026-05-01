@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest';
 
 describe('server tools registration', () => {
-  it('exports all 14 v1 tools', async () => {
+  it('exports all 16 v1 tools', async () => {
     const { toolDefinitions } = await import('../src/tools/index.ts');
     const names = toolDefinitions.map(t => t.name).sort();
     expect(names).toEqual([
-      'add_note', 'add_resume', 'draft_application', 'explain_fit',
-      'fetch_jobs', 'list_pipeline', 'list_resumes', 'run_workflow',
-      'schedule_workflow', 'score_fit', 'set_status',
-      'setup_profile', 'submit_application', 'tailor_resume'
+      'add_note', 'add_resume', 'delete_workflow', 'draft_application',
+      'explain_fit', 'fetch_jobs', 'list_pipeline', 'list_resumes',
+      'list_workflows', 'run_workflow', 'schedule_workflow', 'score_fit',
+      'set_status', 'setup_profile', 'submit_application', 'tailor_resume'
     ]);
   });
 

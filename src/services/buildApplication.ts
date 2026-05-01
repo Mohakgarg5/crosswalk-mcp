@@ -26,6 +26,7 @@ export type BuildApplicationResult = {
   answerPack: Record<string, string>;
   deepLink: string;
   pickedReason: string;
+  guardrailWarnings: string[];
 };
 
 export async function buildApplication(
@@ -43,6 +44,7 @@ export async function buildApplication(
     confirmLowFit: input.confirmLowFit
   });
   if (!guardrail.allowed) throw new Error(guardrail.reason);
+  const guardrailWarnings = guardrail.warnings;
 
   const { resumeId: chosenResumeId, resume, pickedReason } = await resolveResume({
     db: ctx.db, sampling: ctx.sampling,
@@ -90,6 +92,7 @@ export async function buildApplication(
     coverLetterMd: cover.coverLetterMd,
     answerPack,
     deepLink,
-    pickedReason
+    pickedReason,
+    guardrailWarnings
   };
 }

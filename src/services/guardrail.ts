@@ -20,7 +20,9 @@ export function checkGuardrail(db: Db, input: GuardrailInput): GuardrailResult {
   // 1. Weekly cap
   const cutoff = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString();
   const count = (db.prepare(
-    `SELECT COUNT(*) AS n FROM application WHERE created_at >= ?`
+    `SELECT COUNT(*) AS n FROM application
+     WHERE created_at >= ?
+       AND status IN ('submitted', 'interviewing', 'rejected', 'offer')`
   ).get(cutoff) as { n: number }).n;
   if (count >= WEEKLY_CAP) {
     return {
