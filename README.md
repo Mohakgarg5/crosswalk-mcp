@@ -18,7 +18,7 @@ Restart Claude Desktop. Then say:
 > *"Find PM roles at H-1B sponsors with 0.8+ confidence."*
 > *"Why am I a fit for the Stripe Payments PM role?"*
 
-## What it does (M2)
+## What it does (M3)
 
 | Tool | Purpose |
 |---|---|
@@ -29,7 +29,13 @@ Restart Claude Desktop. Then say:
 | `score_fit` | Numeric fit score + structured strengths/gaps. |
 | `explain_fit` | Markdown narrative — why fit, gap, positioning. |
 | `tailor_resume` | Edit your best base resume for a specific JD; returns markdown, DOCX, or print-ready HTML. |
-| `draft_application` | Build a complete application bundle (tailored resume + cover letter + deep link), persisted as a tracked draft. |
+| `draft_application` | Build a complete application bundle (tailored resume + cover letter + deep link), persisted as a tracked draft. Anti-spam guardrail enforces a weekly cap and refuses obvious duplicates. |
+| `submit_application` | Mark an application submitted after you click Apply in your browser. |
+| `set_status` | Update an application status (interviewing, rejected, offer, etc.). |
+| `add_note` | Append a free-text note to an application's event log. |
+| `list_pipeline` | List your applications with company + job context, optionally filtered by status. |
+| `schedule_workflow` | Schedule a non-sampling recurring workflow (job-cache refresh, old-job pruning) via cron expression. |
+| `run_workflow` | Manually run a scheduled workflow now. |
 
 ## Why it's different
 
@@ -42,12 +48,28 @@ Restart Claude Desktop. Then say:
 | Version | Headline |
 |---|---|
 | M1 | Discover + match + explain |
-| **M2 (this release)** | Tailor resume, draft cover letter, application "PR" bundle |
-| M3 | Pipeline tracker, anti-spam guardrail, scheduled workflows |
+| M2 | Tailor resume, draft cover letter, application "PR" bundle |
+| **M3 (this release)** | Pipeline tracker, anti-spam guardrail, scheduled workflows |
 | M4 | 7 more ATS adapters; registry to 200+ companies; install polish |
 | v2 | Autonomous apply via Playwright in a sandbox |
 
 See `docs/superpowers/specs/2026-04-30-crosswalk-design.md` for the full spec.
+
+## Scheduled workflows (optional)
+
+Crosswalk can run **non-sampling** workflows (job cache refresh, old-job pruning) on a schedule. These don't need the AI host to be running — Crosswalk pokes the ATS APIs directly.
+
+Schedule one in chat:
+
+> *"Schedule a workflow to refresh PM jobs at H-1B sponsors every Monday at 9 AM."*
+
+Then add a single line to your crontab to actually invoke them:
+
+```
+* * * * * /usr/local/bin/crosswalk-mcp run-scheduled >> ~/.crosswalk/scheduler.log 2>&1
+```
+
+Sampling-driven workflows (e.g., "tailor the top 3 fits") are a v2 feature — they need a live AI host.
 
 ## Development
 
