@@ -5,7 +5,11 @@ import type { SamplingClient } from '../sampling/client.ts';
 
 export const draftApplicationInput = z.object({
   jobId: z.string(),
-  resumeId: z.string().optional()
+  resumeId: z.string().optional(),
+  allowDuplicate: z.boolean().optional()
+    .describe('Override duplicate-application refusal.'),
+  confirmLowFit: z.boolean().optional()
+    .describe('Reserved: override low-fit refusal (M4).')
 });
 
 export type DraftApplicationInput = z.infer<typeof draftApplicationInput>;

@@ -7,11 +7,14 @@ import { createApplication } from '../store/application.ts';
 import { resolveResume } from './resolveResume.ts';
 import { tailorResume } from './tailorResume.ts';
 import { draftCoverLetter } from './coverLetter.ts';
+import { checkGuardrail } from './guardrail.ts';
 import type { SamplingClient } from '../sampling/client.ts';
 
 export type BuildApplicationInput = {
   jobId: string;
   resumeId?: string;
+  allowDuplicate?: boolean;
+  confirmLowFit?: boolean;
 };
 
 export type BuildApplicationResult = {
@@ -31,6 +34,15 @@ export async function buildApplication(
 ): Promise<BuildApplicationResult> {
   const job = getJob(ctx.db, input.jobId);
   if (!job) throw new Error(`unknown job: ${input.jobId}`);
+
+  // Guardrail: check before any sampling cost.
+  const guardrail = checkGuardrail(ctx.db, {
+    jobId: input.jobId,
+    resumeId: input.resumeId ?? '',
+    allowDuplicate: input.allowDuplicate,
+    confirmLowFit: input.confirmLowFit
+  });
+  if (!guardrail.allowed) throw new Error(guardrail.reason);
 
   const { resumeId: chosenResumeId, resume, pickedReason } = await resolveResume({
     db: ctx.db, sampling: ctx.sampling,
