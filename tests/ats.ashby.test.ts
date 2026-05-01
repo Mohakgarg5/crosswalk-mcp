@@ -22,4 +22,15 @@ describe('ats/ashby', () => {
     expect(jobs[0].salaryMax).toBe(500000);
     expect(jobs[1].locationType).toBe('remote');
   });
+
+  it('filters by sinceDays', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => fixture
+    }));
+    // Ashby fixture: 2026-04-28 and 2026-04-22. System date 2026-04-30.
+    const wide = await ashby.listJobs('openai', { sinceDays: 30 });
+    expect(wide).toHaveLength(2);
+    const narrow = await ashby.listJobs('openai', { sinceDays: 5 });
+    expect(narrow).toHaveLength(1);
+  });
 });

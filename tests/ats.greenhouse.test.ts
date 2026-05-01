@@ -26,4 +26,16 @@ describe('ats/greenhouse', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
     await expect(greenhouse.listJobs('nope')).rejects.toThrow(/404/);
   });
+
+  it('filters by sinceDays', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => fixture
+    }));
+    // Fixture timestamps: 2026-04-25 and 2026-04-20.
+    // System date is 2026-04-30; sinceDays=14 includes both, sinceDays=3 excludes both.
+    const recent = await greenhouse.listJobs('stripe', { sinceDays: 14 });
+    expect(recent).toHaveLength(2);
+    const veryRecent = await greenhouse.listJobs('stripe', { sinceDays: 3 });
+    expect(veryRecent).toHaveLength(0);
+  });
 });

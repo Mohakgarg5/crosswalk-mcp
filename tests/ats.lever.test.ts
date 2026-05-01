@@ -20,4 +20,15 @@ describe('ats/lever', () => {
     });
     expect(jobs[1].locationType).toBe('remote');
   });
+
+  it('filters by sinceDays', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, status: 200, json: async () => fixture
+    }));
+    // Lever fixture epochs are 2025; very old by current 2026 system date.
+    const wide = await lever.listJobs('netflix', { sinceDays: 1000 });
+    expect(wide).toHaveLength(2);
+    const narrow = await lever.listJobs('netflix', { sinceDays: 30 });
+    expect(narrow).toHaveLength(0);
+  });
 });
