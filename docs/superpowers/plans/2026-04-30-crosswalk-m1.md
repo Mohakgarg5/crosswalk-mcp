@@ -1871,7 +1871,7 @@ export function bootstrap() {
   seedRegistryIfEmpty(db);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {}, resources: {}, sampling: {} } }
+    { capabilities: { tools: {}, resources: {} } } // `sampling` is a CLIENT capability in MCP; servers consume it via createMessage
   );
   const sampling = new SamplingClient(server as unknown as ConstructorConstructorParameters<typeof SamplingClient>[0]);
   return { db, server, sampling };
@@ -2749,7 +2749,7 @@ export function bootstrap() {
   seedRegistryIfEmpty(db);
   const server = new Server(
     { name: SERVER_NAME, version: SERVER_VERSION },
-    { capabilities: { tools: {}, resources: {}, sampling: {} } }
+    { capabilities: { tools: {}, resources: {} } } // `sampling` is a CLIENT capability in MCP; servers consume it via createMessage
   );
   const sampling = new SamplingClient(server as unknown as ConstructorConstructorParameters<typeof SamplingClient>[0]);
   const ctx: ToolCtx = { db, sampling };
