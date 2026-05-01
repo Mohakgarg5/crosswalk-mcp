@@ -8,6 +8,8 @@ import { listResumesTool, listResumesInput } from './list_resumes.ts';
 import { fetchJobs, fetchJobsInput } from './fetch_jobs.ts';
 import { scoreFit, scoreFitInput } from './score_fit.ts';
 import { explainFit, explainFitInput } from './explain_fit.ts';
+import { tailorResumeTool, tailorResumeInput } from './tailor_resume.ts';
+import { draftApplication, draftApplicationInput } from './draft_application.ts';
 
 export type ToolCtx = { db: Db; sampling: SamplingClient };
 
@@ -54,5 +56,17 @@ export const toolDefinitions: ToolDef[] = [
     description: 'Produce a markdown narrative explaining fit, strengths, gaps, and positioning.',
     inputSchema: zodToJsonSchema(explainFitInput),
     run: (i, c) => explainFit(explainFitInput.parse(i), c)
+  },
+  {
+    name: 'tailor_resume',
+    description: 'Tailor your stored resume for a specific job. Returns markdown by default; optional DOCX (base64) or print-ready HTML on request.',
+    inputSchema: zodToJsonSchema(tailorResumeInput),
+    run: (i, c) => tailorResumeTool(tailorResumeInput.parse(i), c)
+  },
+  {
+    name: 'draft_application',
+    description: 'Build a full application "PR" — tailored resume + cover letter + deep link to the form — and persist it. Returns the application id and bundle.',
+    inputSchema: zodToJsonSchema(draftApplicationInput),
+    run: (i, c) => draftApplication(draftApplicationInput.parse(i), c)
   }
 ];

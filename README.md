@@ -18,7 +18,7 @@ Restart Claude Desktop. Then say:
 > *"Find PM roles at H-1B sponsors with 0.8+ confidence."*
 > *"Why am I a fit for the Stripe Payments PM role?"*
 
-## What it does (M1)
+## What it does (M2)
 
 | Tool | Purpose |
 |---|---|
@@ -28,6 +28,8 @@ Restart Claude Desktop. Then say:
 | `fetch_jobs` | Pull live roles from Greenhouse, Lever, and Ashby. |
 | `score_fit` | Numeric fit score + structured strengths/gaps. |
 | `explain_fit` | Markdown narrative — why fit, gap, positioning. |
+| `tailor_resume` | Edit your best base resume for a specific JD; returns markdown, DOCX, or print-ready HTML. |
+| `draft_application` | Build a complete application bundle (tailored resume + cover letter + deep link), persisted as a tracked draft. |
 
 ## Why it's different
 
@@ -39,8 +41,8 @@ Restart Claude Desktop. Then say:
 
 | Version | Headline |
 |---|---|
-| **M1 (this release)** | Discover + match + explain |
-| M2 | Tailor resume, draft cover letter, application "PR" bundle |
+| M1 | Discover + match + explain |
+| **M2 (this release)** | Tailor resume, draft cover letter, application "PR" bundle |
 | M3 | Pipeline tracker, anti-spam guardrail, scheduled workflows |
 | M4 | 7 more ATS adapters; registry to 200+ companies; install polish |
 | v2 | Autonomous apply via Playwright in a sandbox |
