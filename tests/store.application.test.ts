@@ -4,7 +4,8 @@ import { upsertCompany } from '../src/store/company.ts';
 import { upsertJobs } from '../src/store/job.ts';
 import { addResume } from '../src/store/resume.ts';
 import {
-  createApplication, getApplication, listApplications
+  createApplication, getApplication, listApplications,
+  updateApplicationStatus, addEventForApplication, listEventsForApplication
 } from '../src/store/application.ts';
 
 describe('store/application', () => {
@@ -47,5 +48,62 @@ describe('store/application', () => {
 
   it('returns null for unknown id', () => {
     expect(getApplication(db, 'nope')).toBeNull();
+  });
+
+  it('updates status and stamps submitted_at when status becomes submitted', () => {
+    createApplication(db, {
+      id: 'a1', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: '# r', coverLetterMd: 'Hello',
+      answerPack: {}, deepLink: 'https://x'
+    });
+    updateApplicationStatus(db, 'a1', 'submitted');
+    const app = getApplication(db, 'a1');
+    expect(app?.status).toBe('submitted');
+    expect(app?.submittedAt).toBeTypeOf('string');
+  });
+
+  it('updates status without stamping submitted_at for non-submitted statuses', () => {
+    createApplication(db, {
+      id: 'a1', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: '# r', coverLetterMd: 'Hello',
+      answerPack: {}, deepLink: 'https://x'
+    });
+    updateApplicationStatus(db, 'a1', 'rejected');
+    const app = getApplication(db, 'a1');
+    expect(app?.status).toBe('rejected');
+    expect(app?.submittedAt).toBeUndefined();
+  });
+
+  it('throws when updating status of unknown application', () => {
+    expect(() => updateApplicationStatus(db, 'nope', 'submitted')).toThrow(/unknown application/);
+  });
+
+  it('appends events and lists them in order', () => {
+    createApplication(db, {
+      id: 'a1', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: '# r', coverLetterMd: 'Hello',
+      answerPack: {}, deepLink: 'https://x'
+    });
+    addEventForApplication(db, 'a1', 'note', { text: 'first note' });
+    addEventForApplication(db, 'a1', 'status_changed', { from: 'draft', to: 'submitted' });
+    const events = listEventsForApplication(db, 'a1');
+    expect(events).toHaveLength(2);
+    expect(events[0].kind).toBe('note');
+    expect(events[0].payload).toEqual({ text: 'first note' });
+    expect(events[1].kind).toBe('status_changed');
+  });
+
+  it('filters listApplications by status', () => {
+    createApplication(db, {
+      id: 'a', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: 'a', coverLetterMd: 'a', answerPack: {}, deepLink: 'https://x'
+    });
+    createApplication(db, {
+      id: 'b', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: 'b', coverLetterMd: 'b', answerPack: {}, deepLink: 'https://x'
+    });
+    updateApplicationStatus(db, 'b', 'submitted');
+    expect(listApplications(db, { status: 'submitted' }).map(a => a.id)).toEqual(['b']);
+    expect(listApplications(db, { status: 'draft' }).map(a => a.id)).toEqual(['a']);
   });
 });
