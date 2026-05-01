@@ -1,4 +1,5 @@
 import type { SamplingClient } from '../sampling/client.ts';
+import { JD_CHARS_LETTER } from './constants.ts';
 
 export type CoverLetterArgs = {
   job: { title: string; companyName: string; description: string };
@@ -29,7 +30,7 @@ export async function draftCoverLetter(args: CoverLetterArgs): Promise<CoverLett
     job: {
       title: args.job.title,
       company: args.job.companyName,
-      description: args.job.description.slice(0, 6000)
+      description: args.job.description.slice(0, JD_CHARS_LETTER)
     },
     profile: args.profile,
     tailored_resume_md: args.tailoredResumeMd

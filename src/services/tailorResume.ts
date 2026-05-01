@@ -1,4 +1,5 @@
 import type { SamplingClient } from '../sampling/client.ts';
+import { JD_CHARS_TAILOR, RESUME_RAW_CHARS } from './constants.ts';
 
 export type TailorResumeArgs = {
   job: { title: string; description: string };
@@ -24,11 +25,11 @@ Return ONLY the markdown. No preamble, no postscript, no code fences.`;
 
 export async function tailorResume(args: TailorResumeArgs): Promise<TailorResumeResult> {
   const prompt = JSON.stringify({
-    job: { title: args.job.title, description: args.job.description.slice(0, 6000) },
+    job: { title: args.job.title, description: args.job.description.slice(0, JD_CHARS_TAILOR) },
     profile: args.profile,
     base_resume: {
       label: args.resume.label,
-      raw_text: args.resume.rawText.slice(0, 8000),
+      raw_text: args.resume.rawText.slice(0, RESUME_RAW_CHARS),
       parsed: args.resume.parsed
     }
   });

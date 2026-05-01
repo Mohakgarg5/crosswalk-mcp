@@ -1,4 +1,5 @@
 import type { SamplingClient } from '../sampling/client.ts';
+import { JD_CHARS_PICKER } from './constants.ts';
 
 export type PickResumeJobCtx = {
   jobTitle: string;
@@ -34,7 +35,7 @@ export async function pickBestResume(
   }
 
   const prompt = JSON.stringify({
-    job: { title: job.jobTitle, description: job.jobDescription.slice(0, 4000) },
+    job: { title: job.jobTitle, description: job.jobDescription.slice(0, JD_CHARS_PICKER) },
     resumes: resumes.map(r => ({ id: r.id, label: r.label, parsed: r.parsed }))
   });
 
