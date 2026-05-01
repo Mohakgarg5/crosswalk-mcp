@@ -87,6 +87,26 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_application_event_at ON application_event(at);
     `
   }
+  ,
+  {
+    id: 3,
+    name: 'workflow',
+    sql: `
+      CREATE TABLE workflow (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        description TEXT NOT NULL,
+        cron TEXT NOT NULL,
+        params_json TEXT NOT NULL,
+        last_run_at TEXT,
+        next_run_at TEXT NOT NULL,
+        last_status TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_workflow_next_run ON workflow(next_run_at);
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {
