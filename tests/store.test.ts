@@ -12,14 +12,21 @@ describe('store/db', () => {
     expect(names).toContain('resume');
     expect(names).toContain('company');
     expect(names).toContain('job');
+    expect(names).toContain('application');
+    expect(names).toContain('application_event');
     expect(names).toContain('migrations');
   });
 
   it('is idempotent across repeat openings', () => {
     const db1 = openDb(':memory:');
     const db2 = openDb(':memory:');
-    // No throw on either call
     expect(db1).toBeDefined();
     expect(db2).toBeDefined();
+  });
+
+  it('applied two migrations', () => {
+    const db = openDb(':memory:');
+    const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
+    expect(ids).toEqual([1, 2]);
   });
 });

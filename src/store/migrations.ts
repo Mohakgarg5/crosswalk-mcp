@@ -53,6 +53,39 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_job_company ON job(company_id);
       CREATE INDEX idx_job_last_seen ON job(last_seen_at);
     `
+  },
+  {
+    id: 2,
+    name: 'application',
+    sql: `
+      CREATE TABLE application (
+        id TEXT PRIMARY KEY,
+        job_id TEXT NOT NULL REFERENCES job(id),
+        resume_id TEXT NOT NULL REFERENCES resume(id),
+        status TEXT NOT NULL DEFAULT 'draft',
+        fit_score REAL,
+        fit_narrative_md TEXT,
+        tailored_resume_md TEXT NOT NULL,
+        cover_letter_md TEXT NOT NULL,
+        answer_pack_json TEXT NOT NULL,
+        deep_link TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        submitted_at TEXT
+      );
+      CREATE INDEX idx_application_job ON application(job_id);
+      CREATE INDEX idx_application_status ON application(status);
+      CREATE INDEX idx_application_created ON application(created_at);
+
+      CREATE TABLE application_event (
+        id TEXT PRIMARY KEY,
+        application_id TEXT NOT NULL REFERENCES application(id),
+        kind TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        at TEXT NOT NULL
+      );
+      CREATE INDEX idx_application_event_app ON application_event(application_id);
+      CREATE INDEX idx_application_event_at ON application_event(at);
+    `
   }
 ];
 
