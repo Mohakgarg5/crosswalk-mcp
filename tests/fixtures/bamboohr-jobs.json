@@ -1,0 +1,26 @@
+{
+  "result": [
+    {
+      "id": 101,
+      "jobOpeningName": "Marketing Manager",
+      "departmentLabel": "Marketing",
+      "jobOpeningStatus": "Open",
+      "location": { "city": "Salt Lake City", "state": "Utah", "addressCountry": "United States" },
+      "employmentStatusLabel": "Full-Time",
+      "datePosted": "2026-04-23",
+      "jobDescription": "Lead our marketing strategy.",
+      "hash": "abc123"
+    },
+    {
+      "id": 102,
+      "jobOpeningName": "Software Engineer",
+      "departmentLabel": "Engineering",
+      "jobOpeningStatus": "Open",
+      "location": { "city": "Remote", "state": "", "addressCountry": "United States" },
+      "employmentStatusLabel": "Full-Time",
+      "datePosted": "2026-04-21",
+      "jobDescription": "Build internal tools.",
+      "hash": "def456"
+    }
+  ]
+}
