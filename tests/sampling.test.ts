@@ -7,7 +7,7 @@ describe('sampling/client', () => {
       createMessage: vi.fn().mockResolvedValue({
         content: { type: 'text', text: 'hello world' }
       })
-    } as unknown as Parameters<typeof SamplingClient>[0];
+    } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     const out = await c.complete({ prompt: 'say hi', maxTokens: 32 });
     expect(out).toBe('hello world');
@@ -18,7 +18,7 @@ describe('sampling/client', () => {
       createMessage: vi.fn().mockResolvedValue({
         content: { type: 'text', text: '```json\n{"score": 0.8}\n```' }
       })
-    } as unknown as Parameters<typeof SamplingClient>[0];
+    } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     const out = await c.completeJson<{ score: number }>({ prompt: 'score', maxTokens: 64 });
     expect(out.score).toBe(0.8);
@@ -28,7 +28,7 @@ describe('sampling/client', () => {
     const create = vi.fn()
       .mockRejectedValueOnce(new Error('timeout'))
       .mockResolvedValue({ content: { type: 'text', text: 'ok' } });
-    const fakeServer = { createMessage: create } as unknown as Parameters<typeof SamplingClient>[0];
+    const fakeServer = { createMessage: create } as unknown as ConstructorParameters<typeof SamplingClient>[0];
     const c = new SamplingClient(fakeServer);
     expect(await c.complete({ prompt: 'x', maxTokens: 8 })).toBe('ok');
     expect(create).toHaveBeenCalledTimes(2);
