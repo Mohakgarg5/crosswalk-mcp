@@ -56,4 +56,43 @@ describe('services/buildApplication', () => {
     await expect(buildApplication({ jobId: 'g:stripe:1' }, { db: empty, sampling }))
       .rejects.toThrow(/no resumes/);
   });
+
+  it('refuses when guardrail blocks (duplicate)', async () => {
+    const { createApplication } = await import('../src/store/application.ts');
+    createApplication(db, {
+      id: 'pre', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: 'x', coverLetterMd: 'x', answerPack: {}, deepLink: 'https://x'
+    });
+
+    const sampling = {
+      complete: vi.fn(),
+      completeJson: vi.fn()
+    } as unknown as SamplingClient;
+
+    await expect(
+      buildApplication({ jobId: 'g:stripe:1' }, { db, sampling })
+    ).rejects.toThrow(/already.*application/i);
+    expect(sampling.complete).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when allowDuplicate=true', async () => {
+    const { createApplication } = await import('../src/store/application.ts');
+    createApplication(db, {
+      id: 'pre', jobId: 'g:stripe:1', resumeId: 'r1',
+      tailoredResumeMd: 'x', coverLetterMd: 'x', answerPack: {}, deepLink: 'https://x'
+    });
+
+    const sampling = {
+      complete: vi.fn()
+        .mockResolvedValueOnce('# Mohak\n\n- PM')
+        .mockResolvedValueOnce('Dear hiring manager...'),
+      completeJson: vi.fn()
+    } as unknown as SamplingClient;
+
+    const out = await buildApplication(
+      { jobId: 'g:stripe:1', allowDuplicate: true },
+      { db, sampling }
+    );
+    expect(out.applicationId).toBeTypeOf('string');
+  });
 });

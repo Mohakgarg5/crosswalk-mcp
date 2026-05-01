@@ -1,0 +1,35 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import { openDb } from '../src/store/db.ts';
+import { upsertCompany } from '../src/store/company.ts';
+import { upsertJobs, listJobs } from '../src/store/job.ts';
+import { runWorkflowKind } from '../src/services/workflowEngine.ts';
+
+describe('services/workflowEngine', () => {
+  let db: ReturnType<typeof openDb>;
+  beforeEach(() => {
+    db = openDb(':memory:');
+  });
+
+  it('runs prune_old_jobs and removes ancient jobs', async () => {
+    upsertCompany(db, { id: 'stripe', name: 'Stripe', ats: 'greenhouse', atsOrgSlug: 'stripe' });
+    upsertJobs(db, [
+      { id: 'old', companyId: 'stripe', title: 'old', url: 'https://x', raw: {},
+        postedAt: '2020-01-01T00:00:00Z' },
+      { id: 'new', companyId: 'stripe', title: 'new', url: 'https://y', raw: {},
+        postedAt: new Date().toISOString() }
+    ]);
+
+    // Manually backdate 'old' so its last_seen_at is also 2020.
+    db.prepare(`UPDATE job SET last_seen_at = '2020-01-01T00:00:00Z' WHERE id = 'old'`).run();
+
+    const out = await runWorkflowKind(db, 'prune_old_jobs', { olderThanDays: 30 });
+    expect(out.status).toBe('ok');
+    expect(listJobs(db).map(j => j.id).sort()).toEqual(['new']);
+  });
+
+  it('returns error for unknown workflow kind', async () => {
+    const out = await runWorkflowKind(db, 'unknown' as never, {});
+    expect(out.status).toBe('error');
+    expect(out.error).toMatch(/unknown.*workflow.*kind/i);
+  });
+});

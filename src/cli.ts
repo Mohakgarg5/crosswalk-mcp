@@ -69,8 +69,33 @@ async function main() {
     console.log(`Usage:
   crosswalk-mcp                 # run as MCP server (used by Claude Desktop)
   crosswalk-mcp install         # add to Claude Desktop config
+  crosswalk-mcp run-scheduled   # run any workflows whose next_run_at has passed
   crosswalk-mcp --version       # print version
   crosswalk-mcp --help          # show this message`);
+    return;
+  }
+
+  if (cmd === 'run-scheduled') {
+    const { openDb } = await import('./store/db.ts');
+    const { listDueWorkflows, recordWorkflowRun } = await import('./store/workflow.ts');
+    const { runWorkflowKind } = await import('./services/workflowEngine.ts');
+    const { CronExpressionParser } = await import('cron-parser');
+    const db = openDb();
+    const due = listDueWorkflows(db);
+    if (due.length === 0) {
+      console.log('No workflows due.');
+      return;
+    }
+    for (const wf of due) {
+      const result = await runWorkflowKind(db, wf.kind, wf.params);
+      const interval = CronExpressionParser.parse(wf.cron, { currentDate: new Date() });
+      const nextRunAt = interval.next().toDate().toISOString();
+      recordWorkflowRun(db, wf.id, { status: result.status, error: result.error, nextRunAt });
+      console.log(
+        `[${result.status}] ${wf.id} (${wf.kind}) — next run ${nextRunAt}` +
+        (result.error ? ` (error: ${result.error})` : '')
+      );
+    }
     return;
   }
 

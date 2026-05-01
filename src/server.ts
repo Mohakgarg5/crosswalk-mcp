@@ -19,7 +19,7 @@ import './ats/lever.ts';
 import './ats/ashby.ts';
 
 export const SERVER_NAME = 'crosswalk-mcp';
-export const SERVER_VERSION = '0.0.1';
+export const SERVER_VERSION = '0.2.0';
 
 export function bootstrap() {
   const db = openDb();
