@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<workzag-jobs>
+  <position>
+    <id>1001</id>
+    <name>Backend Engineer</name>
+    <departmentExternalName>Engineering</departmentExternalName>
+    <office>Munich</office>
+    <employmentType>permanent</employmentType>
+    <createdAt>2026-04-25T00:00:00+02:00</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name>Your Tasks</name>
+        <value><![CDATA[Build APIs and services.]]></value>
+      </jobDescription>
+      <jobDescription>
+        <name>Your Profile</name>
+        <value><![CDATA[3+ years backend experience.]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+  <position>
+    <id>1002</id>
+    <name>Remote Designer</name>
+    <departmentExternalName>Design</departmentExternalName>
+    <office>Remote</office>
+    <employmentType>permanent</employmentType>
+    <createdAt>2026-04-21T00:00:00+02:00</createdAt>
+    <jobDescriptions>
+      <jobDescription>
+        <name>About</name>
+        <value><![CDATA[Design for our EU customers.]]></value>
+      </jobDescription>
+    </jobDescriptions>
+  </position>
+</workzag-jobs>

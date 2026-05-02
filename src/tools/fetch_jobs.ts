@@ -8,6 +8,11 @@ import type { NormalizedJob } from '../ats/types.ts';
 import '../ats/greenhouse.ts';
 import '../ats/lever.ts';
 import '../ats/ashby.ts';
+import '../ats/workable.ts';
+import '../ats/smartrecruiters.ts';
+import '../ats/bamboohr.ts';
+import '../ats/recruitee.ts';
+import '../ats/personio.ts';
 
 export const fetchJobsInput = z.object({
   titleContains: z.string().optional(),

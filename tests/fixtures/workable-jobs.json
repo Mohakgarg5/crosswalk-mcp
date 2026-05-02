@@ -1,0 +1,28 @@
+{
+  "results": [
+    {
+      "shortcode": "ABC123",
+      "title": "Senior Product Manager",
+      "full_title": "Senior Product Manager - Payments",
+      "description": "<p>Lead the payments roadmap.</p>",
+      "requirements": "<p>5+ years PM experience.</p>",
+      "location": { "city": "San Francisco", "country": "United States" },
+      "employment_type": "Full-time",
+      "department": "Product",
+      "application_url": "https://apply.workable.com/example/j/ABC123",
+      "published_on": "2026-04-25"
+    },
+    {
+      "shortcode": "DEF456",
+      "title": "Backend Engineer",
+      "full_title": "Backend Engineer (Remote)",
+      "description": "<p>Scale our APIs.</p>",
+      "requirements": "<p>Go or Node experience.</p>",
+      "location": { "city": "Remote", "country": "United States" },
+      "employment_type": "Full-time",
+      "department": "Engineering",
+      "application_url": "https://apply.workable.com/example/j/DEF456",
+      "published_on": "2026-04-20"
+    }
+  ]
+}

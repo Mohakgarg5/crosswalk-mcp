@@ -18,14 +18,14 @@ Restart Claude Desktop. Then say:
 > *"Find PM roles at H-1B sponsors with 0.8+ confidence."*
 > *"Why am I a fit for the Stripe Payments PM role?"*
 
-## What it does (M3)
+## What it does (M4)
 
 | Tool | Purpose |
 |---|---|
 | `setup_profile` | Store a structured profile from a free-form description. |
 | `add_resume` | Parse and store a labeled resume version (DOCX/PDF/text). |
 | `list_resumes` | List stored resumes. |
-| `fetch_jobs` | Pull live roles from Greenhouse, Lever, and Ashby. |
+| `fetch_jobs` | Pull live roles from 8 ATSs: Greenhouse, Lever, Ashby, Workable, SmartRecruiters, BambooHR, Recruitee, Personio. |
 | `score_fit` | Numeric fit score + structured strengths/gaps. |
 | `explain_fit` | Markdown narrative — why fit, gap, positioning. |
 | `tailor_resume` | Edit your best base resume for a specific JD; returns markdown, DOCX, or print-ready HTML. |
@@ -39,6 +39,23 @@ Restart Claude Desktop. Then say:
 | `list_workflows` | List all scheduled workflows. |
 | `delete_workflow` | Delete a scheduled workflow by id. |
 
+### ATS coverage
+
+Crosswalk currently fetches live jobs from 8 ATSs. Each adapter is small (~50 lines) and lives in `src/ats/`. To add a company on a supported ATS, send a PR to `registry/companies.json`. The registry is MIT-licensed.
+
+| ATS | Coverage |
+|---|---|
+| Greenhouse | 15 orgs |
+| Lever | 8 orgs |
+| Ashby | 7 orgs |
+| Workable | 4 orgs |
+| SmartRecruiters | 4 orgs |
+| BambooHR | 4 orgs |
+| Recruitee | 4 orgs |
+| Personio | 4 orgs |
+
+Workday and iCIMS aren't supported in v0.3 — they don't expose public JSON endpoints. Coming in M5 via a Playwright-sandbox scraping framework.
+
 ## Why it's different
 
 1. **Zero API keys.** All AI work runs through MCP sampling — calling back into your AI client's model. No keys in this repo, no AI bill on us, no rate limits beyond yours.
@@ -51,8 +68,9 @@ Restart Claude Desktop. Then say:
 |---|---|
 | M1 | Discover + match + explain |
 | M2 | Tailor resume, draft cover letter, application "PR" bundle |
-| **M3 (this release)** | Pipeline tracker, anti-spam guardrail, scheduled workflows |
-| M4 | 7 more ATS adapters; registry to 200+ companies; install polish |
+| M3 | Pipeline tracker, anti-spam guardrail, scheduled workflows |
+| **M4 (this release)** | 5 more ATS adapters (8 total); 51-company registry; carry-over fixes |
+| M5 | Workday + iCIMS via Playwright sandbox; live-fit guardrail; registry to 200+ |
 | v2 | Autonomous apply via Playwright in a sandbox |
 
 See `docs/superpowers/specs/2026-04-30-crosswalk-design.md` for the full spec.

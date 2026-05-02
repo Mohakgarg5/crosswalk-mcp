@@ -1,0 +1,30 @@
+{
+  "offers": [
+    {
+      "id": 12345,
+      "slug": "senior-pm-eu",
+      "title": "Senior Product Manager",
+      "description": "<p>Lead product in EU.</p>",
+      "requirements": "<p>4+ years PM.</p>",
+      "location": "Amsterdam",
+      "city": "Amsterdam",
+      "country": "Netherlands",
+      "department": "Product",
+      "careers_url": "https://example.recruitee.com/o/senior-pm-eu",
+      "created_at": "2026-04-24T00:00:00.000Z"
+    },
+    {
+      "id": 67890,
+      "slug": "remote-engineer",
+      "title": "Senior Engineer (Remote)",
+      "description": "<p>Build EU infra.</p>",
+      "requirements": "<p>Backend experience.</p>",
+      "location": "Remote (EU)",
+      "city": "",
+      "country": "",
+      "department": "Engineering",
+      "careers_url": "https://example.recruitee.com/o/remote-engineer",
+      "created_at": "2026-04-19T00:00:00.000Z"
+    }
+  ]
+}

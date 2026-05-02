@@ -89,6 +89,8 @@ describe('store/application', () => {
     const events = listEventsForApplication(db, 'a1');
     expect(events).toHaveLength(2);
     expect(events[0].kind).toBe('note');
+    // UUID v4 format check (8-4-4-4-12 hex)
+    expect(events[0].id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(events[0].payload).toEqual({ text: 'first note' });
     expect(events[1].kind).toBe('status_changed');
   });

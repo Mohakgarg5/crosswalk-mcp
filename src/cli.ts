@@ -77,25 +77,26 @@ async function main() {
 
   if (cmd === 'run-scheduled') {
     const { openDb } = await import('./store/db.ts');
-    const { listDueWorkflows, recordWorkflowRun } = await import('./store/workflow.ts');
+    const { claimDueWorkflow, recordWorkflowRun } = await import('./store/workflow.ts');
     const { runWorkflowKind } = await import('./services/workflowEngine.ts');
     const { CronExpressionParser } = await import('cron-parser');
     const db = openDb();
-    const due = listDueWorkflows(db);
-    if (due.length === 0) {
-      console.log('No workflows due.');
-      return;
-    }
-    for (const wf of due) {
+
+    let ran = 0;
+    while (true) {
+      const wf = claimDueWorkflow(db);
+      if (!wf) break;
       const result = await runWorkflowKind(db, wf.kind, wf.params);
       const interval = CronExpressionParser.parse(wf.cron, { currentDate: new Date() });
       const nextRunAt = interval.next().toDate().toISOString();
       recordWorkflowRun(db, wf.id, { status: result.status, error: result.error, nextRunAt });
+      ran++;
       console.log(
         `[${result.status}] ${wf.id} (${wf.kind}) — next run ${nextRunAt}` +
         (result.error ? ` (error: ${result.error})` : '')
       );
     }
+    if (ran === 0) console.log('No workflows due.');
     return;
   }
 
