@@ -17,6 +17,11 @@ import { pathToFileURL } from 'node:url';
 import './ats/greenhouse.ts';
 import './ats/lever.ts';
 import './ats/ashby.ts';
+import './ats/workable.ts';
+import './ats/smartrecruiters.ts';
+import './ats/bamboohr.ts';
+import './ats/recruitee.ts';
+import './ats/personio.ts';
 
 export const SERVER_NAME = 'crosswalk-mcp';
 export const SERVER_VERSION = '0.2.0';
