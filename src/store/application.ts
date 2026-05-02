@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import type { Db } from './db.ts';
 
 export type Application = {
@@ -129,7 +130,7 @@ export function addEventForApplication(
   kind: string,
   payload: Record<string, unknown>
 ): ApplicationEvent {
-  const id = `evt_${Math.random().toString(36).slice(2, 12)}_${Date.now()}`;
+  const id = randomUUID();
   const at = new Date().toISOString();
   db.prepare(`
     INSERT INTO application_event (id, application_id, kind, payload_json, at)

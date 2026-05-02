@@ -32,4 +32,13 @@ describe('services/workflowEngine', () => {
     expect(out.status).toBe('error');
     expect(out.error).toMatch(/unknown.*workflow.*kind/i);
   });
+
+  it('returns descriptive error for invalid fetch_jobs_refresh params', async () => {
+    const out = await runWorkflowKind(db, 'fetch_jobs_refresh', {
+      // limit is bounded 1..200 in fetchJobsInput; 9999 fails the schema
+      limit: 9999
+    });
+    expect(out.status).toBe('error');
+    expect(out.error).toMatch(/limit/i);
+  });
 });
