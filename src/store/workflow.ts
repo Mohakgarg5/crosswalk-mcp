@@ -98,3 +98,28 @@ export function recordWorkflowRun(
     WHERE id = ?
   `).run(now, result.status, result.error ?? null, result.nextRunAt, id);
 }
+
+/**
+ * Atomically claim a single due workflow. Returns the claimed workflow
+ * or null if another process beat us to it (or none are due).
+ * The claimed workflow's next_run_at is bumped 1h into the future as a
+ * placeholder; the caller should call recordWorkflowRun() with the real
+ * next_run_at once the workflow finishes.
+ */
+export function claimDueWorkflow(db: Db): Workflow | null {
+  const now = new Date().toISOString();
+  const placeholder = new Date(Date.now() + 3600_000).toISOString();
+  return db.transaction(() => {
+    const row = db.prepare(
+      `${SELECT} WHERE next_run_at <= ? ORDER BY next_run_at ASC LIMIT 1`
+    ).get(now) as Row | undefined;
+    if (!row) return null;
+    const result = db.prepare(`
+      UPDATE workflow
+      SET next_run_at = ?
+      WHERE id = ? AND next_run_at = ?
+    `).run(placeholder, row.id, row.nextRunAt);
+    if (result.changes === 0) return null;  // someone else claimed it
+    return rowToWorkflow(row);
+  })();
+}
