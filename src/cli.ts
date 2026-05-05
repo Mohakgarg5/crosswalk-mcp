@@ -126,20 +126,22 @@ export type StatusReport = {
   jobs: number;
   applicationsByStatus: Record<string, number>;
   workflows: number;
-  installedInClaudeDesktop: boolean;
-  configPath: string;
+  installedHosts: Record<'claude' | 'cursor' | 'windsurf', boolean>;
+  configPaths: Record<'claude' | 'cursor' | 'windsurf', string>;
 };
 
-export async function runStatus(opts: { configPath?: string } = {}): Promise<StatusReport> {
+export async function runStatus(opts: {
+  configPaths?: Partial<Record<'claude' | 'cursor' | 'windsurf', string>>;
+} = {}): Promise<StatusReport> {
   const { paths } = await import('./config.ts');
   const { openDb } = await import('./store/db.ts');
   const { SERVER_VERSION } = await import('./server.ts');
+  const { listHostNames, hostConfigPath } = await import('./cli/hosts.ts');
 
   const stateDir = paths.stateDir();
   const dbFile = paths.dbFile();
 
   const db = openDb();
-
   const dbExists = existsSync(dbFile);
   const dbSizeBytes = dbExists ? statSync(dbFile).size : 0;
 
@@ -154,14 +156,21 @@ export async function runStatus(opts: { configPath?: string } = {}): Promise<Sta
   const applicationsByStatus: Record<string, number> = {};
   for (const r of statusRows) applicationsByStatus[r.status] = r.n;
 
-  const { hostConfigPath } = await import('./cli/hosts.ts');
-  const configPath = opts.configPath ?? hostConfigPath('claude');
-  let installedInClaudeDesktop = false;
-  try {
-    const json = JSON.parse(await fs.readFile(configPath, 'utf8')) as { mcpServers?: Record<string, unknown> };
-    installedInClaudeDesktop = Boolean(json.mcpServers && 'crosswalk-mcp' in json.mcpServers);
-  } catch {
-    installedInClaudeDesktop = false;
+  const installedHosts: Record<'claude' | 'cursor' | 'windsurf', boolean> = {
+    claude: false, cursor: false, windsurf: false
+  };
+  const configPaths: Record<'claude' | 'cursor' | 'windsurf', string> = {
+    claude: '', cursor: '', windsurf: ''
+  };
+  for (const host of listHostNames()) {
+    const cfgPath = opts.configPaths?.[host] ?? hostConfigPath(host);
+    configPaths[host] = cfgPath;
+    try {
+      const json = JSON.parse(await fs.readFile(cfgPath, 'utf8')) as { mcpServers?: Record<string, unknown> };
+      installedHosts[host] = Boolean(json.mcpServers && 'crosswalk-mcp' in json.mcpServers);
+    } catch {
+      installedHosts[host] = false;
+    }
   }
 
   return {
@@ -175,8 +184,8 @@ export async function runStatus(opts: { configPath?: string } = {}): Promise<Sta
     jobs: jobRow.n,
     applicationsByStatus,
     workflows: workflowRow.n,
-    installedInClaudeDesktop,
-    configPath
+    installedHosts,
+    configPaths
   };
 }
 
@@ -261,7 +270,11 @@ async function main() {
     console.log(`  jobs (cached): ${r.jobs}`);
     console.log(`  applications: ${Object.entries(r.applicationsByStatus).map(([s, n]) => `${s}=${n}`).join(', ') || '(none)'}`);
     console.log(`  workflows: ${r.workflows}`);
-    console.log(`Claude Desktop install: ${r.installedInClaudeDesktop ? '✓' : '(not installed — run `crosswalk-mcp install`)'}`);
+    console.log(`Hosts:`);
+    for (const host of ['claude', 'cursor', 'windsurf'] as const) {
+      const mark = r.installedHosts[host] ? '✓' : '·';
+      console.log(`  ${mark} ${host}: ${r.configPaths[host]}`);
+    }
     return;
   }
 
