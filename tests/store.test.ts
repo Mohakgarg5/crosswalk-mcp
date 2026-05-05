@@ -15,6 +15,7 @@ describe('store/db', () => {
     expect(names).toContain('application');
     expect(names).toContain('application_event');
     expect(names).toContain('workflow');
+    expect(names).toContain('fit_score_cache');
     expect(names).toContain('migrations');
   });
 
@@ -25,9 +26,9 @@ describe('store/db', () => {
     expect(db2).toBeDefined();
   });
 
-  it('applied three migrations', () => {
+  it('applied four migrations', () => {
     const db = openDb(':memory:');
     const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
-    expect(ids).toEqual([1, 2, 3]);
+    expect(ids).toEqual([1, 2, 3, 4]);
   });
 });

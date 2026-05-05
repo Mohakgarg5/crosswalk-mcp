@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -42,6 +43,89 @@ export async function installClaudeDesktop(opts: { configPath?: string } = {}): 
   return { configPath };
 }
 
+export async function uninstallClaudeDesktop(opts: { configPath?: string } = {}): Promise<{ configPath: string; removed: boolean }> {
+  const configPath = opts.configPath ?? defaultClaudeConfigPath();
+
+  let json: { mcpServers?: Record<string, unknown> };
+  try {
+    json = JSON.parse(await fs.readFile(configPath, 'utf8')) as typeof json;
+  } catch {
+    return { configPath, removed: false };
+  }
+
+  if (!json.mcpServers || !('crosswalk-mcp' in json.mcpServers)) {
+    return { configPath, removed: false };
+  }
+
+  delete json.mcpServers['crosswalk-mcp'];
+  await fs.writeFile(configPath, JSON.stringify(json, null, 2) + '\n', 'utf8');
+  return { configPath, removed: true };
+}
+
+export type StatusReport = {
+  version: string;
+  stateDir: string;
+  dbFile: string;
+  dbExists: boolean;
+  dbSizeBytes: number;
+  profile: boolean;
+  resumes: number;
+  jobs: number;
+  applicationsByStatus: Record<string, number>;
+  workflows: number;
+  installedInClaudeDesktop: boolean;
+  configPath: string;
+};
+
+export async function runStatus(opts: { configPath?: string } = {}): Promise<StatusReport> {
+  const { paths } = await import('./config.ts');
+  const { openDb } = await import('./store/db.ts');
+  const { SERVER_VERSION } = await import('./server.ts');
+
+  const stateDir = paths.stateDir();
+  const dbFile = paths.dbFile();
+
+  const db = openDb();
+
+  const dbExists = existsSync(dbFile);
+  const dbSizeBytes = dbExists ? statSync(dbFile).size : 0;
+
+  const profileRow = db.prepare(`SELECT COUNT(*) AS n FROM profile`).get() as { n: number };
+  const resumeRow = db.prepare(`SELECT COUNT(*) AS n FROM resume`).get() as { n: number };
+  const jobRow = db.prepare(`SELECT COUNT(*) AS n FROM job`).get() as { n: number };
+  const workflowRow = db.prepare(`SELECT COUNT(*) AS n FROM workflow`).get() as { n: number };
+
+  const statusRows = db.prepare(
+    `SELECT status, COUNT(*) AS n FROM application GROUP BY status`
+  ).all() as Array<{ status: string; n: number }>;
+  const applicationsByStatus: Record<string, number> = {};
+  for (const r of statusRows) applicationsByStatus[r.status] = r.n;
+
+  const configPath = opts.configPath ?? defaultClaudeConfigPath();
+  let installedInClaudeDesktop = false;
+  try {
+    const json = JSON.parse(await fs.readFile(configPath, 'utf8')) as { mcpServers?: Record<string, unknown> };
+    installedInClaudeDesktop = Boolean(json.mcpServers && 'crosswalk-mcp' in json.mcpServers);
+  } catch {
+    installedInClaudeDesktop = false;
+  }
+
+  return {
+    version: SERVER_VERSION,
+    stateDir,
+    dbFile,
+    dbExists,
+    dbSizeBytes,
+    profile: profileRow.n > 0,
+    resumes: resumeRow.n,
+    jobs: jobRow.n,
+    applicationsByStatus,
+    workflows: workflowRow.n,
+    installedInClaudeDesktop,
+    configPath
+  };
+}
+
 async function main() {
   const cmd = process.argv[2];
 
@@ -59,6 +143,44 @@ async function main() {
     return;
   }
 
+  if (cmd === 'uninstall') {
+    const purge = process.argv.includes('--purge');
+    const { configPath, removed } = await uninstallClaudeDesktop();
+    if (removed) {
+      console.log(`✓ Removed crosswalk-mcp from Claude Desktop at:\n  ${configPath}`);
+    } else {
+      console.log(`(Nothing to remove — crosswalk-mcp was not in ${configPath}.)`);
+    }
+    if (purge) {
+      const { paths } = await import('./config.ts');
+      const fsSync = await import('node:fs');
+      const stateDir = paths.stateDir();
+      try {
+        fsSync.rmSync(stateDir, { recursive: true, force: true });
+        console.log(`✓ Purged state at ${stateDir}`);
+      } catch (e) {
+        console.error(`(Failed to purge ${stateDir}: ${(e as Error).message})`);
+      }
+    } else {
+      console.log(`State at ${process.env.CROSSWALK_HOME ?? '~/.crosswalk/'} preserved. Pass --purge to delete.`);
+    }
+    return;
+  }
+
+  if (cmd === 'status') {
+    const r = await runStatus();
+    console.log(`Crosswalk v${r.version}`);
+    console.log(`State: ${r.stateDir}`);
+    console.log(`  db: ${r.dbExists ? `${r.dbFile} (${(r.dbSizeBytes / 1024).toFixed(1)} KB)` : '(not yet created)'}`);
+    console.log(`  profile: ${r.profile ? 'set' : 'unset'}`);
+    console.log(`  resumes: ${r.resumes}`);
+    console.log(`  jobs (cached): ${r.jobs}`);
+    console.log(`  applications: ${Object.entries(r.applicationsByStatus).map(([s, n]) => `${s}=${n}`).join(', ') || '(none)'}`);
+    console.log(`  workflows: ${r.workflows}`);
+    console.log(`Claude Desktop install: ${r.installedInClaudeDesktop ? '✓' : '(not installed — run `crosswalk-mcp install`)'}`);
+    return;
+  }
+
   if (cmd === '--version' || cmd === '-v') {
     const { SERVER_VERSION } = await import('./server.ts');
     console.log(SERVER_VERSION);
@@ -69,7 +191,10 @@ async function main() {
     console.log(`Usage:
   crosswalk-mcp                 # run as MCP server (used by Claude Desktop)
   crosswalk-mcp install         # add to Claude Desktop config
+  crosswalk-mcp uninstall       # remove from Claude Desktop config
+  crosswalk-mcp uninstall --purge  # also delete ~/.crosswalk/state.db
   crosswalk-mcp run-scheduled   # run any workflows whose next_run_at has passed
+  crosswalk-mcp status          # show installed state and counts
   crosswalk-mcp --version       # print version
   crosswalk-mcp --help          # show this message`);
     return;

@@ -8,8 +8,8 @@ Local-first. Zero API keys. Bring your own model.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-124%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Tests](https://img.shields.io/badge/tests-146%20passing-brightgreen.svg)](#development)
+[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -65,7 +65,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**16 MCP tools across 5 surfaces:**
+**16 MCP tools across 5 surfaces.** v0.4.0 adds the **live-fit guardrail gate** to `draft_application` and the `crosswalk-mcp uninstall` + `crosswalk-mcp status` CLI subcommands.
 
 ### Profile & resumes
 
@@ -88,7 +88,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 | Tool | What it does |
 |---|---|
 | `tailor_resume` | Edits your best base resume for a specific JD. Returns markdown by default; optional **DOCX** (base64) or **print-ready HTML** on request. |
-| `draft_application` | Builds a complete "application PR": tailored resume + cover letter + deep link, persisted. **Anti-spam guardrail** enforces a weekly cap and refuses obvious duplicates. |
+| `draft_application` | Builds a complete "application PR": tailored resume + cover letter + deep link, persisted. **Anti-spam guardrail** enforces a weekly cap, refuses obvious duplicates, and refuses drafts where cached fit < 0.50 (override with `confirmLowFit: true`). |
 
 ### Pipeline tracker
 
@@ -206,8 +206,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.0.1 — M1 | Discover + match + explain · 6 tools · 3 ATSs · 42 tests | Shipped |
 | v0.1.0 — M2 | Tailor resume + draft application · 8 tools · 68 tests | Shipped |
 | v0.2.0 — M3 | Pipeline tracker + anti-spam guardrail + scheduled workflows · 16 tools · 110 tests | Shipped |
-| **v0.3.0 — M4** | **5 more ATS adapters (8 total) · 51-company registry · M3 carry-overs · 124 tests** | **Current** |
-| v0.4.0 — M5 | Workday + iCIMS via Playwright sandbox · live-fit guardrail · registry to 200+ · install polish | Next |
+| v0.3.0 — M4 | 5 more ATS adapters (8 total) · 51-company registry · M3 carry-overs · 124 tests | Shipped |
+| **v0.4.0 — M5** | **Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests** | **Current** |
+| v0.5.0 — M6 | Workday + iCIMS via Playwright sandbox · Cursor/Windsurf installers · registry to 200+ | Next |
 | v1.0.0 — v2 | Autonomous apply via Playwright in a sandbox · full agent loop | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.

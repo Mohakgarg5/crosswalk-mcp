@@ -3,6 +3,7 @@ import type { Db } from '../store/db.ts';
 import { getJob } from '../store/job.ts';
 import { listResumes, getResume, type Resume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
+import { setCachedFit } from '../store/fitScoreCache.ts';
 import type { SamplingClient } from '../sampling/client.ts';
 
 export const scoreFitInput = z.object({
@@ -48,6 +49,14 @@ export async function scoreFit(
   const out = await ctx.sampling.completeJson<{
     score: number; top_strengths: string[]; top_gaps: string[];
   }>({ system: SYSTEM, prompt, maxTokens: 512 });
+
+  setCachedFit(ctx.db, {
+    jobId: input.jobId,
+    resumeId: resume.id,
+    score: out.score,
+    topStrengths: out.top_strengths,
+    topGaps: out.top_gaps
+  });
 
   return {
     score: out.score, topStrengths: out.top_strengths, topGaps: out.top_gaps,

@@ -38,4 +38,19 @@ describe('tools/score_fit', () => {
     const sampling = { completeJson: vi.fn() } as unknown as SamplingClient;
     await expect(scoreFit({ jobId: 'nope' }, { db, sampling })).rejects.toThrow(/unknown job/);
   });
+
+  it('persists the score to the fit_score_cache', async () => {
+    const sampling = {
+      completeJson: vi.fn().mockResolvedValue({
+        score: 0.82, top_strengths: ['payments domain'], top_gaps: ['no Kafka']
+      })
+    } as unknown as SamplingClient;
+    await scoreFit({ jobId: 'greenhouse:stripe:1' }, { db, sampling });
+
+    const { getCachedFit } = await import('../src/store/fitScoreCache.ts');
+    const cached = getCachedFit(db, 'greenhouse:stripe:1', 'r1');
+    expect(cached?.score).toBe(0.82);
+    expect(cached?.topStrengths).toEqual(['payments domain']);
+    expect(cached?.topGaps).toEqual(['no Kafka']);
+  });
 });

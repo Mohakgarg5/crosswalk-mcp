@@ -26,4 +26,29 @@ describe('tools/explain_fit', () => {
     expect(out.narrativeMd).toContain('Fit');
     expect(out.narrativeMd).toContain('Kafka');
   });
+
+  it('writes the narrative to fit_score_cache when a score row exists', async () => {
+    const { setCachedFit, getCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'greenhouse:stripe:1', resumeId: 'r1',
+      score: 0.82, topStrengths: [], topGaps: []
+    });
+
+    const sampling = {
+      complete: vi.fn().mockResolvedValue('## Fit\n\n82% fit. Strong on payments.')
+    } as unknown as SamplingClient;
+    await explainFit({ jobId: 'greenhouse:stripe:1' }, { db, sampling });
+
+    const cached = getCachedFit(db, 'greenhouse:stripe:1', 'r1');
+    expect(cached?.narrativeMd).toContain('Fit');
+  });
+
+  it('is a no-op on cache when no score row exists', async () => {
+    const { getCachedFit } = await import('../src/store/fitScoreCache.ts');
+    const sampling = {
+      complete: vi.fn().mockResolvedValue('## Fit\n\nbody')
+    } as unknown as SamplingClient;
+    await explainFit({ jobId: 'greenhouse:stripe:1' }, { db, sampling });
+    expect(getCachedFit(db, 'greenhouse:stripe:1', 'r1')).toBeNull();
+  });
 });
