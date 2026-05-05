@@ -26,6 +26,53 @@ export async function uninstallClaudeDesktop(opts: { configPath?: string } = {})
   return uninstallFromHost({ configPath });
 }
 
+export type RunInstallInput = {
+  client: 'claude' | 'cursor' | 'windsurf' | 'all';
+  configPaths?: Partial<Record<'claude' | 'cursor' | 'windsurf', string>>;
+};
+
+export type RunInstallResult = {
+  installed: string[];
+  skipped: string[];
+  paths: Record<string, string>;
+};
+
+export async function runInstall(input: RunInstallInput): Promise<RunInstallResult> {
+  const { listHostNames, hostConfigPath, isKnownHost } = await import('./cli/hosts.ts');
+  const { installToHost } = await import('./cli/installToHost.ts');
+
+  if (input.client !== 'all' && !isKnownHost(input.client)) {
+    throw new Error(`unknown client: ${input.client}`);
+  }
+
+  const targets = input.client === 'all' ? listHostNames() : [input.client];
+
+  const command = process.env.CROSSWALK_INSTALL_COMMAND ?? 'npx';
+  const args = process.env.CROSSWALK_INSTALL_COMMAND
+    ? []
+    : ['-y', 'crosswalk-mcp@latest'];
+  const env: Record<string, string> = process.env.CROSSWALK_HOME
+    ? { CROSSWALK_HOME: process.env.CROSSWALK_HOME }
+    : {};
+
+  const installed: string[] = [];
+  const skipped: string[] = [];
+  const paths: Record<string, string> = {};
+
+  for (const host of listHostNames()) {
+    const cfgPath = input.configPaths?.[host] ?? hostConfigPath(host);
+    paths[host] = cfgPath;
+    if (!targets.includes(host)) {
+      skipped.push(host);
+      continue;
+    }
+    await installToHost({ configPath: cfgPath, command, args, env });
+    installed.push(host);
+  }
+
+  return { installed, skipped, paths };
+}
+
 export type StatusReport = {
   version: string;
   stateDir: string;
@@ -102,9 +149,26 @@ async function main() {
   }
 
   if (cmd === 'install') {
-    const { configPath } = await installClaudeDesktop();
-    console.log(`✓ Installed crosswalk-mcp into Claude Desktop at:\n  ${configPath}\n`);
-    console.log(`Restart Claude Desktop to activate. State will live in ${process.env.CROSSWALK_HOME ?? '~/.crosswalk/'}.`);
+    const clientIdx = process.argv.indexOf('--client');
+    const clientArg = clientIdx >= 0 ? process.argv[clientIdx + 1] : 'all';
+    const { isKnownHost } = await import('./cli/hosts.ts');
+    if (clientArg !== 'all' && !isKnownHost(clientArg)) {
+      console.error(`Unknown --client value: ${clientArg}. Use one of: claude, cursor, windsurf, all`);
+      process.exit(1);
+    }
+    const result = await runInstall({ client: clientArg as 'claude' | 'cursor' | 'windsurf' | 'all' });
+    if (result.installed.length === 0) {
+      console.log('Nothing installed (no targets matched).');
+    } else {
+      console.log(`✓ Installed crosswalk-mcp into:`);
+      for (const host of result.installed) {
+        console.log(`  ${host}: ${result.paths[host]}`);
+      }
+    }
+    if (result.skipped.length > 0) {
+      console.log(`Skipped: ${result.skipped.join(', ')}`);
+    }
+    console.log(`Restart the affected app(s) to activate. State at ${process.env.CROSSWALK_HOME ?? '~/.crosswalk/'}.`);
     return;
   }
 
@@ -154,14 +218,18 @@ async function main() {
 
   if (cmd === '--help' || cmd === '-h') {
     console.log(`Usage:
-  crosswalk-mcp                 # run as MCP server (used by Claude Desktop)
-  crosswalk-mcp install         # add to Claude Desktop config
-  crosswalk-mcp uninstall       # remove from Claude Desktop config
-  crosswalk-mcp uninstall --purge  # also delete ~/.crosswalk/state.db
-  crosswalk-mcp run-scheduled   # run any workflows whose next_run_at has passed
-  crosswalk-mcp status          # show installed state and counts
-  crosswalk-mcp --version       # print version
-  crosswalk-mcp --help          # show this message`);
+  crosswalk-mcp                            # run as MCP server
+  crosswalk-mcp install                    # install into all detected hosts
+  crosswalk-mcp install --client claude    # install into Claude Desktop only
+  crosswalk-mcp install --client cursor    # install into Cursor only
+  crosswalk-mcp install --client windsurf  # install into Windsurf only
+  crosswalk-mcp uninstall                  # remove from all detected hosts
+  crosswalk-mcp uninstall --purge          # also delete ~/.crosswalk/state.db
+  crosswalk-mcp status                     # show installed state and counts
+  crosswalk-mcp doctor                     # run sanity checks (added in M6-7)
+  crosswalk-mcp run-scheduled              # run any due workflows now
+  crosswalk-mcp --version                  # print version
+  crosswalk-mcp --help                     # show this message`);
     return;
   }
 
