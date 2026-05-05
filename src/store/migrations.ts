@@ -107,6 +107,24 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_workflow_next_run ON workflow(next_run_at);
     `
   }
+  ,
+  {
+    id: 4,
+    name: 'fit_score_cache',
+    sql: `
+      CREATE TABLE fit_score_cache (
+        job_id TEXT NOT NULL REFERENCES job(id),
+        resume_id TEXT NOT NULL REFERENCES resume(id),
+        score REAL NOT NULL,
+        top_strengths_json TEXT NOT NULL,
+        top_gaps_json TEXT NOT NULL,
+        narrative_md TEXT,
+        computed_at TEXT NOT NULL,
+        PRIMARY KEY (job_id, resume_id)
+      );
+      CREATE INDEX idx_fit_cache_computed ON fit_score_cache(computed_at);
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {
