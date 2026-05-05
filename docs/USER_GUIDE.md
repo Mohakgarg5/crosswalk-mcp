@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v0.3.0"
+subtitle: "AI-native career copilot · v0.5.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -586,13 +586,22 @@ A: As of v0.3.0:
 
 | Command | Purpose |
 |---|---|
-| `crosswalk-mcp` (no args) | Run as MCP server (used by Claude Desktop) |
-| `crosswalk-mcp install` | Add Crosswalk to Claude Desktop config |
+| `crosswalk-mcp` (no args) | Run as MCP server (used by Claude Desktop / Cursor / Windsurf) |
+| `crosswalk-mcp install` | Install into all detected hosts |
+| `crosswalk-mcp install --client claude` | Install only into Claude Desktop |
+| `crosswalk-mcp install --client cursor` | Install only into Cursor |
+| `crosswalk-mcp install --client windsurf` | Install only into Windsurf |
+| `crosswalk-mcp install --client all` | Install into all detected hosts (default) |
+| `crosswalk-mcp uninstall` | Remove from all detected hosts |
+| `crosswalk-mcp uninstall --client <name>` | Remove from only one host |
+| `crosswalk-mcp uninstall --purge` | Also delete `~/.crosswalk/state.db` |
+| `crosswalk-mcp status` | Show installed state and per-host install presence |
+| `crosswalk-mcp doctor` | Run sanity checks (db, migrations, registry, tools, adapters) |
 | `crosswalk-mcp run-scheduled` | Run any due workflows now (called from cron) |
-| `crosswalk-mcp --version` | Print version (e.g. `0.3.0`) |
+| `crosswalk-mcp --version` | Print version (e.g. `0.5.0`) |
 | `crosswalk-mcp --help` | Show usage |
 
-## 6.3 ATS coverage at v0.3
+## 6.3 ATS coverage at v0.5
 
 | ATS | Companies in seed registry |
 |---|---|
@@ -653,8 +662,10 @@ A: As of v0.3.0:
 | v0.0.1 | Shipped | M1 — Discover + match + explain |
 | v0.1.0 | Shipped | M2 — Tailor + draft application |
 | v0.2.0 | Shipped | M3 — Pipeline tracker + guardrail + workflows |
-| **v0.3.0** | **Current** | **M4 — Reach (8 ATSs, 51 companies)** |
-| v0.4.0 | Next | M5 — Workday + iCIMS via Playwright; live-fit gate; registry to 200+ |
+| v0.3.0 | Shipped | M4 — Reach (8 ATSs, 51 companies) |
+| v0.4.0 | Shipped | M5 — Live-fit guardrail gate + uninstall/status CLI |
+| **v0.5.0** | **Current** | **M6 — Multi-host install + doctor + 100 companies** |
+| v0.6.0 | Next | M7 — Workday + iCIMS via Playwright; sampling-driven workflows |
 | v1.0.0 | Planned | v2 — Autonomous apply via Playwright sandbox |
 
 ---

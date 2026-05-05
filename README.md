@@ -8,8 +8,8 @@ Local-first. Zero API keys. Bring your own model.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-146%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-0.4.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Tests](https://img.shields.io/badge/tests-165%20passing-brightgreen.svg)](#development)
+[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -50,7 +50,13 @@ What you say to your AI:                   What Crosswalk does behind the scenes
 npx crosswalk-mcp install
 ```
 
-Restart Claude Desktop. Then say:
+That installs into all detected hosts (Claude Desktop, Cursor, Windsurf). To target one:
+
+```bash
+npx crosswalk-mcp install --client cursor
+```
+
+Restart the affected app(s). Then ask your AI:
 
 > *"Set up my profile: I'm a PM with 2 years at Acme, want NYC or remote, looking at AI infra."*
 > *"Add my resume from ~/Documents/resume.pdf, label it 'Generic PM'."*
@@ -65,7 +71,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**16 MCP tools across 5 surfaces.** v0.4.0 adds the **live-fit guardrail gate** to `draft_application` and the `crosswalk-mcp uninstall` + `crosswalk-mcp status` CLI subcommands.
+**16 MCP tools across 5 surfaces.** v0.5.0 ships with **multi-host install** (Claude Desktop, Cursor, Windsurf), the new `doctor` diagnostic, and the registry grown to **100 companies**.
 
 ### Profile & resumes
 
@@ -207,8 +213,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.1.0 — M2 | Tailor resume + draft application · 8 tools · 68 tests | Shipped |
 | v0.2.0 — M3 | Pipeline tracker + anti-spam guardrail + scheduled workflows · 16 tools · 110 tests | Shipped |
 | v0.3.0 — M4 | 5 more ATS adapters (8 total) · 51-company registry · M3 carry-overs · 124 tests | Shipped |
-| **v0.4.0 — M5** | **Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests** | **Current** |
-| v0.5.0 — M6 | Workday + iCIMS via Playwright sandbox · Cursor/Windsurf installers · registry to 200+ | Next |
+| v0.4.0 — M5 | Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests | Shipped |
+| **v0.5.0 — M6** | **Multi-host install · doctor diagnostic · 100-company registry · 165 tests** | **Current** |
+| v0.6.0 — M7 | Workday + iCIMS via Playwright sandbox · sampling-driven workflows | Next |
 | v1.0.0 — v2 | Autonomous apply via Playwright in a sandbox · full agent loop | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
