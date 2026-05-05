@@ -115,6 +115,104 @@ export async function runUninstall(input: RunUninstallInput): Promise<RunUninsta
   return { removed, notFound, skipped, paths };
 }
 
+export type DoctorCheck = {
+  name: string;
+  status: 'ok' | 'warn' | 'fail';
+  message: string;
+};
+
+export type DoctorReport = {
+  checks: DoctorCheck[];
+  allOk: boolean;
+};
+
+export async function runDoctor(): Promise<DoctorReport> {
+  const checks: DoctorCheck[] = [];
+
+  // 1. Database
+  let db: ReturnType<typeof import('./store/db.ts').openDb> | null = null;
+  try {
+    const { openDb } = await import('./store/db.ts');
+    db = openDb();
+    checks.push({ name: 'database', status: 'ok', message: 'opened and migrated' });
+  } catch (e) {
+    checks.push({ name: 'database', status: 'fail', message: (e as Error).message });
+  }
+
+  // 2. Migrations
+  if (db) {
+    try {
+      const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
+      const expected = [1, 2, 3, 4];
+      if (JSON.stringify(ids) === JSON.stringify(expected)) {
+        checks.push({ name: 'migrations', status: 'ok', message: `applied: [${ids.join(', ')}]` });
+      } else {
+        checks.push({ name: 'migrations', status: 'fail', message: `expected ${JSON.stringify(expected)}, got ${JSON.stringify(ids)}` });
+      }
+    } catch (e) {
+      checks.push({ name: 'migrations', status: 'fail', message: (e as Error).message });
+    }
+  } else {
+    checks.push({ name: 'migrations', status: 'fail', message: 'skipped (database unavailable)' });
+  }
+
+  // 3. Registry
+  if (db) {
+    try {
+      const { listAllCompanies } = await import('./store/company.ts');
+      const { seedRegistryIfEmpty } = await import('./registryBoot.ts');
+      seedRegistryIfEmpty(db);
+      const count = listAllCompanies(db).length;
+      if (count >= 50) {
+        checks.push({ name: 'registry', status: 'ok', message: `${count} companies loaded` });
+      } else if (count > 0) {
+        checks.push({ name: 'registry', status: 'warn', message: `${count} companies (expected ≥ 50)` });
+      } else {
+        checks.push({ name: 'registry', status: 'fail', message: 'no companies loaded' });
+      }
+    } catch (e) {
+      checks.push({ name: 'registry', status: 'fail', message: (e as Error).message });
+    }
+  }
+
+  // 4. Tools
+  try {
+    const { toolDefinitions } = await import('./tools/index.ts');
+    if (toolDefinitions.length === 16) {
+      checks.push({ name: 'tools', status: 'ok', message: `${toolDefinitions.length} tools registered` });
+    } else {
+      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 16)` });
+    }
+  } catch (e) {
+    checks.push({ name: 'tools', status: 'fail', message: (e as Error).message });
+  }
+
+  // 5. Adapters
+  try {
+    await import('./ats/greenhouse.ts');
+    await import('./ats/lever.ts');
+    await import('./ats/ashby.ts');
+    await import('./ats/workable.ts');
+    await import('./ats/smartrecruiters.ts');
+    await import('./ats/bamboohr.ts');
+    await import('./ats/recruitee.ts');
+    await import('./ats/personio.ts');
+    const { listRegisteredAdapters } = await import('./ats/adapter.ts');
+    const names = listRegisteredAdapters().sort();
+    const expected = ['ashby', 'bamboohr', 'greenhouse', 'lever', 'personio', 'recruitee', 'smartrecruiters', 'workable'];
+    const missing = expected.filter(n => !names.includes(n));
+    if (missing.length === 0) {
+      checks.push({ name: 'adapters', status: 'ok', message: `${names.length} adapters: ${names.join(', ')}` });
+    } else {
+      checks.push({ name: 'adapters', status: 'fail', message: `missing: ${missing.join(', ')}` });
+    }
+  } catch (e) {
+    checks.push({ name: 'adapters', status: 'fail', message: (e as Error).message });
+  }
+
+  return { checks, allOk: checks.every(c => c.status !== 'fail') };
+}
+
 export type StatusReport = {
   version: string;
   stateDir: string;
@@ -274,6 +372,18 @@ async function main() {
     for (const host of ['claude', 'cursor', 'windsurf'] as const) {
       const mark = r.installedHosts[host] ? '✓' : '·';
       console.log(`  ${mark} ${host}: ${r.configPaths[host]}`);
+    }
+    return;
+  }
+
+  if (cmd === 'doctor') {
+    const r = await runDoctor();
+    for (const c of r.checks) {
+      const icon = c.status === 'ok' ? '✓' : c.status === 'warn' ? '!' : '✗';
+      console.log(`  ${icon} ${c.name}: ${c.message}`);
+    }
+    if (!r.allOk) {
+      process.exit(1);
     }
     return;
   }
