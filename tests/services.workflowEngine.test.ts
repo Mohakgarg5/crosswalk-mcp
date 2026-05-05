@@ -41,4 +41,14 @@ describe('services/workflowEngine', () => {
     expect(out.status).toBe('error');
     expect(out.error).toMatch(/limit/i);
   });
+
+  it('returns needs_host for sampling_recipe workflows', async () => {
+    const out = await runWorkflowKind(db, 'sampling_recipe', {
+      recipe: 'Find new senior PM roles, score them, draft applications for top 3.'
+    });
+    expect(out.status).toBe('needs_host');
+    expect(out.summary).toEqual({
+      recipe: 'Find new senior PM roles, score them, draft applications for top 3.'
+    });
+  });
 });
