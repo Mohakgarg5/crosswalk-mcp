@@ -73,6 +73,48 @@ export async function runInstall(input: RunInstallInput): Promise<RunInstallResu
   return { installed, skipped, paths };
 }
 
+export type RunUninstallInput = {
+  client: 'claude' | 'cursor' | 'windsurf' | 'all';
+  configPaths?: Partial<Record<'claude' | 'cursor' | 'windsurf', string>>;
+};
+
+export type RunUninstallResult = {
+  removed: string[];
+  notFound: string[];
+  skipped: string[];
+  paths: Record<string, string>;
+};
+
+export async function runUninstall(input: RunUninstallInput): Promise<RunUninstallResult> {
+  const { listHostNames, hostConfigPath, isKnownHost } = await import('./cli/hosts.ts');
+  const { uninstallFromHost } = await import('./cli/installToHost.ts');
+
+  if (input.client !== 'all' && !isKnownHost(input.client)) {
+    throw new Error(`unknown client: ${input.client}`);
+  }
+
+  const targets = input.client === 'all' ? listHostNames() : [input.client];
+
+  const removed: string[] = [];
+  const notFound: string[] = [];
+  const skipped: string[] = [];
+  const paths: Record<string, string> = {};
+
+  for (const host of listHostNames()) {
+    const cfgPath = input.configPaths?.[host] ?? hostConfigPath(host);
+    paths[host] = cfgPath;
+    if (!targets.includes(host)) {
+      skipped.push(host);
+      continue;
+    }
+    const result = await uninstallFromHost({ configPath: cfgPath });
+    if (result.removed) removed.push(host);
+    else notFound.push(host);
+  }
+
+  return { removed, notFound, skipped, paths };
+}
+
 export type StatusReport = {
   version: string;
   stateDir: string;
@@ -174,11 +216,24 @@ async function main() {
 
   if (cmd === 'uninstall') {
     const purge = process.argv.includes('--purge');
-    const { configPath, removed } = await uninstallClaudeDesktop();
-    if (removed) {
-      console.log(`✓ Removed crosswalk-mcp from Claude Desktop at:\n  ${configPath}`);
+    const clientIdx = process.argv.indexOf('--client');
+    const clientArg = clientIdx >= 0 ? process.argv[clientIdx + 1] : 'all';
+    const { isKnownHost } = await import('./cli/hosts.ts');
+    if (clientArg !== 'all' && !isKnownHost(clientArg)) {
+      console.error(`Unknown --client value: ${clientArg}. Use one of: claude, cursor, windsurf, all`);
+      process.exit(1);
+    }
+    const result = await runUninstall({ client: clientArg as 'claude' | 'cursor' | 'windsurf' | 'all' });
+    if (result.removed.length > 0) {
+      console.log(`✓ Removed crosswalk-mcp from:`);
+      for (const host of result.removed) {
+        console.log(`  ${host}: ${result.paths[host]}`);
+      }
     } else {
-      console.log(`(Nothing to remove — crosswalk-mcp was not in ${configPath}.)`);
+      console.log(`(Nothing to remove — no matching entries found.)`);
+    }
+    if (result.notFound.length > 0) {
+      console.log(`Not present in: ${result.notFound.join(', ')}`);
     }
     if (purge) {
       const { paths } = await import('./config.ts');
