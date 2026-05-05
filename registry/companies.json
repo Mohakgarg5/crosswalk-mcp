@@ -55,5 +55,37 @@
   { "id": "personiocompany", "name": "Personio",        "ats": "personio",         "atsOrgSlug": "personio" },
   { "id": "clue",            "name": "Clue",            "ats": "personio",         "atsOrgSlug": "biowink" },
   { "id": "trade",           "name": "Trade Republic",  "ats": "personio",         "atsOrgSlug": "traderepublic" },
-  { "id": "scalable",        "name": "Scalable Capital","ats": "personio",         "atsOrgSlug": "scalable-capital" }
+  { "id": "scalable",        "name": "Scalable Capital","ats": "personio",         "atsOrgSlug": "scalable-capital" },
+
+  { "id": "anduril",         "name": "Anduril",         "ats": "greenhouse",       "atsOrgSlug": "andurilindustries" },
+  { "id": "rippling",        "name": "Rippling",        "ats": "greenhouse",       "atsOrgSlug": "rippling" },
+  { "id": "plaid",           "name": "Plaid",           "ats": "greenhouse",       "atsOrgSlug": "plaid" },
+  { "id": "mercury",         "name": "Mercury",         "ats": "greenhouse",       "atsOrgSlug": "mercury" },
+  { "id": "retool",          "name": "Retool",          "ats": "greenhouse",       "atsOrgSlug": "retool" },
+
+  { "id": "perplexity",      "name": "Perplexity",      "ats": "ashby",            "atsOrgSlug": "perplexity" },
+  { "id": "cohere",          "name": "Cohere",          "ats": "ashby",            "atsOrgSlug": "cohere" },
+  { "id": "huggingface",     "name": "Hugging Face",    "ats": "ashby",            "atsOrgSlug": "huggingface" },
+  { "id": "cursor",          "name": "Cursor (Anysphere)", "ats": "ashby",         "atsOrgSlug": "anysphere" },
+  { "id": "elevenlabs",      "name": "ElevenLabs",      "ats": "ashby",            "atsOrgSlug": "elevenlabs" },
+  { "id": "replit",          "name": "Replit",          "ats": "ashby",            "atsOrgSlug": "replit" },
+
+  { "id": "uber",            "name": "Uber",            "ats": "lever",            "atsOrgSlug": "uber" },
+  { "id": "postman",         "name": "Postman",         "ats": "lever",            "atsOrgSlug": "postman" },
+  { "id": "intercom",        "name": "Intercom",        "ats": "lever",            "atsOrgSlug": "intercom" },
+
+  { "id": "celonis",         "name": "Celonis",         "ats": "smartrecruiters",  "atsOrgSlug": "Celonis1" },
+  { "id": "delivery_hero",   "name": "Delivery Hero",   "ats": "smartrecruiters",  "atsOrgSlug": "DeliveryHero" },
+
+  { "id": "wayfair",         "name": "Wayfair",         "ats": "workable",         "atsOrgSlug": "wayfair" },
+  { "id": "sumup",           "name": "SumUp",           "ats": "workable",         "atsOrgSlug": "sumup" },
+
+  { "id": "loop",            "name": "Loop Returns",    "ats": "bamboohr",         "atsOrgSlug": "loop" },
+  { "id": "polyai",          "name": "PolyAI",          "ats": "bamboohr",         "atsOrgSlug": "polyai" },
+
+  { "id": "wise",            "name": "Wise",            "ats": "recruitee",        "atsOrgSlug": "wise" },
+  { "id": "babbel",          "name": "Babbel",          "ats": "recruitee",        "atsOrgSlug": "babbel" },
+
+  { "id": "n26",             "name": "N26",             "ats": "personio",         "atsOrgSlug": "n26" },
+  { "id": "freenow",         "name": "FreeNow",         "ats": "personio",         "atsOrgSlug": "free-now" }
 ]

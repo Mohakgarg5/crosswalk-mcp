@@ -58,6 +58,31 @@
     "personiocompany":{ "confidence": 0.10, "lastSeen": "2025-09-30" },
     "clue":           { "confidence": 0.15, "lastSeen": "2025-09-30" },
     "trade":          { "confidence": 0.20, "lastSeen": "2025-09-30" },
-    "scalable":       { "confidence": 0.25, "lastSeen": "2025-09-30" }
+    "scalable":       { "confidence": 0.25, "lastSeen": "2025-09-30" },
+
+    "anduril":        { "confidence": 0.79, "lastSeen": "2025-09-30" },
+    "rippling":       { "confidence": 0.74, "lastSeen": "2025-09-30" },
+    "plaid":          { "confidence": 0.81, "lastSeen": "2025-09-30" },
+    "mercury":        { "confidence": 0.62, "lastSeen": "2025-09-30" },
+    "retool":         { "confidence": 0.66, "lastSeen": "2025-09-30" },
+    "perplexity":     { "confidence": 0.70, "lastSeen": "2025-09-30" },
+    "cohere":         { "confidence": 0.55, "lastSeen": "2025-09-30" },
+    "huggingface":    { "confidence": 0.68, "lastSeen": "2025-09-30" },
+    "cursor":         { "confidence": 0.60, "lastSeen": "2025-09-30" },
+    "elevenlabs":     { "confidence": 0.45, "lastSeen": "2025-09-30" },
+    "replit":         { "confidence": 0.58, "lastSeen": "2025-09-30" },
+    "uber":           { "confidence": 0.95, "lastSeen": "2025-09-30" },
+    "postman":        { "confidence": 0.72, "lastSeen": "2025-09-30" },
+    "intercom":       { "confidence": 0.68, "lastSeen": "2025-09-30" },
+    "celonis":        { "confidence": 0.55, "lastSeen": "2025-09-30" },
+    "delivery_hero":  { "confidence": 0.30, "lastSeen": "2025-09-30" },
+    "wayfair":        { "confidence": 0.74, "lastSeen": "2025-09-30" },
+    "sumup":          { "confidence": 0.20, "lastSeen": "2025-09-30" },
+    "loop":           { "confidence": 0.40, "lastSeen": "2025-09-30" },
+    "polyai":         { "confidence": 0.30, "lastSeen": "2025-09-30" },
+    "wise":           { "confidence": 0.40, "lastSeen": "2025-09-30" },
+    "babbel":         { "confidence": 0.20, "lastSeen": "2025-09-30" },
+    "n26":            { "confidence": 0.15, "lastSeen": "2025-09-30" },
+    "freenow":        { "confidence": 0.15, "lastSeen": "2025-09-30" }
   }
 }
