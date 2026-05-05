@@ -8,8 +8,8 @@ Local-first. Zero API keys. Bring your own model.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-165%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Tests](https://img.shields.io/badge/tests-175%20passing-brightgreen.svg)](#development)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -71,7 +71,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**16 MCP tools across 5 surfaces.** v0.5.0 ships with **multi-host install** (Claude Desktop, Cursor, Windsurf), the new `doctor` diagnostic, and the registry grown to **100 companies**.
+**16 MCP tools across 5 surfaces.** v0.6.0 adds **Workday + iCIMS adapters** (10 ATSs total) and **sampling-driven workflow recipes** — schedule a natural-language plan ("find senior PM roles every Monday and score the top 5") that the host AI executes when you next open chat. Registry grown to **115 companies**.
 
 ### Profile & resumes
 
@@ -118,22 +118,22 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## ATS coverage
 
-Crosswalk fetches live jobs from **8 ATSs**, covering 51 seed companies. Each adapter is a small file in `src/ats/` — adding more is a one-PR change.
+Crosswalk fetches live jobs from **10 ATSs**, covering 115 seed companies. Each adapter is a small file in `src/ats/` — adding more is a one-PR change.
 
 | ATS | Endpoint type | Seed coverage |
 |---|---|---|
-| [Greenhouse](https://www.greenhouse.io/) | JSON | Stripe, Airbnb, Anthropic, Vercel, Figma, Linear, DoorDash, Robinhood, Coinbase, Datadog, Snowflake, +4 more |
-| [Lever](https://www.lever.co/) | JSON | Netflix, Spotify, Shopify, Brex, Lyft, GitHub, Checkr, Kraken |
-| [Ashby](https://www.ashbyhq.com/) | JSON | OpenAI, Ramp, Hex, Deel, Notion, Browserbase, Modal Labs |
-| [Workable](https://www.workable.com/) | JSON | Miro, n8n, Remote.com, Deepfence |
-| [SmartRecruiters](https://www.smartrecruiters.com/) | JSON | Bosch, Siemens, Ubisoft, OpenText |
-| [BambooHR](https://www.bamboohr.com/) | JSON | Klaviyo, Buffer, Zapier, Tinybird |
-| [Recruitee](https://recruitee.com/) | JSON | Mollie, MessageBird, HelloFresh, The Trade Desk |
-| [Personio](https://www.personio.com/) | XML | Personio, Clue, Trade Republic, Scalable Capital |
+| [Greenhouse](https://www.greenhouse.io/) | JSON | Stripe, Airbnb, Anthropic, Vercel, Figma, Linear, DoorDash, Robinhood, Coinbase, Datadog, Snowflake, Twilio, +9 more (22 total) |
+| [Lever](https://www.lever.co/) | JSON | Netflix, Spotify, Shopify, Brex, Lyft, GitHub, Atlassian, Canva, Uber, +2 more (11 total) |
+| [Ashby](https://www.ashbyhq.com/) | JSON | OpenAI, Ramp, Notion, Perplexity, Cohere, Hugging Face, Cursor, Replit, Writer, Harvey, +6 more (16 total) |
+| [Workable](https://www.workable.com/) | JSON | Miro, n8n, Remote.com, Wayfair, SumUp, +1 more (6 total) |
+| [SmartRecruiters](https://www.smartrecruiters.com/) | JSON | Bosch, Siemens, Ubisoft, Celonis, Foodpanda, +1 more (6 total) |
+| [BambooHR](https://www.bamboohr.com/) | JSON | Klaviyo, Buffer, Zapier, Amplitude, CrowdStrike, +1 more (6 total) |
+| [Recruitee](https://recruitee.com/) | JSON | Mollie, MessageBird, HelloFresh, Wise, Babbel, Bolt, Kayak, +1 more (8 total) |
+| [Personio](https://www.personio.com/) | XML | Personio, Clue, Trade Republic, N26, FreeNow, Doctolib, +2 more (8 total) |
+| [Workday](https://www.workday.com/) | JSON POST | NVIDIA, Salesforce, JPMorgan, UnitedHealth, Deloitte, Accenture, GE Aerospace, P&G (8 total) |
+| [iCIMS](https://www.icims.com/) | HTML | MongoDB, Fidelity, VMware, Cigna (4 total) |
 
 **Want to add your favorite company?** Send a PR to [`registry/companies.json`](registry/companies.json) — the registry is MIT-licensed.
-
-**Workday and iCIMS aren't supported yet.** They don't expose public JSON endpoints; both need a Playwright-sandbox scraping framework, planned for M5.
 
 ---
 
@@ -214,8 +214,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.2.0 — M3 | Pipeline tracker + anti-spam guardrail + scheduled workflows · 16 tools · 110 tests | Shipped |
 | v0.3.0 — M4 | 5 more ATS adapters (8 total) · 51-company registry · M3 carry-overs · 124 tests | Shipped |
 | v0.4.0 — M5 | Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests | Shipped |
-| **v0.5.0 — M6** | **Multi-host install · doctor diagnostic · 100-company registry · 165 tests** | **Current** |
-| v0.6.0 — M7 | Workday + iCIMS via Playwright sandbox · sampling-driven workflows | Next |
+| v0.5.0 — M6 | Multi-host install · doctor diagnostic · 100-company registry · 165 tests | Shipped |
+| **v0.6.0 — M7** | **Workday + iCIMS adapters · sampling_recipe workflows · 115-company registry · 175 tests** | **Current** |
+| v0.7.0 — M8 | Autonomous browser-driven applying via Playwright sandbox | Next |
 | v1.0.0 — v2 | Autonomous apply via Playwright in a sandbox · full agent loop | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
