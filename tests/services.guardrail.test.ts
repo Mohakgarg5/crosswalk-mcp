@@ -63,4 +63,50 @@ describe('services/guardrail', () => {
     const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1', allowDuplicate: true });
     expect(out.allowed).toBe(true);
   });
+
+  it('refuses when cached fit < 0.50 and confirmLowFit is not set', async () => {
+    const { setCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1',
+      score: 0.35, topStrengths: [], topGaps: []
+    });
+    const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1' });
+    expect(out.allowed).toBe(false);
+    if (out.allowed === false) {
+      expect(out.reason).toMatch(/low fit/i);
+      expect(out.reason).toMatch(/0\.35/);
+    }
+  });
+
+  it('allows low fit when confirmLowFit=true', async () => {
+    const { setCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1',
+      score: 0.35, topStrengths: [], topGaps: []
+    });
+    const out = checkGuardrail(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1', confirmLowFit: true
+    });
+    expect(out.allowed).toBe(true);
+  });
+
+  it('allows when fit is >= 0.50', async () => {
+    const { setCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1',
+      score: 0.62, topStrengths: [], topGaps: []
+    });
+    const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1' });
+    expect(out.allowed).toBe(true);
+  });
+
+  it('skips fit gate when resumeId is empty (picker will choose)', () => {
+    const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: '' });
+    expect(out.allowed).toBe(true);
+  });
+
+  it('skips fit gate when no cache entry exists', () => {
+    const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1' });
+    expect(out.allowed).toBe(true);
+  });
 });

@@ -1,7 +1,9 @@
 import type { Db } from '../store/db.ts';
+import { getCachedFit } from '../store/fitScoreCache.ts';
 
 export const WEEKLY_CAP = 10;
 export const WEEKLY_WINDOW_MS = 7 * 86400_000;
+export const LOW_FIT_THRESHOLD = 0.50;
 
 export type GuardrailInput = {
   jobId: string;
@@ -45,6 +47,18 @@ export function checkGuardrail(db: Db, input: GuardrailInput): GuardrailResult {
       return {
         allowed: false,
         reason: `already drafted an application (${dup.id}, status=${dup.status}) for this job. Pass allowDuplicate=true to override.`
+      };
+    }
+  }
+
+  // 3. Live-fit gate: refuse drafts where cached fit < threshold,
+  //    unless caller explicitly confirms.
+  if (!input.confirmLowFit && input.resumeId) {
+    const cached = getCachedFit(db, input.jobId, input.resumeId);
+    if (cached && cached.score < LOW_FIT_THRESHOLD) {
+      return {
+        allowed: false,
+        reason: `low fit (${cached.score.toFixed(2)}) for this job/resume pair. Run score_fit to get an updated estimate, pick a stronger resume, or pass confirmLowFit=true to override.`
       };
     }
   }
