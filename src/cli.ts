@@ -42,6 +42,25 @@ export async function installClaudeDesktop(opts: { configPath?: string } = {}): 
   return { configPath };
 }
 
+export async function uninstallClaudeDesktop(opts: { configPath?: string } = {}): Promise<{ configPath: string; removed: boolean }> {
+  const configPath = opts.configPath ?? defaultClaudeConfigPath();
+
+  let json: { mcpServers?: Record<string, unknown> };
+  try {
+    json = JSON.parse(await fs.readFile(configPath, 'utf8')) as typeof json;
+  } catch {
+    return { configPath, removed: false };
+  }
+
+  if (!json.mcpServers || !('crosswalk-mcp' in json.mcpServers)) {
+    return { configPath, removed: false };
+  }
+
+  delete json.mcpServers['crosswalk-mcp'];
+  await fs.writeFile(configPath, JSON.stringify(json, null, 2) + '\n', 'utf8');
+  return { configPath, removed: true };
+}
+
 async function main() {
   const cmd = process.argv[2];
 
@@ -59,6 +78,30 @@ async function main() {
     return;
   }
 
+  if (cmd === 'uninstall') {
+    const purge = process.argv.includes('--purge');
+    const { configPath, removed } = await uninstallClaudeDesktop();
+    if (removed) {
+      console.log(`✓ Removed crosswalk-mcp from Claude Desktop at:\n  ${configPath}`);
+    } else {
+      console.log(`(Nothing to remove — crosswalk-mcp was not in ${configPath}.)`);
+    }
+    if (purge) {
+      const { paths } = await import('./config.ts');
+      const fsSync = await import('node:fs');
+      const stateDir = paths.stateDir();
+      try {
+        fsSync.rmSync(stateDir, { recursive: true, force: true });
+        console.log(`✓ Purged state at ${stateDir}`);
+      } catch (e) {
+        console.error(`(Failed to purge ${stateDir}: ${(e as Error).message})`);
+      }
+    } else {
+      console.log(`State at ${process.env.CROSSWALK_HOME ?? '~/.crosswalk/'} preserved. Pass --purge to delete.`);
+    }
+    return;
+  }
+
   if (cmd === '--version' || cmd === '-v') {
     const { SERVER_VERSION } = await import('./server.ts');
     console.log(SERVER_VERSION);
@@ -69,6 +112,8 @@ async function main() {
     console.log(`Usage:
   crosswalk-mcp                 # run as MCP server (used by Claude Desktop)
   crosswalk-mcp install         # add to Claude Desktop config
+  crosswalk-mcp uninstall       # remove from Claude Desktop config
+  crosswalk-mcp uninstall --purge  # also delete ~/.crosswalk/state.db
   crosswalk-mcp run-scheduled   # run any workflows whose next_run_at has passed
   crosswalk-mcp --version       # print version
   crosswalk-mcp --help          # show this message`);
