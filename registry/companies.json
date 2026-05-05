@@ -121,5 +121,23 @@
 
   { "id": "doctolib",        "name": "Doctolib",        "ats": "personio",         "atsOrgSlug": "doctolib" },
   { "id": "blinkist",        "name": "Blinkist",        "ats": "personio",         "atsOrgSlug": "blinkist" },
-  { "id": "auto1",           "name": "AUTO1 Group",     "ats": "personio",         "atsOrgSlug": "auto1-group" }
+  { "id": "auto1",           "name": "AUTO1 Group",     "ats": "personio",         "atsOrgSlug": "auto1-group" },
+
+  { "id": "nvidia",          "name": "NVIDIA",          "ats": "workday",          "atsOrgSlug": "nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite" },
+  { "id": "salesforce",      "name": "Salesforce",      "ats": "workday",          "atsOrgSlug": "salesforce.wd12.myworkdayjobs.com/External_Career_Site" },
+  { "id": "jpmorgan",        "name": "JPMorgan Chase",  "ats": "workday",          "atsOrgSlug": "jpmc.wd5.myworkdayjobs.com/jpmc" },
+  { "id": "unitedhealth",    "name": "UnitedHealth Group", "ats": "workday",       "atsOrgSlug": "uhg.wd5.myworkdayjobs.com/External" },
+  { "id": "deloitte",        "name": "Deloitte",        "ats": "workday",          "atsOrgSlug": "deloitte.wd1.myworkdayjobs.com/Experienced" },
+  { "id": "accenture",       "name": "Accenture",       "ats": "workday",          "atsOrgSlug": "accenture.wd3.myworkdayjobs.com/AccentureCareers" },
+  { "id": "ge",              "name": "GE Aerospace",    "ats": "workday",          "atsOrgSlug": "ge.wd5.myworkdayjobs.com/GE_External_Site" },
+  { "id": "pg",              "name": "Procter & Gamble","ats": "workday",          "atsOrgSlug": "pg.wd5.myworkdayjobs.com/PGCareers" },
+
+  { "id": "mongodb",         "name": "MongoDB",         "ats": "icims",            "atsOrgSlug": "mongodb" },
+  { "id": "fidelity",        "name": "Fidelity",        "ats": "icims",            "atsOrgSlug": "fidelity" },
+  { "id": "vmware",          "name": "VMware",          "ats": "icims",            "atsOrgSlug": "vmware" },
+  { "id": "cigna",           "name": "Cigna",           "ats": "icims",            "atsOrgSlug": "cignaperformance" },
+
+  { "id": "supabase",        "name": "Supabase",        "ats": "ashby",            "atsOrgSlug": "supabase" },
+  { "id": "linear_dev",      "name": "Linear (dev)",    "ats": "ashby",            "atsOrgSlug": "linear" },
+  { "id": "warp",            "name": "Warp",            "ats": "ashby",            "atsOrgSlug": "warp" }
 ]
