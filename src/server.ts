@@ -24,7 +24,7 @@ import './ats/recruitee.ts';
 import './ats/personio.ts';
 
 export const SERVER_NAME = 'crosswalk-mcp';
-export const SERVER_VERSION = '0.3.0';
+export const SERVER_VERSION = '0.4.0';
 
 export function bootstrap() {
   const db = openDb();
