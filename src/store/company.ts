@@ -3,7 +3,7 @@ import type { Db } from './db.ts';
 export type Company = {
   id: string;
   name: string;
-  ats: 'greenhouse' | 'lever' | 'ashby' | 'workable' | 'smartrecruiters' | 'bamboohr' | 'recruitee' | 'personio';
+  ats: 'greenhouse' | 'lever' | 'ashby' | 'workable' | 'smartrecruiters' | 'bamboohr' | 'recruitee' | 'personio' | 'workday' | 'icims';
   atsOrgSlug: string;
   h1bConfidence?: number;
   h1bLastSeen?: string;
