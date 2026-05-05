@@ -1,6 +1,6 @@
 import type { Db } from './db.ts';
 
-export type WorkflowKind = 'fetch_jobs_refresh' | 'prune_old_jobs';
+export type WorkflowKind = 'fetch_jobs_refresh' | 'prune_old_jobs' | 'sampling_recipe';
 
 export type Workflow = {
   id: string;
@@ -89,7 +89,7 @@ export function deleteWorkflow(db: Db, id: string): boolean {
 export function recordWorkflowRun(
   db: Db,
   id: string,
-  result: { status: 'ok' | 'error'; error?: string; nextRunAt: string }
+  result: { status: 'ok' | 'error' | 'needs_host'; error?: string; nextRunAt: string }
 ): void {
   const now = new Date().toISOString();
   db.prepare(`

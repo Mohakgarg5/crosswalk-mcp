@@ -28,4 +28,15 @@ describe('tools/schedule_workflow', () => {
       }, { db })
     ).rejects.toThrow();
   });
+
+  it('schedules a sampling_recipe workflow', async () => {
+    const out = await scheduleWorkflow({
+      kind: 'sampling_recipe',
+      cron: '0 9 * * 1',
+      description: 'Monday triage',
+      params: { recipe: 'Find new senior PM roles and score the top 5.' }
+    }, { db });
+    expect(out.workflowId).toBeTypeOf('string');
+    expect(listWorkflows(db)).toHaveLength(1);
+  });
 });

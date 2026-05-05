@@ -13,7 +13,7 @@ export async function runWorkflow(
   ctx: { db: Db }
 ): Promise<{
   workflowId: string;
-  status: 'ok' | 'error';
+  status: 'ok' | 'error' | 'needs_host';
   error?: string;
   summary?: Record<string, unknown>;
   nextRunAt: string;
