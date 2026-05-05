@@ -1,9 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { greenhouse } from '../src/ats/greenhouse.ts';
 import fixture from './fixtures/greenhouse-jobs.json' with { type: 'json' };
 
 describe('ats/greenhouse', () => {
-  beforeEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-30T00:00:00Z'));
+  });
+  afterEach(() => { vi.useRealTimers(); });
 
   it('lists jobs and normalizes', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
