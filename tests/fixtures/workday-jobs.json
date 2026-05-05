@@ -1,0 +1,19 @@
+{
+  "total": 2,
+  "jobPostings": [
+    {
+      "title": "Senior Software Engineer, AI Infra",
+      "externalPath": "/job/Santa-Clara-CA/Senior-Software-Engineer/JR-12345",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 3 Days Ago",
+      "bulletFields": ["JR-12345"]
+    },
+    {
+      "title": "Remote Site Reliability Engineer",
+      "externalPath": "/job/Remote/Remote-SRE/JR-67890",
+      "locationsText": "Remote, US",
+      "postedOn": "Posted 14 Days Ago",
+      "bulletFields": ["JR-67890"]
+    }
+  ]
+}
