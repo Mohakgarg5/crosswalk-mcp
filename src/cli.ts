@@ -1,65 +1,29 @@
 #!/usr/bin/env node
 import * as fs from 'node:fs/promises';
 import { existsSync, statSync } from 'node:fs';
-import * as path from 'node:path';
-import * as os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
-function defaultClaudeConfigPath(): string {
-  if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
-  }
-  if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA ?? '', 'Claude', 'claude_desktop_config.json');
-  }
-  return path.join(os.homedir(), '.config', 'Claude', 'claude_desktop_config.json');
-}
-
 export async function installClaudeDesktop(opts: { configPath?: string } = {}): Promise<{ configPath: string }> {
-  const configPath = opts.configPath ?? defaultClaudeConfigPath();
-  await fs.mkdir(path.dirname(configPath), { recursive: true });
+  const { hostConfigPath } = await import('./cli/hosts.ts');
+  const { installToHost } = await import('./cli/installToHost.ts');
+  const configPath = opts.configPath ?? hostConfigPath('claude');
 
-  let json: { mcpServers?: Record<string, unknown> } = {};
-  try {
-    json = JSON.parse(await fs.readFile(configPath, 'utf8')) as typeof json;
-  } catch {
-    // File missing or unreadable — start fresh.
-  }
-  json.mcpServers ??= {};
-
-  // Use the local binary if running from a clone; npx if installed globally.
   const command = process.env.CROSSWALK_INSTALL_COMMAND ?? 'npx';
   const args = process.env.CROSSWALK_INSTALL_COMMAND
     ? []
     : ['-y', 'crosswalk-mcp@latest'];
+  const env: Record<string, string> = process.env.CROSSWALK_HOME
+    ? { CROSSWALK_HOME: process.env.CROSSWALK_HOME }
+    : {};
 
-  json.mcpServers['crosswalk-mcp'] = {
-    command,
-    args,
-    env: process.env.CROSSWALK_HOME ? { CROSSWALK_HOME: process.env.CROSSWALK_HOME } : {}
-  };
-
-  await fs.writeFile(configPath, JSON.stringify(json, null, 2) + '\n', 'utf8');
-  return { configPath };
+  return installToHost({ configPath, command, args, env });
 }
 
 export async function uninstallClaudeDesktop(opts: { configPath?: string } = {}): Promise<{ configPath: string; removed: boolean }> {
-  const configPath = opts.configPath ?? defaultClaudeConfigPath();
-
-  let json: { mcpServers?: Record<string, unknown> };
-  try {
-    json = JSON.parse(await fs.readFile(configPath, 'utf8')) as typeof json;
-  } catch {
-    return { configPath, removed: false };
-  }
-
-  if (!json.mcpServers || !('crosswalk-mcp' in json.mcpServers)) {
-    return { configPath, removed: false };
-  }
-
-  delete json.mcpServers['crosswalk-mcp'];
-  await fs.writeFile(configPath, JSON.stringify(json, null, 2) + '\n', 'utf8');
-  return { configPath, removed: true };
+  const { hostConfigPath } = await import('./cli/hosts.ts');
+  const { uninstallFromHost } = await import('./cli/installToHost.ts');
+  const configPath = opts.configPath ?? hostConfigPath('claude');
+  return uninstallFromHost({ configPath });
 }
 
 export type StatusReport = {
@@ -101,7 +65,8 @@ export async function runStatus(opts: { configPath?: string } = {}): Promise<Sta
   const applicationsByStatus: Record<string, number> = {};
   for (const r of statusRows) applicationsByStatus[r.status] = r.n;
 
-  const configPath = opts.configPath ?? defaultClaudeConfigPath();
+  const { hostConfigPath } = await import('./cli/hosts.ts');
+  const configPath = opts.configPath ?? hostConfigPath('claude');
   let installedInClaudeDesktop = false;
   try {
     const json = JSON.parse(await fs.readFile(configPath, 'utf8')) as { mcpServers?: Record<string, unknown> };
