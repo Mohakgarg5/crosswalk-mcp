@@ -95,4 +95,43 @@ describe('services/buildApplication', () => {
     );
     expect(out.applicationId).toBeTypeOf('string');
   });
+
+  it('refuses when cached fit < 0.50', async () => {
+    const { setCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1',
+      score: 0.30, topStrengths: [], topGaps: []
+    });
+
+    const sampling = {
+      complete: vi.fn(),
+      completeJson: vi.fn()
+    } as unknown as SamplingClient;
+
+    await expect(
+      buildApplication({ jobId: 'g:stripe:1', resumeId: 'r1' }, { db, sampling })
+    ).rejects.toThrow(/low fit/i);
+    expect(sampling.complete).not.toHaveBeenCalled();
+  });
+
+  it('proceeds when confirmLowFit=true', async () => {
+    const { setCachedFit } = await import('../src/store/fitScoreCache.ts');
+    setCachedFit(db, {
+      jobId: 'g:stripe:1', resumeId: 'r1',
+      score: 0.30, topStrengths: [], topGaps: []
+    });
+
+    const sampling = {
+      complete: vi.fn()
+        .mockResolvedValueOnce('# Mohak\n\n- PM')
+        .mockResolvedValueOnce('Dear hiring manager...'),
+      completeJson: vi.fn()
+    } as unknown as SamplingClient;
+
+    const out = await buildApplication(
+      { jobId: 'g:stripe:1', resumeId: 'r1', confirmLowFit: true },
+      { db, sampling }
+    );
+    expect(out.applicationId).toBeTypeOf('string');
+  });
 });
