@@ -197,9 +197,11 @@ export async function runDoctor(): Promise<DoctorReport> {
     await import('./ats/bamboohr.ts');
     await import('./ats/recruitee.ts');
     await import('./ats/personio.ts');
+    await import('./ats/workday.ts');
+    await import('./ats/icims.ts');
     const { listRegisteredAdapters } = await import('./ats/adapter.ts');
     const names = listRegisteredAdapters().sort();
-    const expected = ['ashby', 'bamboohr', 'greenhouse', 'lever', 'personio', 'recruitee', 'smartrecruiters', 'workable'];
+    const expected = ['ashby', 'bamboohr', 'greenhouse', 'icims', 'lever', 'personio', 'recruitee', 'smartrecruiters', 'workable', 'workday'];
     const missing = expected.filter(n => !names.includes(n));
     if (missing.length === 0) {
       checks.push({ name: 'adapters', status: 'ok', message: `${names.length} adapters: ${names.join(', ')}` });

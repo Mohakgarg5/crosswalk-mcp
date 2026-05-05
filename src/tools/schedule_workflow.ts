@@ -5,7 +5,7 @@ import type { Db } from '../store/db.ts';
 import { createWorkflow } from '../store/workflow.ts';
 
 export const scheduleWorkflowInput = z.object({
-  kind: z.enum(['fetch_jobs_refresh', 'prune_old_jobs']),
+  kind: z.enum(['fetch_jobs_refresh', 'prune_old_jobs', 'sampling_recipe']),
   cron: z.string().min(1)
     .describe("Cron expression in standard 5-field format (e.g., '0 9 * * 1' for 9am Mondays)."),
   description: z.string().min(1),

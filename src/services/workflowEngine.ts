@@ -4,7 +4,7 @@ import { fetchJobs, fetchJobsInput } from '../tools/fetch_jobs.ts';
 import { ZodError } from 'zod';
 
 export type WorkflowRunResult = {
-  status: 'ok' | 'error';
+  status: 'ok' | 'error' | 'needs_host';
   error?: string;
   summary?: Record<string, unknown>;
 };
@@ -37,6 +37,11 @@ export async function runWorkflowKind(
       }
       const out = await fetchJobs(parsed.data, { db });
       return { status: 'ok', summary: { fetched: out.meta.fetched, errors: out.meta.errors.length } };
+    }
+
+    if (kind === 'sampling_recipe') {
+      const recipe = (params.recipe as string | undefined) ?? '';
+      return { status: 'needs_host', summary: { recipe } };
     }
 
     return { status: 'error', error: `unknown workflow kind: ${kind}` };

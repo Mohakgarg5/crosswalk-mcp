@@ -22,9 +22,11 @@ import './ats/smartrecruiters.ts';
 import './ats/bamboohr.ts';
 import './ats/recruitee.ts';
 import './ats/personio.ts';
+import './ats/workday.ts';
+import './ats/icims.ts';
 
 export const SERVER_NAME = 'crosswalk-mcp';
-export const SERVER_VERSION = '0.5.0';
+export const SERVER_VERSION = '0.6.0';
 
 export function bootstrap() {
   const db = openDb();

@@ -13,6 +13,8 @@ import '../ats/smartrecruiters.ts';
 import '../ats/bamboohr.ts';
 import '../ats/recruitee.ts';
 import '../ats/personio.ts';
+import '../ats/workday.ts';
+import '../ats/icims.ts';
 
 export const fetchJobsInput = z.object({
   titleContains: z.string().optional(),

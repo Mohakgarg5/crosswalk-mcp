@@ -110,6 +110,22 @@
     "kayak":          { "confidence": 0.42, "lastSeen": "2025-09-30" },
     "doctolib":       { "confidence": 0.18, "lastSeen": "2025-09-30" },
     "blinkist":       { "confidence": 0.10, "lastSeen": "2025-09-30" },
-    "auto1":          { "confidence": 0.22, "lastSeen": "2025-09-30" }
+    "auto1":          { "confidence": 0.22, "lastSeen": "2025-09-30" },
+
+    "nvidia":         { "confidence": 0.97, "lastSeen": "2025-09-30" },
+    "salesforce":     { "confidence": 0.94, "lastSeen": "2025-09-30" },
+    "jpmorgan":       { "confidence": 0.96, "lastSeen": "2025-09-30" },
+    "unitedhealth":   { "confidence": 0.91, "lastSeen": "2025-09-30" },
+    "deloitte":       { "confidence": 0.94, "lastSeen": "2025-09-30" },
+    "accenture":      { "confidence": 0.95, "lastSeen": "2025-09-30" },
+    "ge":             { "confidence": 0.86, "lastSeen": "2025-09-30" },
+    "pg":             { "confidence": 0.84, "lastSeen": "2025-09-30" },
+    "mongodb":        { "confidence": 0.88, "lastSeen": "2025-09-30" },
+    "fidelity":       { "confidence": 0.78, "lastSeen": "2025-09-30" },
+    "vmware":         { "confidence": 0.92, "lastSeen": "2025-09-30" },
+    "cigna":          { "confidence": 0.82, "lastSeen": "2025-09-30" },
+    "supabase":       { "confidence": 0.55, "lastSeen": "2025-09-30" },
+    "linear_dev":     { "confidence": 0.65, "lastSeen": "2025-09-30" },
+    "warp":           { "confidence": 0.50, "lastSeen": "2025-09-30" }
   }
 }

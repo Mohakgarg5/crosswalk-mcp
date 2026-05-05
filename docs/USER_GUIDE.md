@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v0.5.0"
+subtitle: "AI-native career copilot · v0.6.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -664,9 +664,10 @@ A: As of v0.3.0:
 | v0.2.0 | Shipped | M3 — Pipeline tracker + guardrail + workflows |
 | v0.3.0 | Shipped | M4 — Reach (8 ATSs, 51 companies) |
 | v0.4.0 | Shipped | M5 — Live-fit guardrail gate + uninstall/status CLI |
-| **v0.5.0** | **Current** | **M6 — Multi-host install + doctor + 100 companies** |
-| v0.6.0 | Next | M7 — Workday + iCIMS via Playwright; sampling-driven workflows |
-| v1.0.0 | Planned | v2 — Autonomous apply via Playwright sandbox |
+| v0.5.0 | Shipped | M6 — Multi-host install + doctor + 100 companies |
+| **v0.6.0** | **Current** | **M7 — Workday + iCIMS adapters + sampling_recipe workflows + 115 companies** |
+| v0.7.0 | Next | M8 — Autonomous browser-driven applying |
+| v1.0.0 | Planned | v2 — Full agent loop |
 
 ---
 

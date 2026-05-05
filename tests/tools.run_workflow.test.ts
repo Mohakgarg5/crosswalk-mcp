@@ -37,4 +37,20 @@ describe('tools/run_workflow', () => {
   it('throws on unknown workflow', async () => {
     await expect(runWorkflow({ workflowId: 'nope' }, { db })).rejects.toThrow(/unknown workflow/);
   });
+
+  it('returns needs_host status for sampling_recipe workflows', async () => {
+    const future = new Date(Date.now() + 60_000).toISOString();
+    createWorkflow(db, {
+      id: 'w-recipe', kind: 'sampling_recipe',
+      description: 'Monday triage',
+      cron: '0 9 * * 1',
+      params: { recipe: 'Find new senior PM roles and score the top 5.' },
+      nextRunAt: future
+    });
+    const out = await runWorkflow({ workflowId: 'w-recipe' }, { db });
+    expect(out.status).toBe('needs_host');
+    expect(out.summary).toEqual({
+      recipe: 'Find new senior PM roles and score the top 5.'
+    });
+  });
 });
