@@ -3,6 +3,7 @@ import type { Db } from '../store/db.ts';
 import { getJob } from '../store/job.ts';
 import { listResumes, getResume } from '../store/resume.ts';
 import { getProfile } from '../store/profile.ts';
+import { setCachedNarrative } from '../store/fitScoreCache.ts';
 import type { SamplingClient } from '../sampling/client.ts';
 
 export const explainFitInput = z.object({
@@ -42,6 +43,8 @@ export async function explainFit(
   const narrativeMd = await ctx.sampling.complete({
     system: SYSTEM, prompt, maxTokens: 768
   });
+
+  setCachedNarrative(ctx.db, input.jobId, resume.id, narrativeMd);
 
   return { narrativeMd, jobId: input.jobId, resumeId: resume.id };
 }
