@@ -10,6 +10,7 @@ import {
 import { openDb } from './store/db.ts';
 import { seedRegistryIfEmpty } from './registryBoot.ts';
 import { SamplingClient } from './sampling/client.ts';
+import { LazyPlaywrightBrowser } from './services/browser/playwright.ts';
 import { toolDefinitions, type ToolCtx } from './tools/index.ts';
 import { listResources, readResource } from './resources/index.ts';
 import { pathToFileURL } from 'node:url';
@@ -36,7 +37,8 @@ export function bootstrap() {
     { capabilities: { tools: {}, resources: {} } } // sampling is a CLIENT capability
   );
   const sampling = new SamplingClient(server as unknown as ConstructorParameters<typeof SamplingClient>[0]);
-  const ctx: ToolCtx = { db, sampling };
+  const browser = new LazyPlaywrightBrowser();
+  const ctx: ToolCtx = { db, sampling, browser };
 
   server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: toolDefinitions.map(t => ({

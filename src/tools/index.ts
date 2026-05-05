@@ -18,8 +18,10 @@ import { scheduleWorkflow, scheduleWorkflowInput } from './schedule_workflow.ts'
 import { runWorkflow, runWorkflowInput } from './run_workflow.ts';
 import { listWorkflowsTool, listWorkflowsInput } from './list_workflows.ts';
 import { deleteWorkflowTool, deleteWorkflowInput } from './delete_workflow.ts';
+import { previewApplication, previewApplicationInput } from './preview_application.ts';
+import type { Browser } from '../services/browser/types.ts';
 
-export type ToolCtx = { db: Db; sampling: SamplingClient };
+export type ToolCtx = { db: Db; sampling: SamplingClient; browser: Browser };
 
 type ToolDef = {
   name: string;
@@ -124,5 +126,11 @@ export const toolDefinitions: ToolDef[] = [
     description: 'Delete a scheduled workflow by id.',
     inputSchema: zodToJsonSchema(deleteWorkflowInput),
     run: (i, c) => deleteWorkflowTool(deleteWorkflowInput.parse(i), c)
+  },
+  {
+    name: 'preview_application',
+    description: "Open the application's deep link in a headless browser and return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first.",
+    inputSchema: zodToJsonSchema(previewApplicationInput),
+    run: (i, c) => previewApplication(previewApplicationInput.parse(i), c)
   }
 ];
