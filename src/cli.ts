@@ -188,10 +188,10 @@ export async function runDoctor(): Promise<DoctorReport> {
   // 4. Tools
   try {
     const { toolDefinitions } = await import('./tools/index.ts');
-    if (toolDefinitions.length === 16) {
+    if (toolDefinitions.length === 17) {
       checks.push({ name: 'tools', status: 'ok', message: `${toolDefinitions.length} tools registered` });
     } else {
-      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 16)` });
+      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 17)` });
     }
   } catch (e) {
     checks.push({ name: 'tools', status: 'fail', message: (e as Error).message });
@@ -220,6 +220,21 @@ export async function runDoctor(): Promise<DoctorReport> {
     }
   } catch (e) {
     checks.push({ name: 'adapters', status: 'fail', message: (e as Error).message });
+  }
+
+  // 6. Browser (optional, only needed for preview_application)
+  try {
+    const isImportable = await isPlaywrightImportable();
+    if (isImportable) {
+      checks.push({ name: 'browser', status: 'ok', message: 'playwright is importable' });
+    } else {
+      checks.push({
+        name: 'browser', status: 'warn',
+        message: 'playwright not installed (optional — run `crosswalk-mcp install-browser` to enable preview_application)'
+      });
+    }
+  } catch (e) {
+    checks.push({ name: 'browser', status: 'warn', message: (e as Error).message });
   }
 
   return { checks, allOk: checks.every(c => c.status !== 'fail') };
