@@ -87,5 +87,39 @@
   { "id": "babbel",          "name": "Babbel",          "ats": "recruitee",        "atsOrgSlug": "babbel" },
 
   { "id": "n26",             "name": "N26",             "ats": "personio",         "atsOrgSlug": "n26" },
-  { "id": "freenow",         "name": "FreeNow",         "ats": "personio",         "atsOrgSlug": "free-now" }
+  { "id": "freenow",         "name": "FreeNow",         "ats": "personio",         "atsOrgSlug": "free-now" },
+
+  { "id": "ramp_labs",       "name": "Ramp Labs",       "ats": "greenhouse",       "atsOrgSlug": "rampnetwork" },
+  { "id": "twilio",          "name": "Twilio",          "ats": "greenhouse",       "atsOrgSlug": "twilio" },
+  { "id": "fivetran",        "name": "Fivetran",        "ats": "greenhouse",       "atsOrgSlug": "fivetran" },
+  { "id": "hashicorp",       "name": "HashiCorp",       "ats": "greenhouse",       "atsOrgSlug": "hashicorp" },
+  { "id": "block",           "name": "Block (Square)",  "ats": "greenhouse",       "atsOrgSlug": "square" },
+  { "id": "samsara",         "name": "Samsara",         "ats": "greenhouse",       "atsOrgSlug": "samsara" },
+  { "id": "datarobot",       "name": "DataRobot",       "ats": "greenhouse",       "atsOrgSlug": "datarobot" },
+
+  { "id": "writer",          "name": "Writer",          "ats": "ashby",            "atsOrgSlug": "writer" },
+  { "id": "harvey",          "name": "Harvey",          "ats": "ashby",            "atsOrgSlug": "harvey" },
+  { "id": "runwayml",        "name": "Runway",          "ats": "ashby",            "atsOrgSlug": "runwayml" },
+  { "id": "togetherai",      "name": "Together AI",     "ats": "ashby",            "atsOrgSlug": "togetherai" },
+  { "id": "groq",            "name": "Groq",            "ats": "ashby",            "atsOrgSlug": "groq" },
+
+  { "id": "atlassian",       "name": "Atlassian",       "ats": "lever",            "atsOrgSlug": "atlassian" },
+  { "id": "canva",           "name": "Canva",           "ats": "lever",            "atsOrgSlug": "canva" },
+  { "id": "asana_lever",     "name": "Asana (Lever)",   "ats": "lever",            "atsOrgSlug": "asanaco" },
+
+  { "id": "delivery_now",    "name": "Foodpanda",       "ats": "smartrecruiters",  "atsOrgSlug": "Foodpanda" },
+  { "id": "publicis",        "name": "Publicis Groupe", "ats": "smartrecruiters",  "atsOrgSlug": "PublicisGroupe" },
+
+  { "id": "frontify",        "name": "Frontify",        "ats": "workable",         "atsOrgSlug": "frontify" },
+  { "id": "bunq",            "name": "bunq",            "ats": "workable",         "atsOrgSlug": "bunq" },
+
+  { "id": "amplitude",       "name": "Amplitude",       "ats": "bamboohr",         "atsOrgSlug": "amplitude" },
+  { "id": "crowdstrike",     "name": "CrowdStrike",     "ats": "bamboohr",         "atsOrgSlug": "crowdstrike" },
+
+  { "id": "personio_jobs",   "name": "Bolt",            "ats": "recruitee",        "atsOrgSlug": "bolt-eu" },
+  { "id": "kayak",           "name": "Kayak",           "ats": "recruitee",        "atsOrgSlug": "kayak" },
+
+  { "id": "doctolib",        "name": "Doctolib",        "ats": "personio",         "atsOrgSlug": "doctolib" },
+  { "id": "blinkist",        "name": "Blinkist",        "ats": "personio",         "atsOrgSlug": "blinkist" },
+  { "id": "auto1",           "name": "AUTO1 Group",     "ats": "personio",         "atsOrgSlug": "auto1-group" }
 ]

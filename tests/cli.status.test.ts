@@ -22,22 +22,30 @@ describe('cli/status', () => {
   });
 
   it('reports counts when state.db is empty (newly created)', async () => {
-    const out = await runStatus({ configPath: tmpCfg });
+    const out = await runStatus({
+      configPaths: {
+        claude: path.join(tmpHome, 'claude.json'),
+        cursor: path.join(tmpHome, 'cursor.json'),
+        windsurf: path.join(tmpHome, 'windsurf.json')
+      }
+    });
     expect(out.stateDir).toBe(tmpHome);
-    expect(out.dbExists).toBe(true); // openDb creates it
+    expect(out.dbExists).toBe(true);
     expect(out.profile).toBe(false);
     expect(out.resumes).toBe(0);
     expect(out.applicationsByStatus).toEqual({});
     expect(out.workflows).toBe(0);
-    expect(out.installedInClaudeDesktop).toBe(false);
+    expect(out.installedHosts).toEqual({ claude: false, cursor: false, windsurf: false });
   });
 
-  it('reports installedInClaudeDesktop=true when config has the entry', async () => {
+  it('reports installedHosts.claude=true when Claude config has the entry', async () => {
     await fs.writeFile(tmpCfg, JSON.stringify({
       mcpServers: { 'crosswalk-mcp': { command: 'npx', args: [] } }
     }));
-    const out = await runStatus({ configPath: tmpCfg });
-    expect(out.installedInClaudeDesktop).toBe(true);
+    const out = await runStatus({ configPaths: { claude: tmpCfg } });
+    expect(out.installedHosts.claude).toBe(true);
+    expect(out.installedHosts.cursor).toBe(false);
+    expect(out.installedHosts.windsurf).toBe(false);
   });
 
   it('counts applications grouped by status', async () => {
@@ -62,7 +70,7 @@ describe('cli/status', () => {
     });
     updateApplicationStatus(db, 'a2', 'submitted');
 
-    const out = await runStatus({ configPath: tmpCfg });
+    const out = await runStatus({ configPaths: { claude: tmpCfg } });
     expect(out.applicationsByStatus).toEqual({ draft: 1, submitted: 1 });
     expect(out.resumes).toBe(1);
   });
