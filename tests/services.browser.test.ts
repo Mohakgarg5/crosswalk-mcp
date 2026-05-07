@@ -125,4 +125,50 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
       browser.fillForm('https://x', [{ kind: 'email', value: 'a@b.co' }])
     ).rejects.toThrow(BrowserNotInstalledError);
   });
+
+  it('fillForm matches cover_letter_file via file selectors and cover_letter_text via textarea selectors', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const setFilesCalls: Array<{ selector: string; files: string[] }> = [];
+
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        // Cover-letter file matches the *generic* file fallback (no resume/cv match)
+        if (selector === 'input[type="file"][name*="cover" i]') {
+          return {
+            setInputFiles: async (files: string[]) => { setFilesCalls.push({ selector, files }); }
+          };
+        }
+        // Cover-letter textarea via Greenhouse-shaped name (second candidate)
+        if (selector === 'textarea[name="job_application[cover_letter]"]') {
+          return {
+            fill: async (value: string) => { fillCalls.push({ selector, value }); }
+          };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [
+      { kind: 'cover_letter_file', path: '/tmp/cover.docx' },
+      { kind: 'cover_letter_text', value: 'Dear hiring team,' }
+    ]);
+
+    expect(result.filled.sort()).toEqual(['cover_letter_file', 'cover_letter_text']);
+    expect(result.skipped).toEqual([]);
+    expect(setFilesCalls).toEqual([
+      { selector: 'input[type="file"][name*="cover" i]', files: ['/tmp/cover.docx'] }
+    ]);
+    expect(fillCalls).toEqual([
+      { selector: 'textarea[name="job_application[cover_letter]"]', value: 'Dear hiring team,' }
+    ]);
+  });
 });

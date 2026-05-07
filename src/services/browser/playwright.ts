@@ -94,7 +94,7 @@ export class LazyPlaywrightBrowser implements Browser {
         for (const selector of candidates) {
           const el = await page.$(selector);
           if (!el) continue;
-          if (field.kind === 'resume_file') {
+          if (field.kind === 'resume_file' || field.kind === 'cover_letter_file') {
             if (typeof el.setInputFiles !== 'function') continue;
             await el.setInputFiles([field.path]);
           } else {
@@ -162,6 +162,18 @@ const SELECTORS: Record<FillField['kind'], string[]> = {
     'input[name="urls[Website]"]',
     'input[name="website"]',
     'input[type="url"]'
+  ],
+  cover_letter_text: [
+    'textarea[name="cover_letter"]',
+    'textarea[name="job_application[cover_letter]"]',
+    'textarea[id="cover_letter"]',
+    'textarea[name*="cover" i]',
+    'textarea[id*="cover" i]'
+  ],
+  cover_letter_file: [
+    'input[type="file"][name*="cover" i]',
+    'input[type="file"][name*="letter" i]',
+    'input[type="file"][id*="cover" i]'
   ],
   resume_file: [
     'input[type="file"][name*="resume" i]',

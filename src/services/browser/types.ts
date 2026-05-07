@@ -52,6 +52,8 @@ export type FillField =
   | { kind: 'phone'; value: string }
   | { kind: 'linkedin'; value: string }
   | { kind: 'website'; value: string }
+  | { kind: 'cover_letter_text'; value: string }
+  | { kind: 'cover_letter_file'; path: string }
   | { kind: 'resume_file'; path: string };
 
 export type BrowserFillResult = {
