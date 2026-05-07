@@ -27,7 +27,7 @@ import './ats/workday.ts';
 import './ats/icims.ts';
 
 export const SERVER_NAME = 'crosswalk-mcp';
-export const SERVER_VERSION = '1.0.0';
+export const SERVER_VERSION = '1.1.0';
 
 export function bootstrap() {
   const db = openDb();
