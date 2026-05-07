@@ -19,6 +19,7 @@ import { runWorkflow, runWorkflowInput } from './run_workflow.ts';
 import { listWorkflowsTool, listWorkflowsInput } from './list_workflows.ts';
 import { deleteWorkflowTool, deleteWorkflowInput } from './delete_workflow.ts';
 import { previewApplication, previewApplicationInput } from './preview_application.ts';
+import { applyApplication, applyApplicationInput } from './apply_application.ts';
 import type { Browser } from '../services/browser/types.ts';
 
 export type ToolCtx = { db: Db; sampling: SamplingClient; browser: Browser };
@@ -132,5 +133,11 @@ export const toolDefinitions: ToolDef[] = [
     description: "Open the application's deep link in a headless browser and return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first.",
     inputSchema: zodToJsonSchema(previewApplicationInput),
     run: (i, c) => previewApplication(previewApplicationInput.parse(i), c)
+  },
+  {
+    name: 'apply_application',
+    description: "Open the application's deep link in a headless browser, auto-fill known fields (email/name/phone/resume) from your profile + tailored resume, take a screenshot, and stop. Does NOT submit — review and click Submit yourself. Requires `crosswalk-mcp install-browser` first.",
+    inputSchema: zodToJsonSchema(applyApplicationInput),
+    run: (i, c) => applyApplication(applyApplicationInput.parse(i), c)
   }
 ];
