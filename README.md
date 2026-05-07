@@ -9,7 +9,7 @@ Local-first. Zero API keys. Bring your own model.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -27,7 +27,7 @@ Every AI-powered job board says the same thing: "Upload your resume, we'll do th
 
 So why hand all that to one more job board?
 
-**Crosswalk is an MCP server.** Install it once into your AI client (Claude Desktop, Cursor, etc.). Your AI gains 16 new tools to find jobs, score fit, tailor resumes, draft applications, track your pipeline, and run scheduled workflows — using the model **you** already pay for, with your data **on your machine**.
+**Crosswalk is an MCP server.** Install it once into your AI client (Claude Desktop, Cursor, etc.). Your AI gains 18 new tools to find jobs, score fit, tailor resumes, draft applications, track your pipeline, and run scheduled workflows — using the model **you** already pay for, with your data **on your machine**.
 
 ```
 What you say to your AI:                   What Crosswalk does behind the scenes:
@@ -71,7 +71,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**17 MCP tools across 5 surfaces.** v0.7.0 adds the **`preview_application`** tool: render an application's deep link in a headless browser and get a screenshot + form-fields manifest before you submit. Playwright ships as an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
+**18 MCP tools across 5 surfaces.** v1.0.0 adds the headline **`apply_application`** tool: open the form in a headless browser, auto-fill known fields (email, name, phone, LinkedIn) and upload your tailored resume, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application` (rendered preview before drafting), Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
 
 ### Profile & resumes
 
@@ -105,6 +105,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 | `add_note` | Append a free-text note to an application's event log ("recruiter emailed back"). |
 | `list_pipeline` | List all applications with company + job context. Filter by status. |
 | `preview_application` | Open the application's deep link in a headless browser; return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first. |
+| `apply_application` | Open the deep link in a headless browser, auto-fill known fields from your profile + tailored resume, take a screenshot. Does **not** submit — you review and click Submit. Requires `crosswalk-mcp install-browser` first. |
 
 ### Scheduling
 
@@ -217,9 +218,10 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.4.0 — M5 | Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests | Shipped |
 | v0.5.0 — M6 | Multi-host install · doctor diagnostic · 100-company registry · 165 tests | Shipped |
 | v0.6.0 — M7 | Workday + iCIMS adapters · sampling_recipe workflows · 115-company registry · 175 tests | Shipped |
-| **v0.7.0 — M8** | **preview_application · optional Playwright · browser-aware doctor · 181 tests** | **Current** |
-| v1.0.0 — v1 | Autonomous browser-driven applying | Next |
-| v1.0.0 — v2 | Autonomous apply via Playwright in a sandbox · full agent loop | Planned |
+| v0.7.0 — M8 | preview_application · optional Playwright · browser-aware doctor · 181 tests | Shipped |
+| **v1.0.0 — M9** | **apply_application · profile-driven auto-fill · review-before-submit safety · 18 tools · ~190 tests** | **Current** |
+| v1.1.0 — M10 | Cover-letter file upload · structured Q&A from answerPack · richer ATS-specific selectors | Planned |
+| v2.0.0 | Full submit-and-confirm autonomy with elicitation gates · captcha handling · multi-step wizards | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
 
@@ -229,7 +231,7 @@ See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordere
 
 A high-level diagram lives in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Short version:
 
-- **`src/server.ts`** boots the MCP server, opens SQLite, registers 16 tools and 2 resources.
+- **`src/server.ts`** boots the MCP server, opens SQLite, registers 18 tools and 2 resources.
 - **`src/tools/`** — one file per MCP tool, each with a zod input schema.
 - **`src/services/`** — pure business logic (resume picker, tailorer, cover-letter drafter, guardrail, workflow engine). Doesn't know about MCP.
 - **`src/ats/`** — 8 self-registering adapters, all conforming to the `ATSAdapter` interface.

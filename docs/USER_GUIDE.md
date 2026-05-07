@@ -1,13 +1,13 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v0.7.0"
+subtitle: "AI-native career copilot · v1.0.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
 
 # Welcome
 
-Crosswalk is an AI-native career copilot. You install it once into your AI client (Claude Desktop, Cursor, etc.), and your AI gains 16 new tools to find jobs, score fit, tailor resumes, draft applications, track your pipeline, and run scheduled background workflows — all using the model you already pay for, with your data on your machine.
+Crosswalk is an AI-native career copilot. You install it once into your AI client (Claude Desktop, Cursor, etc.), and your AI gains 18 new tools to find jobs, score fit, tailor resumes, draft applications, track your pipeline, and run scheduled background workflows — all using the model you already pay for, with your data on your machine.
 
 This guide walks you through installation, every tool, common workflows ("recipes"), troubleshooting, and frequently asked questions.
 
@@ -86,7 +86,7 @@ You're set up. Everything from here is iteration.
 
 \newpage
 
-# Part 2 — The 16 tools
+# Part 2 — The 18 tools
 
 Each tool below has a one-line description, the input it accepts, the output it returns, and an example chat dialogue. Tools that need sampling (LLM work) are flagged.
 
@@ -274,7 +274,46 @@ Lists all your applications with company + job context. Optionally filtered by s
 
 **Crosswalk does:** all 14 applications across `draft`, `submitted`, `interviewing`, `rejected`, `offer`.
 
-## 2.5 Scheduling
+## 2.5 Browser preview & assisted apply (v1.0.0)
+
+These two tools require Playwright + Chromium. Install once with:
+
+```bash
+crosswalk-mcp install-browser   # ~200 MB download
+```
+
+### `preview_application` — see the form before you draft
+
+Renders an application's `deepLink` in a headless browser and returns a screenshot + visible form-fields manifest. Useful before `draft_application` to confirm the URL is the actual apply page (not a 404 or login wall) and to see what questions the form will ask.
+
+> "Preview application app_abc123"
+
+Returns: `screenshotPngBase64` (render in your client to inspect), `formFields[]` (best-effort list of input names/types/labels/required), `resolvedUrl`, `title`.
+
+### `apply_application` — assisted form fill
+
+Opens the deep link, fills the fields it recognizes from your profile (email, first/last name, phone, LinkedIn, website) plus your tailored resume DOCX uploaded to the file input, then takes a screenshot. **It does not click Submit.** You review the screenshot, open the URL yourself, and submit manually.
+
+> "Apply for application app_abc123"
+
+Returns:
+- `screenshotPngBase64` — render to inspect what was filled
+- `filled` — kinds successfully filled (e.g. `['email', 'first_name', 'resume_file']`)
+- `skipped` — kinds we couldn't locate on the form
+- `resolvedUrl` — final URL after redirects (open this to submit)
+- `submitted` — always `false` in v1.0
+- `resumeDocxPath` — path to the tailored DOCX written to `os.tmpdir()`
+
+**What it can fill (v1.0):** `email · first_name · last_name · full_name · phone · linkedin · website · resume_file`.
+
+**What it can't fill (v1.0):** Cover-letter uploads (separate input from resume), free-text "Why this company?" textareas, demographic / EEO dropdowns, captchas, multi-step wizards. v1.1 will close some of these gaps.
+
+**Safety:**
+- No submit click. Ever. v1.0 is "review-then-submit-yourself" by design.
+- No application state mutation. The pipeline status doesn't change until you call `submit_application` after manually submitting.
+- The tailored DOCX is written to `os.tmpdir()`. Path is in the response so you can retain it; OS reaps it on reboot.
+
+## 2.6 Scheduling
 
 ### `schedule_workflow`
 
@@ -618,7 +657,7 @@ A: As of v0.3.0:
 
 **Total: 51 companies, 8 ATSs.** Expanding by community PR.
 
-## 6.4 The 16 tools at a glance
+## 6.4 The 18 tools at a glance
 
 | # | Tool | Sampling? | Purpose |
 |---|---|---|---|
@@ -638,6 +677,8 @@ A: As of v0.3.0:
 | 14 | `run_workflow` | | Manually run a scheduled workflow now |
 | 15 | `list_workflows` | | List scheduled workflows |
 | 16 | `delete_workflow` | | Delete a scheduled workflow |
+| 17 | `preview_application` | | Render application deep link in headless browser; return screenshot + form fields. Requires `install-browser`. |
+| 18 | `apply_application` | | Auto-fill known fields + upload tailored resume; screenshot; never submits. Requires `install-browser`. |
 
 ## 6.5 Privacy summary
 
@@ -668,8 +709,10 @@ A: As of v0.3.0:
 | v0.4.0 | Shipped | M5 — Live-fit guardrail gate + uninstall/status CLI |
 | v0.5.0 | Shipped | M6 — Multi-host install + doctor + 100 companies |
 | v0.6.0 | Shipped | M7 — Workday + iCIMS adapters + sampling_recipe workflows + 115 companies |
-| **v0.7.0** | **Current** | **M8 — preview_application + optional Playwright** |
-| v1.0.0 | Next | v1 — Autonomous browser-driven applying |
+| v0.7.0 | Shipped | M8 — preview_application + optional Playwright |
+| **v1.0.0** | **Current** | **M9 — apply_application + profile-driven auto-fill (review-before-submit)** |
+| v1.1.0 | Planned | M10 — Cover-letter upload + structured Q&A + richer ATS selectors |
+| v2.0.0 | Planned | Full submit-and-confirm autonomy with elicitation gates |
 
 ---
 
@@ -689,4 +732,4 @@ Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context).
 
 ---
 
-*End of Crosswalk User Guide v0.3.0.*
+*End of Crosswalk User Guide v1.0.0.*
