@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v1.0.0"
+subtitle: "AI-native career copilot · v1.1.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -274,7 +274,7 @@ Lists all your applications with company + job context. Optionally filtered by s
 
 **Crosswalk does:** all 14 applications across `draft`, `submitted`, `interviewing`, `rejected`, `offer`.
 
-## 2.5 Browser preview & assisted apply (v1.0.0)
+## 2.5 Browser preview & assisted apply (v1.1.0)
 
 These two tools require Playwright + Chromium. Install once with:
 
@@ -301,12 +301,13 @@ Returns:
 - `filled` — kinds successfully filled (e.g. `['email', 'first_name', 'resume_file']`)
 - `skipped` — kinds we couldn't locate on the form
 - `resolvedUrl` — final URL after redirects (open this to submit)
-- `submitted` — always `false` in v1.0
+- `submitted` — always `false` in v1.1
 - `resumeDocxPath` — path to the tailored DOCX written to `os.tmpdir()`
+- `coverLetterDocxPath` — path to the cover-letter DOCX (undefined if the application has no cover letter)
 
-**What it can fill (v1.0):** `email · first_name · last_name · full_name · phone · linkedin · website · resume_file`.
+**What it can fill (v1.1):** `email · first_name · last_name · full_name · phone · linkedin · website · resume_file · cover_letter_file · cover_letter_text`.
 
-**What it can't fill (v1.0):** Cover-letter uploads (separate input from resume), free-text "Why this company?" textareas, demographic / EEO dropdowns, captchas, multi-step wizards. v1.1 will close some of these gaps.
+**What it can't fill (v1.1):** Free-text "Why this company?" textareas not labeled as `cover_letter`, demographic / EEO dropdowns, captchas, multi-step wizards. v1.2 will tackle structured Q&A fills.
 
 **Safety:**
 - No submit click. Ever. v1.0 is "review-then-submit-yourself" by design.
@@ -710,8 +711,9 @@ A: As of v0.3.0:
 | v0.5.0 | Shipped | M6 — Multi-host install + doctor + 100 companies |
 | v0.6.0 | Shipped | M7 — Workday + iCIMS adapters + sampling_recipe workflows + 115 companies |
 | v0.7.0 | Shipped | M8 — preview_application + optional Playwright |
-| **v1.0.0** | **Current** | **M9 — apply_application + profile-driven auto-fill (review-before-submit)** |
-| v1.1.0 | Planned | M10 — Cover-letter upload + structured Q&A + richer ATS selectors |
+| v1.0.0 | Shipped | M9 — apply_application + profile-driven auto-fill (review-before-submit) |
+| **v1.1.0** | **Current** | **M10 — Cover-letter fill (file + text) + richer Greenhouse/Lever selectors** |
+| v1.2.0 | Planned | M11 — Structured Q&A fills from answerPack + per-ATS selector packs |
 | v2.0.0 | Planned | Full submit-and-confirm autonomy with elicitation gates |
 
 ---
@@ -732,4 +734,4 @@ Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context).
 
 ---
 
-*End of Crosswalk User Guide v1.0.0.*
+*End of Crosswalk User Guide v1.1.0.*
