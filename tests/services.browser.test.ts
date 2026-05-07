@@ -69,4 +69,60 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     await browser.preview('https://b.example');
     expect(launchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('fillForm fills matching selectors and skips unmatched fields', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const setFilesCalls: Array<{ selector: string; files: string[] }> = [];
+
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://apply.example.com/job/1'),
+      // First selector candidate present for email; nothing for phone
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[type="email"]') {
+          return {
+            fill: async (value: string) => { fillCalls.push({ selector, value }); }
+          };
+        }
+        if (selector === 'input[type="file"]') {
+          return {
+            setInputFiles: async (files: string[]) => { setFilesCalls.push({ selector, files }); }
+          };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89, 0x50, 0x4e, 0x47])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({
+      importPlaywright: async () => fakePw as never
+    });
+    const result = await browser.fillForm('https://apply.example.com/job/1', [
+      { kind: 'email', value: 'a@b.co' },
+      { kind: 'phone', value: '+1-555-0100' },
+      { kind: 'resume_file', path: '/tmp/resume.docx' }
+    ]);
+
+    expect(result.filled.sort()).toEqual(['email', 'resume_file']);
+    expect(result.skipped).toEqual(['phone']);
+    expect(fillCalls).toEqual([{ selector: 'input[type="email"]', value: 'a@b.co' }]);
+    expect(setFilesCalls).toEqual([{ selector: 'input[type="file"]', files: ['/tmp/resume.docx'] }]);
+    expect(result.title).toBe('Apply');
+    expect(result.resolvedUrl).toBe('https://apply.example.com/job/1');
+    expect(result.screenshotPng).toBeInstanceOf(Buffer);
+  });
+
+  it('fillForm throws BrowserNotInstalledError when playwright import fails', async () => {
+    const browser = new LazyPlaywrightBrowser({
+      importPlaywright: async () => { throw new Error('no playwright'); }
+    });
+    await expect(
+      browser.fillForm('https://x', [{ kind: 'email', value: 'a@b.co' }])
+    ).rejects.toThrow(BrowserNotInstalledError);
+  });
 });

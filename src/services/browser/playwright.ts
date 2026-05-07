@@ -1,4 +1,4 @@
-import type { Browser, BrowserPreview, FormField } from './types.ts';
+import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
 
 type PlaywrightModule = {
@@ -13,12 +13,18 @@ type PlaywrightModule = {
   };
 };
 
+type PlaywrightLocator = {
+  fill?(value: string): Promise<void>;
+  setInputFiles?(files: string | string[]): Promise<void>;
+};
+
 type PlaywrightPage = {
   goto(url: string, opts?: { waitUntil?: string; timeout?: number }): Promise<unknown>;
   title(): Promise<string>;
   url(): string;
   screenshot(opts?: { fullPage?: boolean }): Promise<Buffer>;
   evaluate<T>(fn: () => T): Promise<T>;
+  $(selector: string): Promise<PlaywrightLocator | null>;
   close(): Promise<void>;
 };
 
@@ -73,6 +79,43 @@ export class LazyPlaywrightBrowser implements Browser {
     }
   }
 
+  async fillForm(url: string, fields: FillField[]): Promise<BrowserFillResult> {
+    const browser = await this.loadBrowser();
+    const ctx = await browser.newContext();
+    try {
+      const page = await ctx.newPage();
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
+      const filled: string[] = [];
+      const skipped: string[] = [];
+
+      for (const field of fields) {
+        const candidates = SELECTORS[field.kind];
+        let matched = false;
+        for (const selector of candidates) {
+          const el = await page.$(selector);
+          if (!el) continue;
+          if (field.kind === 'resume_file') {
+            if (typeof el.setInputFiles !== 'function') continue;
+            await el.setInputFiles([field.path]);
+          } else {
+            if (typeof el.fill !== 'function') continue;
+            await el.fill(field.value);
+          }
+          matched = true;
+          break;
+        }
+        (matched ? filled : skipped).push(field.kind);
+      }
+
+      const title = await page.title();
+      const resolvedUrl = page.url();
+      const screenshotPng = await page.screenshot({ fullPage: false });
+      return { resolvedUrl, title, screenshotPng, filled, skipped };
+    } finally {
+      await ctx.close();
+    }
+  }
+
   async close(): Promise<void> {
     if (this.launchedBrowser) {
       await this.launchedBrowser.close();
@@ -80,6 +123,52 @@ export class LazyPlaywrightBrowser implements Browser {
     }
   }
 }
+
+/** Selector candidates, in priority order. First match wins. */
+const SELECTORS: Record<FillField['kind'], string[]> = {
+  email: [
+    'input[type="email"]',
+    'input[name="email"]',
+    'input[name="job_application[email]"]',
+    'input[autocomplete="email"]'
+  ],
+  first_name: [
+    'input[name="first_name"]',
+    'input[name="job_application[first_name]"]',
+    'input[autocomplete="given-name"]'
+  ],
+  last_name: [
+    'input[name="last_name"]',
+    'input[name="job_application[last_name]"]',
+    'input[autocomplete="family-name"]'
+  ],
+  full_name: [
+    'input[name="name"]',
+    'input[name="full_name"]',
+    'input[autocomplete="name"]'
+  ],
+  phone: [
+    'input[type="tel"]',
+    'input[name="phone"]',
+    'input[name="job_application[phone]"]',
+    'input[autocomplete="tel"]'
+  ],
+  linkedin: [
+    'input[name="urls[LinkedIn]"]',
+    'input[name="linkedin"]',
+    'input[name*="linkedin" i]'
+  ],
+  website: [
+    'input[name="urls[Website]"]',
+    'input[name="website"]',
+    'input[type="url"]'
+  ],
+  resume_file: [
+    'input[type="file"][name*="resume" i]',
+    'input[type="file"][name*="cv" i]',
+    'input[type="file"]'
+  ]
+};
 
 /* Runs in the browser page context (Playwright's page.evaluate).
  * DOM globals are not visible to the Node TS compiler, so we type

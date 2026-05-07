@@ -33,6 +33,7 @@ describe('tools/preview_application', () => {
           { name: 'resume', type: 'file', required: true }
         ]
       }),
+      fillForm: vi.fn(),
       close: vi.fn()
     };
     const out = await previewApplication({ applicationId: 'app1' }, { db, browser });
@@ -46,7 +47,7 @@ describe('tools/preview_application', () => {
   });
 
   it('throws on unknown application', async () => {
-    const browser: Browser = { preview: vi.fn(), close: vi.fn() };
+    const browser: Browser = { preview: vi.fn(), fillForm: vi.fn(), close: vi.fn() };
     await expect(
       previewApplication({ applicationId: 'nope' }, { db, browser })
     ).rejects.toThrow(/unknown application/i);
