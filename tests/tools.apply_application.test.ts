@@ -55,7 +55,7 @@ describe('tools/apply_application', () => {
     );
     const kinds = seenFields.map(f => f.kind).sort();
     expect(kinds).toEqual(
-      ['email', 'first_name', 'last_name', 'linkedin', 'phone', 'resume_file']
+      ['cover_letter_file', 'cover_letter_text', 'email', 'first_name', 'last_name', 'linkedin', 'phone', 'resume_file']
     );
     const resumeField = seenFields.find(f => f.kind === 'resume_file');
     expect(resumeField).toBeDefined();
@@ -98,6 +98,59 @@ describe('tools/apply_application', () => {
     const passed = (browser.fillForm as ReturnType<typeof vi.fn>).mock.calls[0][1] as FillField[];
     const kinds = passed.map(f => f.kind).sort();
     // Only email + resume_file (no name, phone, linkedin in this profile)
-    expect(kinds).toEqual(['email', 'resume_file']);
+    expect(kinds).toEqual(['cover_letter_file', 'cover_letter_text', 'email', 'resume_file']);
+  });
+
+  it('pushes cover_letter_file + cover_letter_text fields when coverLetterMd is set', async () => {
+    const passed: FillField[] = [];
+    const browser: Browser = {
+      preview: vi.fn(),
+      close: vi.fn(),
+      fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
+        passed.push(...fields);
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: fields.map(f => f.kind),
+          skipped: []
+        };
+      })
+    };
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser });
+
+    const kinds = passed.map(f => f.kind).sort();
+    expect(kinds).toContain('cover_letter_file');
+    expect(kinds).toContain('cover_letter_text');
+    expect(kinds).toContain('resume_file');
+
+    const cf = passed.find(f => f.kind === 'cover_letter_file');
+    expect(cf && cf.kind === 'cover_letter_file' && cf.path.endsWith('.docx') && cf.path.includes('cover-letter')).toBe(true);
+
+    const ct = passed.find(f => f.kind === 'cover_letter_text');
+    expect(ct && ct.kind === 'cover_letter_text' && ct.value.length > 0).toBe(true);
+
+    expect(out.coverLetterDocxPath).toBeDefined();
+    expect(out.coverLetterDocxPath?.endsWith('.docx')).toBe(true);
+  });
+
+  it('omits cover-letter fields when coverLetterMd is empty', async () => {
+    db.prepare(`UPDATE application SET cover_letter_md = '' WHERE id = ?`).run('app1');
+    const passed: FillField[] = [];
+    const browser: Browser = {
+      preview: vi.fn(), close: vi.fn(),
+      fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
+        passed.push(...fields);
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: [], skipped: []
+        };
+      })
+    };
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser });
+    const kinds = passed.map(f => f.kind);
+    expect(kinds).not.toContain('cover_letter_file');
+    expect(kinds).not.toContain('cover_letter_text');
+    expect(out.coverLetterDocxPath).toBeUndefined();
   });
 });

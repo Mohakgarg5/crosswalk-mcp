@@ -3,7 +3,7 @@ import type { Db } from '../store/db.ts';
 import { getApplication } from '../store/application.ts';
 import { getProfile } from '../store/profile.ts';
 import type { Browser, FillField } from '../services/browser/types.ts';
-import { writeResumeDocxToTemp } from '../services/browser/resumeFile.ts';
+import { writeResumeDocxToTemp, writeCoverLetterDocxToTemp } from '../services/browser/resumeFile.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string()
@@ -24,6 +24,8 @@ export type ApplyApplicationResult = {
   submitted: false;
   /** Path to the tailored resume DOCX written to /tmp. */
   resumeDocxPath: string;
+  /** Path to the cover-letter DOCX. Undefined when the application has no cover letter. */
+  coverLetterDocxPath?: string;
 };
 
 function asString(v: unknown): string | undefined {
@@ -66,6 +68,13 @@ export async function applyApplication(
   const resumeDocxPath = await writeResumeDocxToTemp(app.tailoredResumeMd, app.id);
   fields.push({ kind: 'resume_file', path: resumeDocxPath });
 
+  let coverLetterDocxPath: string | undefined;
+  if (app.coverLetterMd && app.coverLetterMd.length > 0) {
+    coverLetterDocxPath = await writeCoverLetterDocxToTemp(app.coverLetterMd, app.id);
+    fields.push({ kind: 'cover_letter_file', path: coverLetterDocxPath });
+    fields.push({ kind: 'cover_letter_text', value: app.coverLetterMd });
+  }
+
   const result = await ctx.browser.fillForm(app.deepLink, fields);
 
   return {
@@ -77,6 +86,7 @@ export async function applyApplication(
     filled: result.filled,
     skipped: result.skipped,
     submitted: false,
-    resumeDocxPath
+    resumeDocxPath,
+    coverLetterDocxPath
   };
 }
