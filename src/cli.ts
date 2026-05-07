@@ -188,10 +188,10 @@ export async function runDoctor(): Promise<DoctorReport> {
   // 4. Tools
   try {
     const { toolDefinitions } = await import('./tools/index.ts');
-    if (toolDefinitions.length === 17) {
+    if (toolDefinitions.length === 18) {
       checks.push({ name: 'tools', status: 'ok', message: `${toolDefinitions.length} tools registered` });
     } else {
-      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 17)` });
+      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 18)` });
     }
   } catch (e) {
     checks.push({ name: 'tools', status: 'fail', message: (e as Error).message });

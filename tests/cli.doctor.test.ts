@@ -36,4 +36,11 @@ describe('cli/doctor', () => {
     expect(names).toContain('adapters');
     expect(names).toContain('browser');
   });
+
+  it('tools check passes with 18 tools registered', async () => {
+    const r = await runDoctor();
+    const tools = r.checks.find(c => c.name === 'tools');
+    expect(tools?.status).toBe('ok');
+    expect(tools?.message).toMatch(/18 tools/);
+  });
 });
