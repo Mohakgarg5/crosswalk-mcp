@@ -34,5 +34,6 @@ describe('cli/doctor', () => {
     expect(names).toContain('registry');
     expect(names).toContain('tools');
     expect(names).toContain('adapters');
+    expect(names).toContain('browser');
   });
 });

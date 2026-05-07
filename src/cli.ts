@@ -3,6 +3,16 @@ import * as fs from 'node:fs/promises';
 import { existsSync, statSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+export async function isPlaywrightImportable(): Promise<boolean> {
+  try {
+    // @ts-expect-error - playwright is an optional peer dep
+    await import('playwright');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function installClaudeDesktop(opts: { configPath?: string } = {}): Promise<{ configPath: string }> {
   const { hostConfigPath } = await import('./cli/hosts.ts');
   const { installToHost } = await import('./cli/installToHost.ts');
@@ -178,10 +188,10 @@ export async function runDoctor(): Promise<DoctorReport> {
   // 4. Tools
   try {
     const { toolDefinitions } = await import('./tools/index.ts');
-    if (toolDefinitions.length === 16) {
+    if (toolDefinitions.length === 17) {
       checks.push({ name: 'tools', status: 'ok', message: `${toolDefinitions.length} tools registered` });
     } else {
-      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 16)` });
+      checks.push({ name: 'tools', status: 'warn', message: `${toolDefinitions.length} tools (expected 17)` });
     }
   } catch (e) {
     checks.push({ name: 'tools', status: 'fail', message: (e as Error).message });
@@ -210,6 +220,21 @@ export async function runDoctor(): Promise<DoctorReport> {
     }
   } catch (e) {
     checks.push({ name: 'adapters', status: 'fail', message: (e as Error).message });
+  }
+
+  // 6. Browser (optional, only needed for preview_application)
+  try {
+    const isImportable = await isPlaywrightImportable();
+    if (isImportable) {
+      checks.push({ name: 'browser', status: 'ok', message: 'playwright is importable' });
+    } else {
+      checks.push({
+        name: 'browser', status: 'warn',
+        message: 'playwright not installed (optional — run `crosswalk-mcp install-browser` to enable preview_application)'
+      });
+    }
+  } catch (e) {
+    checks.push({ name: 'browser', status: 'warn', message: (e as Error).message });
   }
 
   return { checks, allOk: checks.every(c => c.status !== 'fail') };
@@ -406,7 +431,9 @@ async function main() {
   crosswalk-mcp uninstall                  # remove from all detected hosts
   crosswalk-mcp uninstall --purge          # also delete ~/.crosswalk/state.db
   crosswalk-mcp status                     # show installed state and counts
-  crosswalk-mcp doctor                     # run sanity checks (added in M6-7)
+  crosswalk-mcp doctor                     # run sanity checks
+  crosswalk-mcp install-browser            # download Playwright + Chromium for preview_application
+  crosswalk-mcp uninstall-browser          # remove Playwright + Chromium
   crosswalk-mcp run-scheduled              # run any due workflows now
   crosswalk-mcp --version                  # print version
   crosswalk-mcp --help                     # show this message`);
@@ -435,6 +462,47 @@ async function main() {
       );
     }
     if (ran === 0) console.log('No workflows due.');
+    return;
+  }
+
+  if (cmd === 'install-browser') {
+    const { spawn } = await import('node:child_process');
+    console.log('Installing Playwright + Chromium for `preview_application`...');
+    console.log('(This downloads ~200 MB on first run.)');
+
+    const npmInstall = spawn('npm', ['install', '-g', 'playwright'], { stdio: 'inherit' });
+    await new Promise<void>((resolve, reject) => {
+      npmInstall.on('exit', code => code === 0 ? resolve() : reject(new Error(`npm install exited ${code}`)));
+      npmInstall.on('error', reject);
+    });
+
+    const pwInstall = spawn('npx', ['playwright', 'install', 'chromium'], { stdio: 'inherit' });
+    await new Promise<void>((resolve, reject) => {
+      pwInstall.on('exit', code => code === 0 ? resolve() : reject(new Error(`playwright install exited ${code}`)));
+      pwInstall.on('error', reject);
+    });
+
+    console.log('\n✓ Browser installed. `preview_application` is now available.');
+    return;
+  }
+
+  if (cmd === 'uninstall-browser') {
+    const { spawn } = await import('node:child_process');
+    console.log('Removing Playwright + Chromium...');
+
+    const pwUninstall = spawn('npx', ['playwright', 'uninstall', '--all'], { stdio: 'inherit' });
+    await new Promise<void>(resolve => {
+      pwUninstall.on('exit', () => resolve());
+      pwUninstall.on('error', () => resolve());
+    });
+
+    const npmUninstall = spawn('npm', ['uninstall', '-g', 'playwright'], { stdio: 'inherit' });
+    await new Promise<void>(resolve => {
+      npmUninstall.on('exit', () => resolve());
+      npmUninstall.on('error', () => resolve());
+    });
+
+    console.log('\n✓ Browser removed. `preview_application` will throw BrowserNotInstalledError until reinstalled.');
     return;
   }
 

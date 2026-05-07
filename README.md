@@ -8,8 +8,8 @@ Local-first. Zero API keys. Bring your own model.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
-[![Tests](https://img.shields.io/badge/tests-175%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
+[![Version](https://img.shields.io/badge/version-0.7.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -71,7 +71,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**16 MCP tools across 5 surfaces.** v0.6.0 adds **Workday + iCIMS adapters** (10 ATSs total) and **sampling-driven workflow recipes** — schedule a natural-language plan ("find senior PM roles every Monday and score the top 5") that the host AI executes when you next open chat. Registry grown to **115 companies**.
+**17 MCP tools across 5 surfaces.** v0.7.0 adds the **`preview_application`** tool: render an application's deep link in a headless browser and get a screenshot + form-fields manifest before you submit. Playwright ships as an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
 
 ### Profile & resumes
 
@@ -104,6 +104,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 | `set_status` | Change status: `draft → submitted → interviewing → rejected | offer`. |
 | `add_note` | Append a free-text note to an application's event log ("recruiter emailed back"). |
 | `list_pipeline` | List all applications with company + job context. Filter by status. |
+| `preview_application` | Open the application's deep link in a headless browser; return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first. |
 
 ### Scheduling
 
@@ -215,8 +216,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.3.0 — M4 | 5 more ATS adapters (8 total) · 51-company registry · M3 carry-overs · 124 tests | Shipped |
 | v0.4.0 — M5 | Live-fit guardrail gate · uninstall + status CLI · 74-company registry · 146 tests | Shipped |
 | v0.5.0 — M6 | Multi-host install · doctor diagnostic · 100-company registry · 165 tests | Shipped |
-| **v0.6.0 — M7** | **Workday + iCIMS adapters · sampling_recipe workflows · 115-company registry · 175 tests** | **Current** |
-| v0.7.0 — M8 | Autonomous browser-driven applying via Playwright sandbox | Next |
+| v0.6.0 — M7 | Workday + iCIMS adapters · sampling_recipe workflows · 115-company registry · 175 tests | Shipped |
+| **v0.7.0 — M8** | **preview_application · optional Playwright · browser-aware doctor · 181 tests** | **Current** |
+| v1.0.0 — v1 | Autonomous browser-driven applying | Next |
 | v1.0.0 — v2 | Autonomous apply via Playwright in a sandbox · full agent loop | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.

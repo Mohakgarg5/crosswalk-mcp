@@ -1,6 +1,6 @@
 {
   "name": "crosswalk-mcp",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "An AI-native, MCP-first career copilot. Local-first, zero API keys.",
   "type": "module",
   "bin": {
@@ -9,7 +9,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "tsup src/server.ts src/cli.ts --format esm --clean",
+    "build": "tsup src/server.ts src/cli.ts --format esm --clean --external playwright",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
@@ -45,5 +45,11 @@
     "tsx": "^4.0.0",
     "typescript": "^5.6.0",
     "vitest": "^2.0.0"
+  },
+  "peerDependencies": {
+    "playwright": ">=1.40.0"
+  },
+  "peerDependenciesMeta": {
+    "playwright": { "optional": true }
   }
 }
