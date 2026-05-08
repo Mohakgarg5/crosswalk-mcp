@@ -9,7 +9,7 @@ Local-first. Zero API keys. Bring your own model.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -71,7 +71,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ## What it does
 
-**18 MCP tools across 5 surfaces.** v1.1.0 expands `apply_application` to also fill **cover-letter** inputs — both the file upload (separate from resume) and the inline textarea (Greenhouse/Lever shape). v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
+**18 MCP tools across 5 surfaces.** v1.2.0 brings `apply_application` to the textarea era: arbitrary form questions are now auto-filled from your application's `answerPack` (the structured Q&A that `draft_application` builds via sampling). v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
 
 ### Profile & resumes
 
@@ -105,7 +105,7 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 | `add_note` | Append a free-text note to an application's event log ("recruiter emailed back"). |
 | `list_pipeline` | List all applications with company + job context. Filter by status. |
 | `preview_application` | Open the application's deep link in a headless browser; return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first. |
-| `apply_application` | Open the deep link in a headless browser, auto-fill known fields from your profile + tailored resume + cover letter, take a screenshot. Does **not** submit — you review and click Submit. Requires `crosswalk-mcp install-browser` first. |
+| `apply_application` | Open the deep link in a headless browser, auto-fill known fields from your profile + tailored resume + cover letter + answer-pack textarea questions, take a screenshot. Does **not** submit — you review and click Submit. Requires `crosswalk-mcp install-browser` first. |
 
 ### Scheduling
 
@@ -220,8 +220,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v0.6.0 — M7 | Workday + iCIMS adapters · sampling_recipe workflows · 115-company registry · 175 tests | Shipped |
 | v0.7.0 — M8 | preview_application · optional Playwright · browser-aware doctor · 181 tests | Shipped |
 | v1.0.0 — M9 | apply_application · profile-driven auto-fill · review-before-submit safety · 18 tools | Shipped |
-| **v1.1.0 — M10** | **Cover-letter fill (file + text) · richer Greenhouse/Lever selectors · 192 tests** | **Current** |
-| v1.2.0 — M11 | Structured Q&A fills from answerPack · per-ATS selector packs · Workday-aware adapter | Planned |
+| v1.1.0 — M10 | Cover-letter fill (file + text) · richer Greenhouse/Lever selectors · 192 tests | Shipped |
+| **v1.2.0 — M11** | **answerPack textarea fills (`text_by_name`) · multi-client install docs · 198 tests** | **Current** |
+| v1.3.0 — M12 | Form-introspection-then-sample (smarter Q&A mapping) · per-ATS selector packs · Workday widget support | Planned |
 | v2.0.0 | Full submit-and-confirm autonomy with elicitation gates · captcha handling · multi-step wizards | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.

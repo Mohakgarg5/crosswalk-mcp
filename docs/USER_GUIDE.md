@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v1.1.0"
+subtitle: "AI-native career copilot · v1.2.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -81,6 +81,139 @@ Claude calls `fetch_jobs` with `h1bSponsorOnly: true`. You get back a ranked lis
 Claude calls `explain_fit` with that job's id. You get a markdown narrative: percentage estimate, strengths (citing your resume), gaps, and how to position the application.
 
 You're set up. Everything from here is iteration.
+
+## 1.4 Using Crosswalk with various MCP clients
+
+Crosswalk is a stdio MCP server. Any MCP-compatible client can use it.
+
+The bundled `crosswalk-mcp install` command auto-configures three clients today: **Claude Desktop**, **Cursor**, **Windsurf**. For everything else, the manual config below is short — paste a snippet into the client's MCP config file and restart.
+
+In all snippets, the server command is `npx -y crosswalk-mcp@latest`. If you've cloned the repo locally instead of installing from npm, replace with `node /absolute/path/to/crosswalk-mcp/dist/cli.js`.
+
+### Claude Desktop (auto-installable)
+
+```bash
+crosswalk-mcp install --client claude
+```
+
+Or manually edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) / `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+
+```json
+{
+  "mcpServers": {
+    "crosswalk-mcp": {
+      "command": "npx",
+      "args": ["-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+Restart Claude Desktop.
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add crosswalk-mcp -- npx -y crosswalk-mcp@latest
+```
+
+Or edit `~/.claude.json` (the global config) and add an `mcpServers` entry of the same shape as above. Restart with `claude` to pick it up.
+
+### Cursor (auto-installable)
+
+```bash
+crosswalk-mcp install --client cursor
+```
+
+Or manually edit `~/.cursor/mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "crosswalk-mcp": {
+      "command": "npx",
+      "args": ["-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+### Windsurf (auto-installable)
+
+```bash
+crosswalk-mcp install --client windsurf
+```
+
+Or manually edit `~/.codeium/windsurf/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "crosswalk-mcp": {
+      "command": "npx",
+      "args": ["-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+### opencode
+
+opencode reads MCP servers from its project-level or global config. Add to `~/.config/opencode/config.json`:
+
+```json
+{
+  "mcp": {
+    "crosswalk-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+Restart opencode (`opencode` or your project session) to pick it up.
+
+### OpenAI Codex CLI
+
+Codex configures MCP servers in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.crosswalk-mcp]
+command = "npx"
+args = ["-y", "crosswalk-mcp@latest"]
+```
+
+Restart your `codex` session.
+
+### Gemini CLI
+
+Gemini CLI reads MCP servers from `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "crosswalk-mcp": {
+      "command": "npx",
+      "args": ["-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+Restart `gemini` to pick it up.
+
+### Any other MCP client
+
+Crosswalk speaks plain stdio MCP over npm-installed `crosswalk-mcp`. If your client supports stdio MCP servers, the recipe is always:
+
+- **Command:** `npx`
+- **Args:** `["-y", "crosswalk-mcp@latest"]`
+- **Env (optional):** `CROSSWALK_HOME=/custom/path` to override the default `~/.crosswalk/` state dir
+
+Once configured, Crosswalk's 18 tools become available to your agent. State (resumes, profile, applications) lives in `~/.crosswalk/state.db` regardless of which client invoked the server.
+
+> **Source-only install (no npm account):** if you've cloned `crosswalk-mcp` from GitHub instead of npm, replace `"command": "npx", "args": ["-y", "crosswalk-mcp@latest"]` with `"command": "node", "args": ["/absolute/path/to/crosswalk-mcp/dist/cli.js"]`.
 
 ---
 
@@ -274,7 +407,7 @@ Lists all your applications with company + job context. Optionally filtered by s
 
 **Crosswalk does:** all 14 applications across `draft`, `submitted`, `interviewing`, `rejected`, `offer`.
 
-## 2.5 Browser preview & assisted apply (v1.1.0)
+## 2.5 Browser preview & assisted apply (v1.2.0)
 
 These two tools require Playwright + Chromium. Install once with:
 
@@ -301,13 +434,15 @@ Returns:
 - `filled` — kinds successfully filled (e.g. `['email', 'first_name', 'resume_file']`)
 - `skipped` — kinds we couldn't locate on the form
 - `resolvedUrl` — final URL after redirects (open this to submit)
-- `submitted` — always `false` in v1.1
+- `submitted` — always `false` in v1.2
 - `resumeDocxPath` — path to the tailored DOCX written to `os.tmpdir()`
 - `coverLetterDocxPath` — path to the cover-letter DOCX (undefined if the application has no cover letter)
 
-**What it can fill (v1.1):** `email · first_name · last_name · full_name · phone · linkedin · website · resume_file · cover_letter_file · cover_letter_text`.
+**What it can fill (v1.2):** `email · first_name · last_name · full_name · phone · linkedin · website · resume_file · cover_letter_file · cover_letter_text · text_by_name (any answerPack key whose name matches a form field's `name` or `id`)`.
 
-**What it can't fill (v1.1):** Free-text "Why this company?" textareas not labeled as `cover_letter`, demographic / EEO dropdowns, captchas, multi-step wizards. v1.2 will tackle structured Q&A fills.
+**What it can't fill (v1.2):** Form questions whose `<textarea>`/`<input>` `name` doesn't appear in `answerPack`, demographic / EEO dropdowns, captchas, multi-step wizards. v1.3 will add form-introspection-then-sample to bridge the answerPack-key vs. form-name gap.
+
+**About answerPack matching (v1.2):** The tool naïvely tries `textarea[name="<key>"]`, `textarea[id="<key>"]`, `input[name="<key>"]`, `input[id="<key>"]` for each non-empty answerPack entry. Names with spaces or special characters are skipped (CSS-selector safety). For best results, write `draft_application` prompts that produce keys like `why_company`, `visa_status`, `years_of_experience` — these match common form-field names directly.
 
 **Safety:**
 - No submit click. Ever. v1.0 is "review-then-submit-yourself" by design.
@@ -712,8 +847,9 @@ A: As of v0.3.0:
 | v0.6.0 | Shipped | M7 — Workday + iCIMS adapters + sampling_recipe workflows + 115 companies |
 | v0.7.0 | Shipped | M8 — preview_application + optional Playwright |
 | v1.0.0 | Shipped | M9 — apply_application + profile-driven auto-fill (review-before-submit) |
-| **v1.1.0** | **Current** | **M10 — Cover-letter fill (file + text) + richer Greenhouse/Lever selectors** |
-| v1.2.0 | Planned | M11 — Structured Q&A fills from answerPack + per-ATS selector packs |
+| v1.1.0 | Shipped | M10 — Cover-letter fill (file + text) + richer Greenhouse/Lever selectors |
+| **v1.2.0** | **Current** | **M11 — answerPack textarea fills (`text_by_name`) + multi-client install docs** |
+| v1.3.0 | Planned | M12 — Form-introspection-then-sample + per-ATS selector packs + Workday widget support |
 | v2.0.0 | Planned | Full submit-and-confirm autonomy with elicitation gates |
 
 ---
@@ -734,4 +870,4 @@ Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context).
 
 ---
 
-*End of Crosswalk User Guide v1.1.0.*
+*End of Crosswalk User Guide v1.2.0.*
