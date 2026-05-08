@@ -75,6 +75,12 @@ export async function applyApplication(
     fields.push({ kind: 'cover_letter_text', value: app.coverLetterMd });
   }
 
+  for (const [name, value] of Object.entries(app.answerPack)) {
+    if (typeof value === 'string' && value.length > 0) {
+      fields.push({ kind: 'text_by_name', name, value });
+    }
+  }
+
   const result = await ctx.browser.fillForm(app.deepLink, fields);
 
   return {

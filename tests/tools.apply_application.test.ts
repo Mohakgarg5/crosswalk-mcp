@@ -153,4 +153,56 @@ describe('tools/apply_application', () => {
     expect(kinds).not.toContain('cover_letter_text');
     expect(out.coverLetterDocxPath).toBeUndefined();
   });
+
+  it('pushes text_by_name fields for each non-empty answerPack entry', async () => {
+    db.prepare(`UPDATE application SET answer_pack_json = ? WHERE id = ?`).run(
+      JSON.stringify({
+        why_company: 'Mission alignment + product depth.',
+        visa_status: 'US Citizen',
+        empty_one: ''
+      }),
+      'app1'
+    );
+    const passed: FillField[] = [];
+    const browser: Browser = {
+      preview: vi.fn(),
+      close: vi.fn(),
+      fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
+        passed.push(...fields);
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: fields.map(f => f.kind === 'text_by_name' ? `text_by_name:${f.name}` : f.kind),
+          skipped: []
+        };
+      })
+    };
+    await applyApplication({ applicationId: 'app1' }, { db, browser });
+
+    const tbn = passed.filter(f => f.kind === 'text_by_name');
+    const tbnNames = tbn.map(f => (f.kind === 'text_by_name' ? f.name : '')).sort();
+    expect(tbnNames).toEqual(['visa_status', 'why_company']);
+
+    const why = tbn.find(f => f.kind === 'text_by_name' && f.name === 'why_company');
+    expect(why && why.kind === 'text_by_name' && why.value).toBe('Mission alignment + product depth.');
+  });
+
+  it('omits text_by_name fields when answerPack is empty', async () => {
+    // beforeEach already sets answerPack: {} — verify nothing leaks through
+    const passed: FillField[] = [];
+    const browser: Browser = {
+      preview: vi.fn(), close: vi.fn(),
+      fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
+        passed.push(...fields);
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: [], skipped: []
+        };
+      })
+    };
+    await applyApplication({ applicationId: 'app1' }, { db, browser });
+
+    expect(passed.filter(f => f.kind === 'text_by_name')).toEqual([]);
+  });
 });
