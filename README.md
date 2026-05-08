@@ -282,7 +282,6 @@ For larger changes, see the implementation plans at [`docs/superpowers/plans/`](
 
 ## Credits
 
-- Inspired by [`jd-intel`](https://github.com/prPMDev/jd-intel) — the LinkedIn-post MCP that proved the "fetch jobs from your AI" hook works.
 - The H-1B confidence dataset is derived from the publicly-published USCIS H-1B Employer Data Hub (FY2025).
 - Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context). Every commit is co-authored by the model that wrote it.
 
