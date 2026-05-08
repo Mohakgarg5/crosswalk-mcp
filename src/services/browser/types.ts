@@ -54,7 +54,8 @@ export type FillField =
   | { kind: 'website'; value: string }
   | { kind: 'cover_letter_text'; value: string }
   | { kind: 'cover_letter_file'; path: string }
-  | { kind: 'resume_file'; path: string };
+  | { kind: 'resume_file'; path: string }
+  | { kind: 'text_by_name'; name: string; value: string };
 
 export type BrowserFillResult = {
   /** Final URL after navigation/redirects. */

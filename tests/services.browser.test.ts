@@ -171,4 +171,81 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
       { selector: 'textarea[name="job_application[cover_letter]"]', value: 'Dear hiring team,' }
     ]);
   });
+
+  it('fillForm matches text_by_name via textarea[name="..."] and reports filled with qualified label', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'textarea[name="why_company"]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [
+      { kind: 'text_by_name', name: 'why_company', value: 'I love your mission.' }
+    ]);
+
+    expect(result.filled).toEqual(['text_by_name:why_company']);
+    expect(result.skipped).toEqual([]);
+    expect(fillCalls).toEqual([
+      { selector: 'textarea[name="why_company"]', value: 'I love your mission.' }
+    ]);
+  });
+
+  it('fillForm reports text_by_name unmatched as skipped with qualified label', async () => {
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async () => null),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [
+      { kind: 'text_by_name', name: 'unknown_field', value: 'foo' }
+    ]);
+
+    expect(result.filled).toEqual([]);
+    expect(result.skipped).toEqual(['text_by_name:unknown_field']);
+  });
+
+  it('fillForm rejects text_by_name fields with unsafe names without attempting selector lookups', async () => {
+    const dollarMock = vi.fn(async () => null);
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: dollarMock,
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [
+      { kind: 'text_by_name', name: 'name with spaces"; injection', value: 'x' }
+    ]);
+
+    expect(result.filled).toEqual([]);
+    expect(result.skipped).toEqual(['text_by_name:name with spaces"; injection']);
+    expect(dollarMock).not.toHaveBeenCalled();
+  });
 });

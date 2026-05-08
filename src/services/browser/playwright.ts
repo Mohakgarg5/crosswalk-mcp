@@ -89,6 +89,31 @@ export class LazyPlaywrightBrowser implements Browser {
       const skipped: string[] = [];
 
       for (const field of fields) {
+        if (field.kind === 'text_by_name') {
+          const label = `text_by_name:${field.name}`;
+          if (!isSafeFieldName(field.name)) {
+            skipped.push(label);
+            continue;
+          }
+          const candidates = [
+            `textarea[name="${field.name}"]`,
+            `textarea[id="${field.name}"]`,
+            `input[name="${field.name}"]`,
+            `input[id="${field.name}"]`
+          ];
+          let matched = false;
+          for (const selector of candidates) {
+            const el = await page.$(selector);
+            if (!el) continue;
+            if (typeof el.fill !== 'function') continue;
+            await el.fill(field.value);
+            matched = true;
+            break;
+          }
+          (matched ? filled : skipped).push(label);
+          continue;
+        }
+
         const candidates = SELECTORS[field.kind];
         let matched = false;
         for (const selector of candidates) {
@@ -125,7 +150,7 @@ export class LazyPlaywrightBrowser implements Browser {
 }
 
 /** Selector candidates, in priority order. First match wins. */
-const SELECTORS: Record<FillField['kind'], string[]> = {
+const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = {
   email: [
     'input[type="email"]',
     'input[name="email"]',
@@ -181,6 +206,11 @@ const SELECTORS: Record<FillField['kind'], string[]> = {
     'input[type="file"]'
   ]
 };
+
+const SAFE_FIELD_NAME_RE = /^[A-Za-z0-9_-]+$/;
+function isSafeFieldName(name: string): boolean {
+  return SAFE_FIELD_NAME_RE.test(name);
+}
 
 /* Runs in the browser page context (Playwright's page.evaluate).
  * DOM globals are not visible to the Node TS compiler, so we type
