@@ -248,4 +248,31 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.skipped).toEqual(['text_by_name:name with spaces"; injection']);
     expect(dollarMock).not.toHaveBeenCalled();
   });
+
+  it('fillForm falls back to input[name*="email" i] when no specific selector matches', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[name*="email" i]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [
+      { kind: 'email', value: 'a@b.co' }
+    ]);
+    expect(result.filled).toEqual(['email']);
+    expect(fillCalls).toEqual([{ selector: 'input[name*="email" i]', value: 'a@b.co' }]);
+  });
 });

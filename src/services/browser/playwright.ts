@@ -155,7 +155,8 @@ const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = 
     'input[type="email"]',
     'input[name="email"]',
     'input[name="job_application[email]"]',
-    'input[autocomplete="email"]'
+    'input[autocomplete="email"]',
+    'input[name*="email" i]'
   ],
   first_name: [
     'input[name="first_name"]',
@@ -176,7 +177,8 @@ const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = 
     'input[type="tel"]',
     'input[name="phone"]',
     'input[name="job_application[phone]"]',
-    'input[autocomplete="tel"]'
+    'input[autocomplete="tel"]',
+    'input[name*="phone" i]'
   ],
   linkedin: [
     'input[name="urls[LinkedIn]"]',
