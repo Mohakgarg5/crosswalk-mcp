@@ -9,7 +9,7 @@ Local-first. Zero API keys. Bring your own model.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-1.4.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.5.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -129,7 +129,7 @@ See [USER_GUIDE §1.4](docs/USER_GUIDE.md#14-using-crosswalk-with-various-mcp-cl
 
 ## What it does
 
-**18 MCP tools across 5 surfaces.** v1.4.0 adds **per-ATS selector packs** to `apply_application` — Workable's `firstName`/`phoneNumber`/`resumeFile` and Ashby's `data-testid` attributes are now first-class selectors, alongside generic Greenhouse/Lever coverage. v1.3.0 brought form-introspection-then-sample (LLM fallback for unmatched textareas); v1.2.0 brought textarea fills via `text_by_name`; v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
+**18 MCP tools across 5 surfaces.** v1.5.0 adds **Workday support** via `data-automation-id` selectors (the framework Workday's Lightning components use). Combined with the existing per-ATS packs from v1.4.0 — Workable's `firstName`/`phoneNumber`/`resumeFile` and Ashby's `data-testid` attributes — `apply_application` now has first-class coverage across the 4 highest-impact ATSes plus Greenhouse/Lever generics. v1.3.0 brought form-introspection-then-sample (LLM fallback for unmatched textareas); v1.2.0 brought textarea fills via `text_by_name`; v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
 
 ### Profile & resumes
 
@@ -281,8 +281,8 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v1.1.0 — M10 | Cover-letter fill (file + text) · richer Greenhouse/Lever selectors · 192 tests | Shipped |
 | v1.2.0 — M11 | answerPack textarea fills (`text_by_name`) · multi-client install docs · 198 tests | Shipped |
 | v1.3.0 — M12 | Smart fill: form-introspection-then-sample for unmatched textareas · 204 tests | Shipped |
-| **v1.4.0 — M13** | **Per-ATS selector packs (Workable + Ashby) · 209 tests** | **Current** |
-| v1.5.0 — M14 | Workday widget support (`data-automation-id` selectors) | Planned |
+| v1.4.0 — M13 | Per-ATS selector packs (Workable + Ashby) · 209 tests | Shipped |
+| **v1.5.0 — M14** | **Workday widget support (`data-automation-id` selectors) · 210 tests** | **Current** |
 | v2.0.0 | Full submit-and-confirm autonomy with elicitation gates · captcha handling · multi-step wizards | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
