@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v1.5.0"
+subtitle: "AI-native career copilot · v1.6.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -448,7 +448,7 @@ Returns:
 
 This costs an extra browser call (preview + fillForm), so a smart-fill `apply_application` invocation takes roughly twice as long as a v1.2 call (~10s vs. ~5s on a typical form). Worth it once per application.
 
-**Per-ATS packs (v1.4–v1.5):** When the application's company is in your registry, the tool passes the company's ATS slug to the browser layer. Per-ATS selector overlays are tried before the generic candidates — so e.g. on a Workable form, `input[name="firstName"]` is matched directly without needing the case-insensitive substring fallback. v1.4 shipped Workable and Ashby; **v1.5 adds Workday** via `data-automation-id` selectors (e.g. `input[data-automation-id="email"]`, `input[data-automation-id="legalNameSection_firstName"]`). Greenhouse and Lever continue to be served by generics. The selected pack appears as `detectedAts` on the result so you can verify which path ran.
+**Per-ATS packs (v1.4–v1.6):** When the application's company is in your registry, the tool passes the company's ATS slug to the browser layer. Per-ATS selector overlays are tried before the generic candidates. As of v1.6, packs ship for **all 10 supported ATSes**: Workable (camelCase names), Ashby (`data-testid`), Workday (`data-automation-id`), SmartRecruiters (camelCase), BambooHR (`fname`/`lname`), Recruitee (`candidate[*]` namespacing), Personio (`job_application[*]` namespacing), iCIMS (id-based substring), plus Greenhouse and Lever which already work via generics. The selected pack appears as `detectedAts` on the result so you can verify which path ran.
 
 **About answerPack matching (v1.2):** The tool naïvely tries `textarea[name="<key>"]`, `textarea[id="<key>"]`, `input[name="<key>"]`, `input[id="<key>"]` for each non-empty answerPack entry. Names with spaces or special characters are skipped (CSS-selector safety). For best results, write `draft_application` prompts that produce keys like `why_company`, `visa_status`, `years_of_experience` — these match common form-field names directly.
 
@@ -859,7 +859,8 @@ A: As of v0.3.0:
 | v1.2.0 | Shipped | M11 — answerPack textarea fills (`text_by_name`) + multi-client install docs |
 | v1.3.0 | Shipped | M12 — Smart fill: form-introspection-then-sample for unmatched textareas |
 | v1.4.0 | Shipped | M13 — Per-ATS selector packs (Workable + Ashby) |
-| **v1.5.0** | **Current** | **M14 — Workday widget support (`data-automation-id` selectors)** |
+| v1.5.0 | Shipped | M14 — Workday widget support (`data-automation-id` selectors) |
+| **v1.6.0** | **Current** | **M15 — Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS** |
 | v2.0.0 | Planned | Full submit-and-confirm autonomy with elicitation gates |
 
 ---
@@ -880,4 +881,4 @@ Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context).
 
 ---
 
-*End of Crosswalk User Guide v1.5.0.*
+*End of Crosswalk User Guide v1.6.0.*
