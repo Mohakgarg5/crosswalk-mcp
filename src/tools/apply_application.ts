@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import type { Db } from '../store/db.ts';
-import { getApplication } from '../store/application.ts';
+import { getApplication, addEventForApplication, updateApplicationStatus } from '../store/application.ts';
 import { getProfile } from '../store/profile.ts';
 import type { Browser, FillField } from '../services/browser/types.ts';
 import { writeResumeDocxToTemp, writeCoverLetterDocxToTemp } from '../services/browser/resumeFile.ts';
@@ -10,7 +10,8 @@ import { getJob } from '../store/job.ts';
 import { getCompany } from '../store/company.ts';
 
 export const applyApplicationInput = z.object({
-  applicationId: z.string()
+  applicationId: z.string(),
+  submit: z.boolean().optional()
 });
 
 export type ApplyApplicationResult = {
@@ -24,8 +25,8 @@ export type ApplyApplicationResult = {
   filled: string[];
   /** Field kinds the browser couldn't find a selector for. */
   skipped: string[];
-  /** Always false for v1.0 — the user clicks Submit themselves. */
-  submitted: false;
+  /** True if a submit button was clicked (v2.0+ opt-in via input.submit). False otherwise. */
+  submitted: boolean;
   /** Path to the tailored resume DOCX written to /tmp. */
   resumeDocxPath: string;
   /** Path to the cover-letter DOCX. Undefined when the application has no cover letter. */
@@ -34,6 +35,8 @@ export type ApplyApplicationResult = {
   sampledFields: string[];
   /** ATS slug derived from the application's company. Null if the job/company isn't in the DB. */
   detectedAts: string | null;
+  /** URL after submit click (post-navigation). Only set when submit succeeded. */
+  postSubmitUrl?: string;
 };
 
 function asString(v: unknown): string | undefined {
@@ -133,7 +136,27 @@ export async function applyApplication(
     }
   }
 
-  const result = await ctx.browser.fillForm(app.deepLink, fields, detectedAts ? { ats: detectedAts } : {});
+  const result = await ctx.browser.fillForm(
+    app.deepLink,
+    fields,
+    {
+      ...(detectedAts ? { ats: detectedAts } : {}),
+      ...(input.submit ? { clickSubmit: true } : {})
+    }
+  );
+
+  const submitted = Boolean(result.submitClicked);
+  if (submitted) {
+    addEventForApplication(ctx.db, app.id, 'browser_submitted', {
+      postSubmitUrl: result.postSubmitUrl ?? null,
+      postSubmitTitle: result.postSubmitTitle ?? null
+    });
+    try {
+      updateApplicationStatus(ctx.db, app.id, 'submitted');
+    } catch {
+      // Already in submitted state or unknown — ignore
+    }
+  }
 
   return {
     applicationId: app.id,
@@ -143,10 +166,11 @@ export async function applyApplication(
     screenshotPngBase64: result.screenshotPng.toString('base64'),
     filled: result.filled,
     skipped: result.skipped,
-    submitted: false,
+    submitted,
     resumeDocxPath,
     coverLetterDocxPath,
     sampledFields,
-    detectedAts
+    detectedAts,
+    postSubmitUrl: result.postSubmitUrl
   };
 }

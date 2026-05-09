@@ -317,4 +317,46 @@ describe('tools/apply_application', () => {
     const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
     expect(out.detectedAts).toBeNull();
   });
+
+  it('passes clickSubmit:true to fillForm when input.submit is true and reports submitted=true', async () => {
+    let seenOpts: { ats?: string; clickSubmit?: boolean } | undefined;
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (_url: string, _fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean }) => {
+        seenOpts = opts;
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: [], skipped: [],
+          submitClicked: true,
+          postSubmitUrl: 'https://x/thank-you',
+          postSubmitTitle: 'Thank You'
+        };
+      })
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+
+    expect(seenOpts?.clickSubmit).toBe(true);
+    expect(out.submitted).toBe(true);
+    expect(out.postSubmitUrl).toBe('https://x/thank-you');
+  });
+
+  it('does not pass clickSubmit when submit is omitted; submitted=false', async () => {
+    let seenOpts: { ats?: string; clickSubmit?: boolean } | undefined;
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (_url: string, _fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean }) => {
+        seenOpts = opts;
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: [], skipped: []
+        };
+      })
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
+
+    expect(seenOpts?.clickSubmit).toBeUndefined();
+    expect(out.submitted).toBe(false);
+  });
 });
