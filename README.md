@@ -9,7 +9,7 @@ Local-first. Zero API keys. Bring your own model.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -129,7 +129,7 @@ See [USER_GUIDE §1.4](docs/USER_GUIDE.md#14-using-crosswalk-with-various-mcp-cl
 
 ## What it does
 
-**18 MCP tools across 5 surfaces.** v1.6.0 closes the per-ATS coverage loop — `apply_application` now has selector packs for **all 10 supported ATSes**: Workable, Ashby, Workday, SmartRecruiters, BambooHR, Recruitee, Personio, iCIMS, plus Greenhouse and Lever (served by generics). v1.3.0 brought form-introspection-then-sample (LLM fallback for unmatched textareas); v1.2.0 brought textarea fills via `text_by_name`; v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
+**18 MCP tools across 5 surfaces.** v2.0.0 ships **opt-in autonomous submit**. Pass `submit: true` to `apply_application` and the tool will click the form's submit button after filling — logging a `browser_submitted` event and updating the application's status to `submitted`. The default remains `submit: false` (review-then-click-yourself), preserving the v1.x safety stance. v1.7.0 added per-op resilience; v1.6.0 closed per-ATS coverage across all 10 supported ATSes (Workable, Ashby, Workday, SmartRecruiters, BambooHR, Recruitee, Personio, iCIMS, Greenhouse, Lever). v1.3.0 brought form-introspection-then-sample (LLM fallback for unmatched textareas); v1.2.0 brought textarea fills via `text_by_name`; v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
 
 ### Profile & resumes
 
@@ -163,7 +163,7 @@ See [USER_GUIDE §1.4](docs/USER_GUIDE.md#14-using-crosswalk-with-various-mcp-cl
 | `add_note` | Append a free-text note to an application's event log ("recruiter emailed back"). |
 | `list_pipeline` | List all applications with company + job context. Filter by status. |
 | `preview_application` | Open the application's deep link in a headless browser; return a screenshot + visible form fields. Requires `crosswalk-mcp install-browser` first. |
-| `apply_application` | Open the deep link in a headless browser, auto-fill known fields from your profile + tailored resume + cover letter + answer-pack textareas, sample the LLM for any unmatched textarea question, take a screenshot. Does **not** submit — you review and click Submit. Requires `crosswalk-mcp install-browser` first. |
+| `apply_application` | Open the deep link in a headless browser, auto-fill known fields from your profile + tailored resume + cover letter + answer-pack textareas, sample the LLM for any unmatched textarea question, take a screenshot. Pass `submit: true` to also click the submit button (v2.0+); default behavior leaves submission to you. Requires `crosswalk-mcp install-browser` first. |
 
 ### Scheduling
 
@@ -284,8 +284,9 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v1.4.0 — M13 | Per-ATS selector packs (Workable + Ashby) · 209 tests | Shipped |
 | v1.5.0 — M14 | Workday widget support (`data-automation-id` selectors) · 210 tests | Shipped |
 | v1.6.0 — M15 | Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS · 211 tests | Shipped |
-| **v1.7.0 — M16** | **fillForm resilience: per-op try/catch so a single Playwright error skips the selector instead of crashing the apply · 212 tests** | **Current** |
-| v2.0.0 | Full submit-and-confirm autonomy with elicitation gates · captcha handling · multi-step wizards | Planned |
+| v1.7.0 — M16 | fillForm resilience: per-op try/catch so a single Playwright error skips the selector instead of crashing the apply · 212 tests | Shipped |
+| **v2.0.0 — M17** | **Opt-in autonomous submit (`submit: true`) · `browser_submitted` event · auto-status update · 216 tests** | **Current** |
+| v2.1.0 | Captcha detection · multi-step wizard navigation · MCP elicitation gates | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
 
