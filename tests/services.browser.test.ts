@@ -361,4 +361,33 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.filled).toEqual(['first_name']);
     expect(fillCalls).toEqual([{ selector: 'input[autocomplete="given-name"]', value: 'Jane' }]);
   });
+
+  it('fillForm with ats=workday matches input[data-automation-id="email"] for email kind', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[data-automation-id="email"]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm(
+      'https://acme.wd1.myworkdayjobs.com/careers/job/123',
+      [{ kind: 'email', value: 'a@b.co' }],
+      { ats: 'workday' }
+    );
+    expect(result.filled).toEqual(['email']);
+    expect(fillCalls).toEqual([{ selector: 'input[data-automation-id="email"]', value: 'a@b.co' }]);
+  });
 });

@@ -224,6 +224,19 @@ const ATS_SELECTORS: Record<string, Partial<Record<StaticKind, string[]>>> = {
     phone: ['input[data-testid*="phone" i]'],
     resume_file: ['input[data-testid*="resume" i]']
   },
+  workday: {
+    email: ['input[data-automation-id="email"]'],
+    first_name: [
+      'input[data-automation-id="legalNameSection_firstName"]',
+      'input[data-automation-id="firstName"]'
+    ],
+    last_name: [
+      'input[data-automation-id="legalNameSection_lastName"]',
+      'input[data-automation-id="lastName"]'
+    ],
+    phone: ['input[data-automation-id="phone-number"]', 'input[data-automation-id="phoneNumber"]'],
+    resume_file: ['input[data-automation-id="file-upload-input-ref"]']
+  },
   greenhouse: {},
   lever: {}
 };
