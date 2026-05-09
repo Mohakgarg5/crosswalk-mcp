@@ -16,6 +16,7 @@ type PlaywrightModule = {
 type PlaywrightLocator = {
   fill?(value: string): Promise<void>;
   setInputFiles?(files: string | string[]): Promise<void>;
+  click?(): Promise<void>;
 };
 
 type PlaywrightPage = {
@@ -79,7 +80,7 @@ export class LazyPlaywrightBrowser implements Browser {
     }
   }
 
-  async fillForm(url: string, fields: FillField[], opts: { ats?: string } = {}): Promise<BrowserFillResult> {
+  async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean } = {}): Promise<BrowserFillResult> {
     const browser = await this.loadBrowser();
     const ctx = await browser.newContext();
     try {
@@ -140,10 +141,40 @@ export class LazyPlaywrightBrowser implements Browser {
         (matched ? filled : skipped).push(field.kind);
       }
 
-      const title = await page.title();
       const resolvedUrl = page.url();
+      const title = await page.title();
+
+      let submitClicked: boolean | undefined;
+      let postSubmitUrl: string | undefined;
+      let postSubmitTitle: string | undefined;
+      if (opts.clickSubmit) {
+        submitClicked = false;
+        for (const selector of SUBMIT_SELECTORS) {
+          const btn = await page.$(selector);
+          if (!btn) continue;
+          if (typeof btn.click !== 'function') continue;
+          try {
+            await btn.click();
+            submitClicked = true;
+            break;
+          } catch {
+            continue;
+          }
+        }
+        if (submitClicked) {
+          try {
+            // Best-effort wait for navigation to settle
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            postSubmitUrl = page.url();
+            postSubmitTitle = await page.title();
+          } catch {
+            // Page might be in transient state; leave URL/title undefined
+          }
+        }
+      }
+
       const screenshotPng = await page.screenshot({ fullPage: false });
-      return { resolvedUrl, title, screenshotPng, filled, skipped };
+      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle };
     } finally {
       await ctx.close();
     }
@@ -156,6 +187,16 @@ export class LazyPlaywrightBrowser implements Browser {
     }
   }
 }
+
+const SUBMIT_SELECTORS: string[] = [
+  'button[type="submit"]',
+  'input[type="submit"]',
+  'button[name="submit"]',
+  'button[id*="submit" i]',
+  'button[name*="submit" i]',
+  'button[data-automation-id*="submit" i]',
+  'button[data-automation-id="bottom-navigation-next-button"]'
+];
 
 /** Selector candidates, in priority order. First match wins. */
 const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = {

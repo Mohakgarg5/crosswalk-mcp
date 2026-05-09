@@ -25,12 +25,9 @@ export interface Browser {
   preview(url: string): Promise<BrowserPreview>;
 
   /**
-   * Open the URL in a headless browser, attempt to fill each field by
-   * its kind using common ATS selectors, and return a screenshot.
-   * Does NOT submit the form. Unmatched fields go to `skipped`.
-   * Throws if the browser runtime is not installed.
+   * Open the URL in a headless browser, attempt to fill each field by its kind using common ATS selectors, optionally click the submit button, and return a screenshot. Unmatched fields go to `skipped`. Throws if the browser runtime is not installed.
    */
-  fillForm(url: string, fields: FillField[], opts?: { ats?: string }): Promise<BrowserFillResult>;
+  fillForm(url: string, fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean }): Promise<BrowserFillResult>;
 
   /** Release any resources held by this browser instance. */
   close(): Promise<void>;
@@ -68,4 +65,10 @@ export type BrowserFillResult = {
   filled: string[];
   /** Field kinds we tried but couldn't find a selector for. */
   skipped: string[];
+  /** Whether a submit button was clicked. False when clickSubmit was not requested or no submit button matched. */
+  submitClicked?: boolean;
+  /** URL after submit click (post-navigation). Only set when submitClicked is true. */
+  postSubmitUrl?: string;
+  /** Page title after submit click (post-navigation). Only set when submitClicked is true. */
+  postSubmitTitle?: string;
 };

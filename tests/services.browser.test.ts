@@ -420,6 +420,59 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(fillCalls).toEqual([{ selector: 'input[name="firstName"]', value: 'Jane' }]);
   });
 
+  it('fillForm with clickSubmit clicks the first matching submit button and reports postSubmit state', async () => {
+    let submitClicked = false;
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValueOnce('Apply').mockResolvedValueOnce('Thank You'),
+      url: vi.fn().mockReturnValueOnce('https://x').mockReturnValueOnce('https://x/thank-you'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'button[type="submit"]') {
+          return { click: async () => { submitClicked = true; } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm(
+      'https://x',
+      [],
+      { clickSubmit: true }
+    );
+
+    expect(submitClicked).toBe(true);
+    expect(result.submitClicked).toBe(true);
+    expect(result.postSubmitUrl).toBe('https://x/thank-you');
+    expect(result.postSubmitTitle).toBe('Thank You');
+  }, 10000);
+
+  it('fillForm with clickSubmit but no matching button reports submitClicked=false', async () => {
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async () => null),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [], { clickSubmit: true });
+
+    expect(result.submitClicked).toBe(false);
+    expect(result.postSubmitUrl).toBeUndefined();
+    expect(result.postSubmitTitle).toBeUndefined();
+  });
+
   it('fillForm continues to next selector when fill() throws', async () => {
     let firstAttemptThrown = false;
     let secondCallCount = 0;
