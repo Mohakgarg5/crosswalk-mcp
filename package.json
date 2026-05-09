@@ -1,6 +1,6 @@
 {
   "name": "crosswalk-mcp",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "An AI-native, MCP-first career copilot. Local-first, zero API keys.",
   "type": "module",
   "bin": {
