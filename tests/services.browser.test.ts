@@ -419,4 +419,38 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.filled).toEqual(['first_name']);
     expect(fillCalls).toEqual([{ selector: 'input[name="firstName"]', value: 'Jane' }]);
   });
+
+  it('fillForm continues to next selector when fill() throws', async () => {
+    let firstAttemptThrown = false;
+    let secondCallCount = 0;
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        // First selector returns an element whose fill() always throws
+        if (selector === 'input[type="email"]') {
+          return { fill: async () => { firstAttemptThrown = true; throw new Error('detached'); } };
+        }
+        // Second selector works
+        if (selector === 'input[name="email"]') {
+          return { fill: async () => { secondCallCount++; } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://x', [{ kind: 'email', value: 'a@b.co' }]);
+
+    expect(firstAttemptThrown).toBe(true);
+    expect(secondCallCount).toBe(1);
+    expect(result.filled).toEqual(['email']);
+    expect(result.skipped).toEqual([]);
+  });
 });

@@ -106,7 +106,11 @@ export class LazyPlaywrightBrowser implements Browser {
             const el = await page.$(selector);
             if (!el) continue;
             if (typeof el.fill !== 'function') continue;
-            await el.fill(field.value);
+            try {
+              await el.fill(field.value);
+            } catch {
+              continue;
+            }
             matched = true;
             break;
           }
@@ -119,12 +123,16 @@ export class LazyPlaywrightBrowser implements Browser {
         for (const selector of candidates) {
           const el = await page.$(selector);
           if (!el) continue;
-          if (field.kind === 'resume_file' || field.kind === 'cover_letter_file') {
-            if (typeof el.setInputFiles !== 'function') continue;
-            await el.setInputFiles([field.path]);
-          } else {
-            if (typeof el.fill !== 'function') continue;
-            await el.fill(field.value);
+          try {
+            if (field.kind === 'resume_file' || field.kind === 'cover_letter_file') {
+              if (typeof el.setInputFiles !== 'function') continue;
+              await el.setInputFiles([field.path]);
+            } else {
+              if (typeof el.fill !== 'function') continue;
+              await el.fill(field.value);
+            }
+          } catch {
+            continue;
           }
           matched = true;
           break;
