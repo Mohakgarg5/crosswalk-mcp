@@ -238,7 +238,39 @@ const ATS_SELECTORS: Record<string, Partial<Record<StaticKind, string[]>>> = {
     resume_file: ['input[data-automation-id="file-upload-input-ref"]']
   },
   greenhouse: {},
-  lever: {}
+  lever: {},
+  smartrecruiters: {
+    first_name: ['input[name="firstName"]'],
+    last_name: ['input[name="lastName"]'],
+    phone: ['input[name="phoneNumber"]'],
+    resume_file: ['input[name="cv"]', 'input[name="resume"]']
+  },
+  bamboohr: {
+    first_name: ['input[name="fname"]', 'input[name="firstName"]'],
+    last_name: ['input[name="lname"]', 'input[name="lastName"]'],
+    resume_file: ['input[name="resume_file"]', 'input[name="resume"]']
+  },
+  recruitee: {
+    email: ['input[name="candidate[email]"]'],
+    first_name: ['input[name="candidate[first_name]"]'],
+    last_name: ['input[name="candidate[last_name]"]'],
+    phone: ['input[name="candidate[phone]"]'],
+    resume_file: ['input[name="candidate[cv]"]', 'input[name="candidate[resume]"]']
+  },
+  personio: {
+    email: ['input[name="job_application[email_address]"]'],
+    first_name: ['input[name="job_application[first_name]"]'],
+    last_name: ['input[name="job_application[last_name]"]'],
+    phone: ['input[name="job_application[phone]"]'],
+    resume_file: ['input[name="job_application[cv]"]', 'input[name="job_application[recent_professional_experience]"]']
+  },
+  icims: {
+    email: ['input[id*="email" i]', 'input[data-test-id*="email" i]'],
+    first_name: ['input[id*="firstName" i]', 'input[id*="first_name" i]'],
+    last_name: ['input[id*="lastName" i]', 'input[id*="last_name" i]'],
+    phone: ['input[id*="phone" i]', 'input[data-test-id*="phone" i]'],
+    resume_file: ['input[id*="resume" i]', 'input[data-test-id*="resume" i]']
+  }
 };
 
 function selectorsForKind(kind: StaticKind, ats: string | undefined): string[] {
