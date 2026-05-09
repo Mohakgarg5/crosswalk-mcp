@@ -1,6 +1,6 @@
 ---
 title: "Crosswalk User Guide"
-subtitle: "AI-native career copilot · v1.6.0"
+subtitle: "AI-native career copilot · v1.7.0"
 author: "Mohak Garg"
 date: "May 2026"
 ---
@@ -860,7 +860,8 @@ A: As of v0.3.0:
 | v1.3.0 | Shipped | M12 — Smart fill: form-introspection-then-sample for unmatched textareas |
 | v1.4.0 | Shipped | M13 — Per-ATS selector packs (Workable + Ashby) |
 | v1.5.0 | Shipped | M14 — Workday widget support (`data-automation-id` selectors) |
-| **v1.6.0** | **Current** | **M15 — Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS** |
+| v1.6.0 | Shipped | M15 — Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS |
+| **v1.7.0** | **Current** | **M16 — fillForm resilience: per-op try/catch around fill / setInputFiles** |
 | v2.0.0 | Planned | Full submit-and-confirm autonomy with elicitation gates |
 
 ---
@@ -881,4 +882,4 @@ Built with [Claude Code](https://claude.com/claude-code) (Opus 4.7, 1M context).
 
 ---
 
-*End of Crosswalk User Guide v1.6.0.*
+*End of Crosswalk User Guide v1.7.0.*

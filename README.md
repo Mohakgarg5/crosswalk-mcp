@@ -9,7 +9,7 @@ Local-first. Zero API keys. Bring your own model.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D24-brightgreen.svg)](#requirements)
 [![Tests](https://img.shields.io/badge/tests-181%20passing-brightgreen.svg)](#development)
-[![Version](https://img.shields.io/badge/version-1.6.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
+[![Version](https://img.shields.io/badge/version-1.7.0-blue.svg)](https://github.com/Mohakgarg5/crosswalk-mcp/releases)
 
 [Quick start](#quick-start) ·
 [Tools](#what-it-does) ·
@@ -283,7 +283,8 @@ Sampling-driven workflows ("tailor the top 3 fits") are an M5+ feature — they 
 | v1.3.0 — M12 | Smart fill: form-introspection-then-sample for unmatched textareas · 204 tests | Shipped |
 | v1.4.0 — M13 | Per-ATS selector packs (Workable + Ashby) · 209 tests | Shipped |
 | v1.5.0 — M14 | Workday widget support (`data-automation-id` selectors) · 210 tests | Shipped |
-| **v1.6.0 — M15** | **Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS · 211 tests** | **Current** |
+| v1.6.0 — M15 | Selector packs for SmartRecruiters / BambooHR / Recruitee / Personio / iCIMS · 211 tests | Shipped |
+| **v1.7.0 — M16** | **fillForm resilience: per-op try/catch so a single Playwright error skips the selector instead of crashing the apply · 212 tests** | **Current** |
 | v2.0.0 | Full submit-and-confirm autonomy with elicitation gates · captcha handling · multi-step wizards | Planned |
 
 See [`docs/superpowers/plans/`](docs/superpowers/plans/) for the full TDD-ordered implementation plans for each milestone.
