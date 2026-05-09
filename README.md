@@ -69,6 +69,64 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ---
 
+## Use with other MCP clients
+
+Crosswalk is a stdio MCP server. The auto-installer above covers Claude Desktop, Cursor, and Windsurf. For other clients, drop a config snippet into the client's MCP config file and restart. (Replace `npx -y crosswalk-mcp@latest` with `node /absolute/path/to/crosswalk-mcp/dist/cli.js` if you've cloned from GitHub instead of installing from npm.)
+
+### Claude Code (CLI)
+
+```bash
+claude mcp add crosswalk-mcp -- npx -y crosswalk-mcp@latest
+```
+
+### opencode
+
+Add to `~/.config/opencode/config.json`:
+
+```json
+{
+  "mcp": {
+    "crosswalk-mcp": {
+      "type": "local",
+      "command": ["npx", "-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+### OpenAI Codex CLI
+
+Add to `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.crosswalk-mcp]
+command = "npx"
+args = ["-y", "crosswalk-mcp@latest"]
+```
+
+### Gemini CLI
+
+Add to `~/.gemini/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "crosswalk-mcp": {
+      "command": "npx",
+      "args": ["-y", "crosswalk-mcp@latest"]
+    }
+  }
+}
+```
+
+### Any other MCP client
+
+If your client supports stdio MCP servers, the recipe is always: command `npx`, args `["-y", "crosswalk-mcp@latest"]`, optional env `CROSSWALK_HOME=/custom/path`. State lives in `~/.crosswalk/state.db` regardless of which client invoked the server.
+
+See [USER_GUIDE §1.4](docs/USER_GUIDE.md#14-using-crosswalk-with-various-mcp-clients) for full per-client details and source-only install instructions.
+
+---
+
 ## What it does
 
 **18 MCP tools across 5 surfaces.** v1.2.0 brings `apply_application` to the textarea era: arbitrary form questions are now auto-filled from your application's `answerPack` (the structured Q&A that `draft_application` builds via sampling). v1.1.0 added cover-letter inputs (file + text); v1.0.0 introduced the tool itself: open the form in a headless browser, auto-fill known fields, take a screenshot, and **stop** — you review and click Submit yourself. Combined with `preview_application`, Playwright remains an *optional* peer dep — base install stays light; opt in with `crosswalk-mcp install-browser`.
