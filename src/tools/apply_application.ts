@@ -114,7 +114,7 @@ export async function applyApplication(
       if (formField.type !== 'textarea') continue;
       if (!formField.name || knownNames.has(formField.name)) continue;
       const labelOrName = (formField.label || formField.name).toLowerCase();
-      if (/cover[\s_-]?letter/.test(labelOrName)) continue;
+      if (/(?<![a-z])cover[\s_-]?letter/.test(labelOrName)) continue;
 
       const answer = await sampleAnswerForFormField({
         sampling: ctx.sampling,
