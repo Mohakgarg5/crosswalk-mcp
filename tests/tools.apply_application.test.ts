@@ -73,7 +73,8 @@ describe('tools/apply_application', () => {
 
     expect(browser.fillForm).toHaveBeenCalledWith(
       'https://apply.example.com/job/12345',
-      expect.any(Array)
+      expect.any(Array),
+      expect.any(Object)
     );
     const kinds = seenFields.map(f => f.kind).sort();
     expect(kinds).toEqual(
@@ -279,5 +280,41 @@ describe('tools/apply_application', () => {
     // Sampling was called for the two textareas that needed answers (why_company + random_q),
     // and skipped cover_letter (regex) + email (wrong type).
     expect(completeFn).toHaveBeenCalledTimes(2);
+  });
+
+  it('passes the company ats to browser.fillForm and reports detectedAts on the result', async () => {
+    let seenOpts: { ats?: string } | undefined;
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (_url: string, _fields: FillField[], opts?: { ats?: string }) => {
+        seenOpts = opts;
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: [], skipped: []
+        };
+      })
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
+
+    expect(seenOpts).toEqual({ ats: 'greenhouse' });
+    expect(out.detectedAts).toBe('greenhouse');
+  });
+
+  it('reports detectedAts as null when the application job is missing from the DB', async () => {
+    db.prepare(`DELETE FROM application WHERE id = ?`).run('app1');
+    db.prepare(`DELETE FROM job WHERE id = ?`).run('g:stripe:1');
+    // Re-create the application without a valid job in the DB — use a non-existent jobId
+    // by re-inserting with a bogus jobId is impossible due to FK, so instead
+    // we test by noting getJob returns null → detectedAts is null.
+    // We re-insert with PRAGMA foreign_keys = OFF briefly.
+    db.prepare(`PRAGMA foreign_keys = OFF`).run();
+    db.prepare(`INSERT INTO application (id, job_id, resume_id, tailored_resume_md, cover_letter_md, answer_pack_json, deep_link, created_at)
+      VALUES ('app1', 'nonexistent-job', 'r1', '# Resume', '.', '{}', 'https://apply.example.com/job/12345', datetime('now'))`).run();
+    db.prepare(`PRAGMA foreign_keys = ON`).run();
+    const browser = makeDefaultBrowser();
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
+    expect(out.detectedAts).toBeNull();
   });
 });
