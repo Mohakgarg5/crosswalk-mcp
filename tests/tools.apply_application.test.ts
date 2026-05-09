@@ -7,6 +7,29 @@ import { upsertProfile } from '../src/store/profile.ts';
 import { createApplication } from '../src/store/application.ts';
 import { applyApplication } from '../src/tools/apply_application.ts';
 import type { Browser, FillField } from '../src/services/browser/types.ts';
+import type { SamplingClient } from '../src/sampling/client.ts';
+
+function makeDefaultBrowser(overrides: Partial<Browser> = {}): Browser {
+  return {
+    preview: vi.fn().mockResolvedValue({
+      screenshotPng: Buffer.from([]),
+      resolvedUrl: 'https://x',
+      title: 'Apply',
+      formFields: []
+    }),
+    fillForm: vi.fn(async (_url: string, _fields: FillField[]) => ({
+      resolvedUrl: 'u', title: 't',
+      screenshotPng: Buffer.from([]),
+      filled: [], skipped: []
+    })),
+    close: vi.fn(),
+    ...overrides
+  };
+}
+
+function makeNoopSampling(): SamplingClient {
+  return { complete: vi.fn().mockResolvedValue('SKIP') } as unknown as SamplingClient;
+}
 
 describe('tools/apply_application', () => {
   let db: ReturnType<typeof openDb>;
@@ -33,9 +56,7 @@ describe('tools/apply_application', () => {
 
   it('fills known fields from profile + tailored resume and returns base64 screenshot', async () => {
     const seenFields: FillField[] = [];
-    const browser: Browser = {
-      preview: vi.fn(),
-      close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (url: string, fields: FillField[]) => {
         seenFields.push(...fields);
         return {
@@ -46,8 +67,9 @@ describe('tools/apply_application', () => {
           skipped: []
         };
       })
-    };
-    const out = await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
 
     expect(browser.fillForm).toHaveBeenCalledWith(
       'https://apply.example.com/job/12345',
@@ -75,26 +97,26 @@ describe('tools/apply_application', () => {
   });
 
   it('throws on unknown application', async () => {
-    const browser: Browser = { preview: vi.fn(), close: vi.fn(), fillForm: vi.fn() };
+    const browser = makeDefaultBrowser();
+    const sampling = makeNoopSampling();
     await expect(
-      applyApplication({ applicationId: 'nope' }, { db, browser })
+      applyApplication({ applicationId: 'nope' }, { db, browser, sampling })
     ).rejects.toThrow(/unknown application/i);
     expect(browser.fillForm).not.toHaveBeenCalled();
   });
 
   it('skips fields the profile does not provide', async () => {
     upsertProfile(db, { email: 'only@example.com' });
-    const browser: Browser = {
-      preview: vi.fn(),
-      close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (_url: string, fields: FillField[]) => ({
         resolvedUrl: 'u', title: 't',
         screenshotPng: Buffer.from([]),
         filled: fields.map(f => f.kind),
         skipped: []
       }))
-    };
-    await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
     const passed = (browser.fillForm as ReturnType<typeof vi.fn>).mock.calls[0][1] as FillField[];
     const kinds = passed.map(f => f.kind).sort();
     // Only email + resume_file (no name, phone, linkedin in this profile)
@@ -103,9 +125,7 @@ describe('tools/apply_application', () => {
 
   it('pushes cover_letter_file + cover_letter_text fields when coverLetterMd is set', async () => {
     const passed: FillField[] = [];
-    const browser: Browser = {
-      preview: vi.fn(),
-      close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
         passed.push(...fields);
         return {
@@ -115,8 +135,9 @@ describe('tools/apply_application', () => {
           skipped: []
         };
       })
-    };
-    const out = await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
 
     const kinds = passed.map(f => f.kind).sort();
     expect(kinds).toContain('cover_letter_file');
@@ -136,8 +157,7 @@ describe('tools/apply_application', () => {
   it('omits cover-letter fields when coverLetterMd is empty', async () => {
     db.prepare(`UPDATE application SET cover_letter_md = '' WHERE id = ?`).run('app1');
     const passed: FillField[] = [];
-    const browser: Browser = {
-      preview: vi.fn(), close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
         passed.push(...fields);
         return {
@@ -146,8 +166,9 @@ describe('tools/apply_application', () => {
           filled: [], skipped: []
         };
       })
-    };
-    const out = await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
     const kinds = passed.map(f => f.kind);
     expect(kinds).not.toContain('cover_letter_file');
     expect(kinds).not.toContain('cover_letter_text');
@@ -164,9 +185,7 @@ describe('tools/apply_application', () => {
       'app1'
     );
     const passed: FillField[] = [];
-    const browser: Browser = {
-      preview: vi.fn(),
-      close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
         passed.push(...fields);
         return {
@@ -176,8 +195,9 @@ describe('tools/apply_application', () => {
           skipped: []
         };
       })
-    };
-    await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
 
     const tbn = passed.filter(f => f.kind === 'text_by_name');
     const tbnNames = tbn.map(f => (f.kind === 'text_by_name' ? f.name : '')).sort();
@@ -190,8 +210,7 @@ describe('tools/apply_application', () => {
   it('omits text_by_name fields when answerPack is empty', async () => {
     // beforeEach already sets answerPack: {} — verify nothing leaks through
     const passed: FillField[] = [];
-    const browser: Browser = {
-      preview: vi.fn(), close: vi.fn(),
+    const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
         passed.push(...fields);
         return {
@@ -200,9 +219,65 @@ describe('tools/apply_application', () => {
           filled: [], skipped: []
         };
       })
-    };
-    await applyApplication({ applicationId: 'app1' }, { db, browser });
+    });
+    const sampling = makeNoopSampling();
+    await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
 
     expect(passed.filter(f => f.kind === 'text_by_name')).toEqual([]);
+  });
+
+  it('introspects the form and samples answers for unmatched textareas', async () => {
+    const completeFn = vi.fn().mockImplementation(async (opts: { prompt: string }) => {
+      if (opts.prompt.includes('Why are you interested')) {
+        return 'Because I love your product depth.';
+      }
+      return 'SKIP';
+    });
+    const sampling = { complete: completeFn } as unknown as SamplingClient;
+
+    const passed: FillField[] = [];
+    const browser = makeDefaultBrowser({
+      preview: vi.fn().mockResolvedValue({
+        screenshotPng: Buffer.from([]),
+        resolvedUrl: 'https://x',
+        title: 'Apply',
+        formFields: [
+          { name: 'why_company', type: 'textarea', label: 'Why are you interested in this company?', required: true },
+          { name: 'random_q', type: 'textarea', label: 'Your favorite color?', required: false },
+          { name: 'cover_letter', type: 'textarea', label: 'Cover letter', required: false },
+          { name: 'email', type: 'email', label: 'Email', required: true }
+        ]
+      }),
+      fillForm: vi.fn(async (_url: string, fields: FillField[]) => {
+        passed.push(...fields);
+        return {
+          resolvedUrl: 'u', title: 't',
+          screenshotPng: Buffer.from([]),
+          filled: fields.map(f => f.kind === 'text_by_name' ? `text_by_name:${f.name}` : f.kind),
+          skipped: []
+        };
+      })
+    });
+
+    const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
+
+    // why_company should be sampled and pushed as text_by_name
+    const why = passed.find(f => f.kind === 'text_by_name' && f.name === 'why_company');
+    expect(why && why.kind === 'text_by_name' && why.value).toBe('Because I love your product depth.');
+
+    // random_q got SKIP — should NOT appear
+    expect(passed.find(f => f.kind === 'text_by_name' && f.name === 'random_q')).toBeUndefined();
+
+    // cover_letter is excluded by the cover-letter regex — should NOT appear in sampledFields
+    expect(out.sampledFields).toContain('why_company');
+    expect(out.sampledFields).not.toContain('cover_letter');
+    expect(out.sampledFields).not.toContain('random_q');
+
+    // Type=email shouldn't be considered a textarea
+    expect(passed.find(f => f.kind === 'text_by_name' && f.name === 'email')).toBeUndefined();
+
+    // Sampling was called for the two textareas that needed answers (why_company + random_q),
+    // and skipped cover_letter (regex) + email (wrong type).
+    expect(completeFn).toHaveBeenCalledTimes(2);
   });
 });
