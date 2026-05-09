@@ -30,7 +30,7 @@ export interface Browser {
    * Does NOT submit the form. Unmatched fields go to `skipped`.
    * Throws if the browser runtime is not installed.
    */
-  fillForm(url: string, fields: FillField[]): Promise<BrowserFillResult>;
+  fillForm(url: string, fields: FillField[], opts?: { ats?: string }): Promise<BrowserFillResult>;
 
   /** Release any resources held by this browser instance. */
   close(): Promise<void>;

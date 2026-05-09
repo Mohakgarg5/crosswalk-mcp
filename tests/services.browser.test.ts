@@ -275,4 +275,90 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.filled).toEqual(['email']);
     expect(fillCalls).toEqual([{ selector: 'input[name*="email" i]', value: 'a@b.co' }]);
   });
+
+  it('fillForm with ats=workable matches input[name="firstName"] before generic candidates', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[name="firstName"]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm(
+      'https://apply.workable.com/foo/j/123',
+      [{ kind: 'first_name', value: 'Jane' }],
+      { ats: 'workable' }
+    );
+    expect(result.filled).toEqual(['first_name']);
+    expect(fillCalls).toEqual([{ selector: 'input[name="firstName"]', value: 'Jane' }]);
+  });
+
+  it('fillForm with ats=ashby matches input[data-testid*="email" i] for email kind', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[data-testid*="email" i]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm(
+      'https://jobs.ashbyhq.com/foo/123',
+      [{ kind: 'email', value: 'a@b.co' }],
+      { ats: 'ashby' }
+    );
+    expect(result.filled).toEqual(['email']);
+    expect(fillCalls).toEqual([{ selector: 'input[data-testid*="email" i]', value: 'a@b.co' }]);
+  });
+
+  it('fillForm without ats opt falls back to generic SELECTORS only', async () => {
+    const fillCalls: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'input[autocomplete="given-name"]') {
+          return { fill: async (value: string) => { fillCalls.push({ selector, value }); } };
+        }
+        return null;
+      }),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm(
+      'https://x',
+      [{ kind: 'first_name', value: 'Jane' }]
+    );
+    expect(result.filled).toEqual(['first_name']);
+    expect(fillCalls).toEqual([{ selector: 'input[autocomplete="given-name"]', value: 'Jane' }]);
+  });
 });

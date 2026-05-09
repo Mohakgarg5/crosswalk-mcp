@@ -79,7 +79,7 @@ export class LazyPlaywrightBrowser implements Browser {
     }
   }
 
-  async fillForm(url: string, fields: FillField[]): Promise<BrowserFillResult> {
+  async fillForm(url: string, fields: FillField[], opts: { ats?: string } = {}): Promise<BrowserFillResult> {
     const browser = await this.loadBrowser();
     const ctx = await browser.newContext();
     try {
@@ -114,7 +114,7 @@ export class LazyPlaywrightBrowser implements Browser {
           continue;
         }
 
-        const candidates = SELECTORS[field.kind];
+        const candidates = selectorsForKind(field.kind, opts.ats);
         let matched = false;
         for (const selector of candidates) {
           const el = await page.$(selector);
@@ -208,6 +208,32 @@ const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = 
     'input[type="file"]'
   ]
 };
+
+type StaticKind = Exclude<FillField['kind'], 'text_by_name'>;
+
+/** ATS-specific selector overlays. Tried BEFORE generic candidates. */
+const ATS_SELECTORS: Record<string, Partial<Record<StaticKind, string[]>>> = {
+  workable: {
+    first_name: ['input[name="firstName"]'],
+    last_name: ['input[name="lastName"]'],
+    phone: ['input[name="phoneNumber"]'],
+    resume_file: ['input[name="resumeFile"]', 'input[name="cv"]']
+  },
+  ashby: {
+    email: ['input[data-testid*="email" i]'],
+    phone: ['input[data-testid*="phone" i]'],
+    resume_file: ['input[data-testid*="resume" i]']
+  },
+  greenhouse: {},
+  lever: {}
+};
+
+function selectorsForKind(kind: StaticKind, ats: string | undefined): string[] {
+  const overlay = ats ? ATS_SELECTORS[ats]?.[kind] : undefined;
+  return overlay && overlay.length > 0
+    ? [...overlay, ...SELECTORS[kind]]
+    : SELECTORS[kind];
+}
 
 const SAFE_FIELD_NAME_RE = /^[A-Za-z0-9_-]+$/;
 function isSafeFieldName(name: string): boolean {
