@@ -1,55 +1,13 @@
 {
-  "name": "crosswalk-mcp",
-  "version": "2.0.0",
-  "description": "An AI-native, MCP-first career copilot. Local-first, zero API keys.",
+  "name": "crosswalk-monorepo",
+  "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "bin": {
-    "crosswalk-mcp": "dist/cli.js"
-  },
-  "main": "dist/server.js",
+  "engines": { "node": ">=24" },
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "dev": "tsx src/server.ts",
-    "build": "tsup src/server.ts src/cli.ts --format esm --clean --external playwright",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "tsc --noEmit"
-  },
-  "engines": {
-    "node": ">=24"
-  },
-  "license": "MIT",
-  "files": [
-    "dist/",
-    "registry/",
-    "README.md",
-    "LICENSE"
-  ],
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
-    "better-sqlite3": "^11.0.0",
-    "cheerio": "^1.2.0",
-    "cron-parser": "^5.5.0",
-    "docx": "^9.6.1",
-    "fast-xml-parser": "^5.7.2",
-    "mammoth": "^1.8.0",
-    "marked": "^18.0.2",
-    "pdf-parse": "^1.1.1",
-    "zod": "^3.23.0",
-    "zod-to-json-schema": "^3.25.2"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.0",
-    "@types/node": "^24.0.0",
-    "@types/pdf-parse": "^1.1.4",
-    "tsup": "^8.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.6.0",
-    "vitest": "^2.0.0"
-  },
-  "peerDependencies": {
-    "playwright": ">=1.40.0"
-  },
-  "peerDependenciesMeta": {
-    "playwright": { "optional": true }
+    "test": "npm run test -w crosswalk-mcp",
+    "lint": "npm run lint -w crosswalk-mcp",
+    "build:core": "npm run build -w crosswalk-mcp"
   }
 }
