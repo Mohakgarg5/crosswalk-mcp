@@ -25,6 +25,7 @@
     "LICENSE"
   ],
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.98.1",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "better-sqlite3": "^11.0.0",
     "cheerio": "^1.2.0",
@@ -50,6 +51,8 @@
     "playwright": ">=1.40.0"
   },
   "peerDependenciesMeta": {
-    "playwright": { "optional": true }
+    "playwright": {
+      "optional": true
+    }
   }
 }
