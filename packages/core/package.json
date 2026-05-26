@@ -7,9 +7,13 @@
     "crosswalk-mcp": "dist/cli.js"
   },
   "main": "dist/server.js",
+  "exports": {
+    ".": "./dist/server.js",
+    "./runtime": "./dist/runtime.js"
+  },
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "tsup src/server.ts src/cli.ts --format esm --clean --external playwright",
+    "build": "tsup src/server.ts src/cli.ts src/runtime.ts --format esm --clean --external playwright --external better-sqlite3",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
