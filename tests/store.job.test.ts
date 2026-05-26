@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openDb } from '../src/store/db.ts';
 import { upsertCompany } from '../src/store/company.ts';
 import { upsertJobs, listJobs, getJob } from '../src/store/job.ts';
@@ -6,8 +6,15 @@ import { upsertJobs, listJobs, getJob } from '../src/store/job.ts';
 describe('store/job', () => {
   let db: ReturnType<typeof openDb>;
   beforeEach(() => {
+    // Pin the clock so recency assertions don't drift as wall-clock advances
+    // past the hardcoded fixture dates (see ARCHITECTURE.md known limitations).
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-01T00:00:00Z'));
     db = openDb(':memory:');
     upsertCompany(db, { id: 'stripe', name: 'Stripe', ats: 'greenhouse', atsOrgSlug: 'stripe' });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('upserts jobs and filters by recency', () => {
