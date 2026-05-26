@@ -125,6 +125,18 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_fit_cache_computed ON fit_score_cache(computed_at);
     `
   }
+  ,
+  {
+    id: 5,
+    name: 'app_config',
+    sql: `
+      CREATE TABLE app_config (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        data_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

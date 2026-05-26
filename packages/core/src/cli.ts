@@ -153,7 +153,8 @@ export async function runDoctor(): Promise<DoctorReport> {
   if (db) {
     try {
       const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
-      const expected = [1, 2, 3, 4];
+      const { migrations } = await import('./store/migrations.ts');
+      const expected = migrations.map(m => m.id);
       if (JSON.stringify(ids) === JSON.stringify(expected)) {
         checks.push({ name: 'migrations', status: 'ok', message: `applied: [${ids.join(', ')}]` });
       } else {

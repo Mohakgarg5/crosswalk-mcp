@@ -26,9 +26,9 @@ describe('store/db', () => {
     expect(db2).toBeDefined();
   });
 
-  it('applied four migrations', () => {
+  it('applied five migrations', () => {
     const db = openDb(':memory:');
     const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
-    expect(ids).toEqual([1, 2, 3, 4]);
+    expect(ids).toEqual([1, 2, 3, 4, 5]);
   });
 });
