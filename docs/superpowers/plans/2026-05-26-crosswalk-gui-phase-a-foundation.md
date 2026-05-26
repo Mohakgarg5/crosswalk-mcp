@@ -386,7 +386,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 6: Run the full suite to confirm the new migration didn't break anything**
 
 Run: `npm test -w crosswalk-mcp`
-Expected: all previous tests + 2 new = **218 passed**.
+Expected: **221 passed** (216 baseline + 3 from Task 2 + 2 here).
 
 - [ ] **Step 7: Commit**
 
@@ -492,7 +492,7 @@ Expected: PASS (2 tests).
 - [ ] **Step 5: Run the full suite (existing guardrail tests must still pass with the default cap)**
 
 Run: `npm test -w crosswalk-mcp`
-Expected: **220 passed** (no regression — existing guardrail tests use no config row, so `cap` resolves to the default 10).
+Expected: **223 passed** (no regression — existing guardrail tests use no config row, so `cap` resolves to the default 10).
 
 - [ ] **Step 6: Commit**
 
@@ -639,7 +639,7 @@ npm test -w crosswalk-mcp
 npm run lint -w crosswalk-mcp
 node packages/core/dist/cli.js < /dev/null & SVR=$!; sleep 1; kill $SVR 2>/dev/null; echo "mcp boot ok"
 ```
-Expected: **220 passed**; lint clean; `mcp boot ok` printed (MCP server still starts).
+Expected: **225 passed** (216 baseline + 3 + 2 + 2 + 2); lint clean; `mcp boot ok` printed (MCP server still starts).
 
 - [ ] **Step 5: Commit**
 
