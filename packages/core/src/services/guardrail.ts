@@ -1,5 +1,6 @@
 import type { Db } from '../store/db.ts';
 import { getCachedFit } from '../store/fitScoreCache.ts';
+import { getConfig } from '../store/appConfig.ts';
 
 export const WEEKLY_CAP = 10;
 export const WEEKLY_WINDOW_MS = 7 * 86400_000;
@@ -19,21 +20,22 @@ export type GuardrailResult =
 export function checkGuardrail(db: Db, input: GuardrailInput): GuardrailResult {
   const warnings: string[] = [];
 
-  // 1. Weekly cap
+  // 1. Weekly cap (configurable via app_config; defaults to WEEKLY_CAP)
+  const cap = getConfig(db).weeklyCap;
   const cutoff = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString();
   const count = (db.prepare(
     `SELECT COUNT(*) AS n FROM application
      WHERE created_at >= ?
        AND status IN ('submitted', 'interviewing', 'rejected', 'offer')`
   ).get(cutoff) as { n: number }).n;
-  if (count >= WEEKLY_CAP) {
+  if (count >= cap) {
     return {
       allowed: false,
-      reason: `weekly cap reached (${count}/${WEEKLY_CAP} in the last 7 days). Quality > quantity — review your pipeline before adding more.`
+      reason: `weekly cap reached (${count}/${cap} in the last 7 days). Quality > quantity — review your pipeline before adding more.`
     };
   }
-  if (count >= Math.floor(WEEKLY_CAP * 0.8)) {
-    warnings.push(`approaching weekly cap (${count}/${WEEKLY_CAP})`);
+  if (count >= Math.floor(cap * 0.8)) {
+    warnings.push(`approaching weekly cap (${count}/${cap})`);
   }
 
   // 2. Duplicate detection
