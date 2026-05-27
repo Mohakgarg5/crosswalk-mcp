@@ -11,6 +11,7 @@ describe('runtime library entry', () => {
     expect(typeof runtime.seedRegistryIfEmpty).toBe('function');
     expect(typeof runtime.getConfig).toBe('function');
     expect(typeof runtime.setConfig).toBe('function');
+    expect(typeof runtime.getProfile).toBe('function');
     expect(runtime.paths).toBeDefined();
     expect(Array.isArray(runtime.toolDefinitions)).toBe(true);
     expect(runtime.toolDefinitions.length).toBe(18);

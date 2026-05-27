@@ -27,3 +27,5 @@ export type { ToolCtx } from './tools/index.ts';
 export { paths } from './config.ts';
 export { getConfig, setConfig, DEFAULT_APP_CONFIG } from './store/appConfig.ts';
 export type { AppConfig, SubmitPolicy } from './store/appConfig.ts';
+export { getProfile } from './store/profile.ts';
+export type { Profile } from './store/profile.ts';

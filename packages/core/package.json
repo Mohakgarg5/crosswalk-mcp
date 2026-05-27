@@ -9,11 +9,14 @@
   "main": "dist/server.js",
   "exports": {
     ".": "./dist/server.js",
-    "./runtime": "./dist/runtime.js"
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "default": "./dist/runtime.js"
+    }
   },
   "scripts": {
     "dev": "tsx src/server.ts",
-    "build": "tsup src/server.ts src/cli.ts src/runtime.ts --format esm --clean --external playwright --external better-sqlite3",
+    "build": "tsup src/server.ts src/cli.ts src/runtime.ts --format esm --clean --external playwright --external better-sqlite3 && tsup src/runtime.ts --dts-only --format esm",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit"
