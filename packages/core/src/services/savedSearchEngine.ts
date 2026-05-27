@@ -7,7 +7,7 @@ import { createNotification } from '../store/notification.ts';
  * since the search was last checked, and raise a `new_match` notification for
  * each. Advances the search's last_checked_at so the same job isn't re-notified.
  */
-export function refreshSavedSearch(db: Db, id: string): { newMatches: number } {
+export function refreshSavedSearch(db: Db, id: string): { newMatches: number; jobIds: string[] } {
   const search = getSavedSearch(db, id);
   if (!search) throw new Error(`unknown saved search: ${id}`);
   const f = search.filters;
@@ -36,7 +36,7 @@ export function refreshSavedSearch(db: Db, id: string): { newMatches: number } {
     });
   }
   touchSavedSearch(db, id, new Date().toISOString());
-  return { newMatches: rows.length };
+  return { newMatches: rows.length, jobIds: rows.map(r => r.id) };
 }
 
 export function refreshAllSavedSearches(db: Db): { total: number; perSearch: Record<string, number> } {

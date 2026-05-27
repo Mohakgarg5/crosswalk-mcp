@@ -190,6 +190,15 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_inbound_email_received ON inbound_email(received_at);
     `
   }
+  ,
+  {
+    id: 8,
+    name: 'saved_search_watch',
+    sql: `
+      ALTER TABLE saved_search ADD COLUMN source TEXT NOT NULL DEFAULT 'web';
+      ALTER TABLE saved_search ADD COLUMN auto_apply INTEGER NOT NULL DEFAULT 0;
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

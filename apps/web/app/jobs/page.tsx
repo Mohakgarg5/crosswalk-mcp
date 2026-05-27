@@ -7,7 +7,7 @@ import { runTool, getSettings } from '@/lib/api';
 
 type AutoApplySummary = { total: number; submitted: number; applied: number; drafted: number; skipped: number; results: { jobId: string; status: string; applicationId?: string; message?: string }[] };
 
-type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; lastCheckedAt?: string };
+type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; source?: string; autoApply?: boolean; lastCheckedAt?: string };
 
 type Job = {
   id: string; company: string; title: string; location?: string;
@@ -33,6 +33,36 @@ export default function JobsPage() {
   const [autoResult, setAutoResult] = useState<AutoApplySummary | null>(null);
   const [mode, setMode] = useState<'web' | 'companies'>('web');
   const [pages, setPages] = useState(3);
+  const [saveAutoApply, setSaveAutoApply] = useState(false);
+  const [watchBusy, setWatchBusy] = useState(false);
+  const [watchMsg, setWatchMsg] = useState('');
+  const [autoRun, setAutoRun] = useState(false);
+
+  async function runWatchNow() {
+    setWatchBusy(true); setWatchMsg('');
+    try {
+      const r = await fetch('/api/watch', { method: 'POST' }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      setWatchMsg(`${r.totalNew} new match(es), ${r.totalSubmitted} auto-submitted. (See Alerts / Pipeline.)`);
+      await loadSearches();
+    } catch (e) { setWatchMsg(`Error: ${(e as Error).message}`); }
+    finally { setWatchBusy(false); }
+  }
+
+  async function toggleAuto(id: string, current: boolean) {
+    await fetch('/api/searches', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'set-auto', id, autoApply: !current })
+    });
+    await loadSearches();
+  }
+
+  // Continuous watcher: while enabled and this tab is open, run every 10 min.
+  useEffect(() => {
+    if (!autoRun) return;
+    const t = setInterval(() => { runWatchNow(); }, 10 * 60 * 1000);
+    return () => clearInterval(t);
+  }, [autoRun]);
 
   useEffect(() => { getSettings().then(s => setPolicy(s.config.submitPolicy)).catch(() => {}); }, []);
 
@@ -74,11 +104,12 @@ export default function JobsPage() {
   }
 
   async function saveSearch() {
-    const name = (title || location || 'All jobs') + (remoteOnly ? ' · remote' : '') + (h1bOnly ? ' · H-1B' : '');
+    const name = (title || location || 'All roles') + (mode === 'web' ? ' · web' : '') + (saveAutoApply ? ' · auto' : '');
     await fetch('/api/searches', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, filters: currentFilters() })
+      body: JSON.stringify({ name, filters: currentFilters(), source: mode, autoApply: saveAutoApply })
     });
+    setSaveAutoApply(false);
     await loadSearches();
   }
 
@@ -161,29 +192,48 @@ export default function JobsPage() {
             <span className="text-[var(--muted)] text-xs">pages (~20 roles each) — more = more to apply to</span>
           </div>
         )}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <Button onClick={search} disabled={busy}>{busy ? 'Searching live…' : 'Search jobs'}</Button>
-          <Button variant="ghost" onClick={saveSearch}>Save this search</Button>
+          <Button variant="ghost" onClick={saveSearch}>Save as watch</Button>
+          <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+            <input type="checkbox" checked={saveAutoApply} onChange={e => setSaveAutoApply(e.target.checked)} /> auto-apply new matches
+          </label>
         </div>
         <ErrorNote>{err}</ErrorNote>
       </Card>
 
       <div className="mt-4">
-        <Card title={`Saved searches (${searches.length})`}
-          subtitle="Run a refresh to detect newly-posted matches and raise alerts."
-          actions={<Button variant="ghost" onClick={refreshAll}>Refresh all</Button>}>
-          {searchMsg && <div className="mb-3 text-sm text-[var(--accent)]">{searchMsg}</div>}
+        <Card title={`Watches (${searches.length})`}
+          subtitle="Each watch re-checks for newly-posted role matches and (if auto-apply is on) applies them for you."
+          actions={
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                <input type="checkbox" checked={autoRun} onChange={e => setAutoRun(e.target.checked)} /> auto-run /10 min
+              </label>
+              <Button onClick={runWatchNow} disabled={watchBusy}>{watchBusy ? 'Watching…' : 'Run watch now'}</Button>
+            </div>
+          }>
+          {(searchMsg || watchMsg) && <div className="mb-3 text-sm text-[var(--accent)]">{watchMsg || searchMsg}</div>}
           {searches.length === 0 ? (
-            <p className="text-sm text-[var(--muted)]">None saved. Set filters above and click “Save this search”.</p>
+            <p className="text-sm text-[var(--muted)]">No watches yet. Search a role above, then “Save as watch” (tick auto-apply to make it hands-off).</p>
           ) : (
             <ul className="divide-y divide-[var(--border)]">
               {searches.map(s => (
                 <li key={s.id} className="flex items-center justify-between py-2.5">
                   <div>
-                    <div className="text-sm">{s.name}</div>
+                    <div className="text-sm flex items-center gap-2">
+                      {s.name}
+                      <Pill tone={s.source === 'web' ? 'accent' : 'muted'}>{s.source === 'web' ? 'open web' : 'ATS'}</Pill>
+                      {s.autoApply && <Pill tone="ok">auto-apply</Pill>}
+                    </div>
                     <div className="text-xs text-[var(--muted)]">{s.lastCheckedAt ? `last checked ${new Date(s.lastCheckedAt).toLocaleString()}` : 'never checked'}</div>
                   </div>
-                  <button onClick={() => removeSearch(s.id)} className="text-xs text-[var(--muted)] hover:text-[var(--bad)]">delete</button>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => toggleAuto(s.id, Boolean(s.autoApply))} className="text-xs text-[var(--accent)]">
+                      {s.autoApply ? 'turn off auto' : 'turn on auto'}
+                    </button>
+                    <button onClick={() => removeSearch(s.id)} className="text-xs text-[var(--muted)] hover:text-[var(--bad)]">delete</button>
+                  </div>
                 </li>
               ))}
             </ul>

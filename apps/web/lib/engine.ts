@@ -116,9 +116,17 @@ export async function listSearches() {
   const { listSavedSearches } = await rt();
   return listSavedSearches(await db());
 }
-export async function createSearch(name: string, filters: Record<string, unknown>) {
+export async function createSearch(name: string, filters: Record<string, unknown>, source?: 'web' | 'companies', autoApply?: boolean) {
   const { createSavedSearch } = await rt();
-  return createSavedSearch(await db(), { name, filters });
+  return createSavedSearch(await db(), { name, filters, source, autoApply });
+}
+export async function setSearchAutoApply(id: string, autoApply: boolean) {
+  const { setSavedSearchAutoApply } = await rt();
+  setSavedSearchAutoApply(await db(), id, autoApply);
+}
+export async function runWatchNow() {
+  const { runWatch } = await rt();
+  return runWatch(await buildCtx());
 }
 export async function deleteSearch(id: string) {
   const { deleteSavedSearch } = await rt();

@@ -29,6 +29,6 @@ describe('store/db', () => {
   it('applied all migrations', () => {
     const db = openDb(':memory:');
     const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
-    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
   });
 });
