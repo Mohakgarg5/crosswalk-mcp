@@ -80,7 +80,17 @@ npm run gui          # builds the engine, then starts the GUI at http://localhos
 
 Then open **http://localhost:3000**, go to **Settings**, and paste an Anthropic API key (or set `ANTHROPIC_API_KEY`). Discovery and pipeline tracking work without a key; tailoring, fit scoring, and cover letters need one.
 
-The GUI drives the same 18 tools in-process via `crosswalk-mcp/runtime`. The MCP path is unchanged and still key-free (it uses the host's model via sampling). See [`docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md`](docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md) for the design.
+The GUI includes:
+
+- **Dashboard** — status at a glance.
+- **Jobs** — live search across all 10 ATSs, H-1B filter, **saved searches** with a refresh that raises new-match **Alerts**, and one-click **draft**.
+- **Application detail** — tailored résumé + cover letter, **DOCX/HTML export**, form **preview** screenshot, **auto-fill + opt-in submit**, status changes, notes, and an event log.
+- **Pipeline** — every application by status.
+- **Alerts** — new-match and routed-recruiter-email notifications (with an unread badge).
+- **Inbox** — paste a recruiter email and it routes to the matching application (live Gmail/IMAP sync is config-gated).
+- **Profile / Résumés / Settings**.
+
+The GUI drives the same 18 tools in-process via `crosswalk-mcp/runtime`, plus saved-search, notification, and email-routing engine modules. The MCP path is unchanged and still key-free (it uses the host's model via sampling). See [`docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md`](docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md) for the design.
 
 ---
 
