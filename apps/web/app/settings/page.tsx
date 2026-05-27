@@ -65,6 +65,21 @@ export default function SettingsPage() {
           </Field>
         </Card>
 
+        <Card title="Autonomous apply (browser)" subtitle="How “apply on your behalf” works, and how to unlock login-walled ATSes.">
+          <p className="text-sm text-[var(--muted)] mb-3">
+            With <strong>submit policy = auto</strong>, the Jobs page “Auto-apply & submit” button tailors a
+            résumé + cover letter for every result and submits it for you (respecting your weekly cap).
+          </p>
+          <p className="text-sm text-[var(--muted)] mb-2">To apply to sites that require a login (Workday, etc.), run the GUI with a persistent browser profile so you sign in once:</p>
+          <pre className="text-xs bg-[var(--panel-2)] border border-[var(--border)] rounded-lg p-3 whitespace-pre-wrap">{`# one-time: install the browser runtime
+npx crosswalk-mcp install-browser
+
+# run the GUI with a visible, persistent browser profile
+CROSSWALK_BROWSER_PROFILE=~/.crosswalk/chrome \\
+CROSSWALK_BROWSER_HEADED=1 npm run gui`}</pre>
+          <p className="text-xs text-[var(--muted)] mt-2">Log into your ATS accounts once in that window; sessions persist for future auto-applies.</p>
+        </Card>
+
         <div className="flex items-center gap-3">
           <Button onClick={save} disabled={saving}>{saving ? 'Saving…' : 'Save settings'}</Button>
           {saved && <span className="text-sm text-[var(--ok)]">Saved.</span>}

@@ -88,9 +88,20 @@ The GUI includes:
 - **Pipeline** — every application by status.
 - **Alerts** — new-match and routed-recruiter-email notifications (with an unread badge).
 - **Inbox** — paste a recruiter email and it routes to the matching application (live Gmail/IMAP sync is config-gated).
+- **Auto-apply (apply on your behalf)** — from a Jobs search, one click tailors a résumé + cover letter for **every** result and, when submit policy is `auto`, **submits each on your behalf** (respecting your weekly cap). Per-job outcomes: submitted / filled / drafted / skipped.
 - **Profile / Résumés / Settings**.
 
-The GUI drives the same 18 tools in-process via `crosswalk-mcp/runtime`, plus saved-search, notification, and email-routing engine modules. The MCP path is unchanged and still key-free (it uses the host's model via sampling). See [`docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md`](docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md) for the design.
+The GUI drives the same 18 tools in-process via `crosswalk-mcp/runtime`, plus saved-search, notification, email-routing, and auto-apply engine modules.
+
+### Applying to login-walled ATSes (Workday, etc.)
+
+Auto-apply fills public forms out of the box. For sites that require a login, run with a **persistent, visible browser profile** so you sign in once and the session is reused:
+
+```bash
+npx crosswalk-mcp install-browser            # one-time: install the browser runtime
+CROSSWALK_BROWSER_PROFILE=~/.crosswalk/chrome \
+CROSSWALK_BROWSER_HEADED=1 npm run gui        # log in once; sessions persist
+``` The MCP path is unchanged and still key-free (it uses the host's model via sampling). See [`docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md`](docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md) for the design.
 
 ---
 

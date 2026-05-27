@@ -148,3 +148,12 @@ export async function ingestEmail(email: { from: string; subject: string; body: 
   const { routeEmail } = await rt();
   return routeEmail(await db(), email);
 }
+
+// --- Autonomous apply ---------------------------------------------------------
+
+export async function autoApplyJobs(jobIds: string[], submit?: boolean) {
+  const { autoApply, getConfig } = await rt();
+  const ctx = await buildCtx();
+  const doSubmit = submit ?? (getConfig(ctx.db).submitPolicy === 'auto');
+  return autoApply({ jobIds, submit: doSubmit }, ctx);
+}

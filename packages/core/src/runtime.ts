@@ -44,3 +44,7 @@ export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/ema
 export type { EmailAccount, InboundEmail } from './store/email.ts';
 export { routeEmail } from './services/emailRouter.ts';
 export type { IncomingEmail, RouteResult } from './services/emailRouter.ts';
+
+// Autonomous apply ("apply on my behalf")
+export { autoApply } from './services/autoApplyEngine.ts';
+export type { AutoApplyOptions, AutoApplyOutcome, AutoApplySummary } from './services/autoApplyEngine.ts';

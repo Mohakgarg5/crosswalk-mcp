@@ -1,15 +1,18 @@
 import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
 
+type PlaywrightContext = {
+  newPage(): Promise<PlaywrightPage>;
+  close(): Promise<void>;
+};
+
 type PlaywrightModule = {
   chromium: {
     launch(opts?: { headless?: boolean }): Promise<{
-      newContext(): Promise<{
-        newPage(): Promise<PlaywrightPage>;
-        close(): Promise<void>;
-      }>;
+      newContext(): Promise<PlaywrightContext>;
       close(): Promise<void>;
     }>;
+    launchPersistentContext(userDataDir: string, opts?: { headless?: boolean }): Promise<PlaywrightContext>;
   };
 };
 
@@ -31,60 +34,84 @@ type PlaywrightPage = {
 
 export type LazyPlaywrightBrowserOpts = {
   importPlaywright?: () => Promise<PlaywrightModule>;
+  /** Persistent user-data-dir. When set, sessions/logins persist across runs
+   *  (the unlock for login-walled ATSes). Defaults to CROSSWALK_BROWSER_PROFILE. */
+  profileDir?: string;
+  /** Run a visible browser. Defaults to CROSSWALK_BROWSER_HEADED=1. */
+  headed?: boolean;
 };
 
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 /**
- * Browser-based preview that lazy-imports Playwright. Single shared
- * Chromium instance; one fresh context per preview call.
+ * Browser automation that lazy-imports Playwright. In the default (ephemeral)
+ * mode it launches a shared Chromium and uses a fresh context per call. When a
+ * profileDir is configured it uses a persistent context, so the user logs in
+ * once and those sessions are reused on later runs.
  */
 export class LazyPlaywrightBrowser implements Browser {
   private importPlaywright: () => Promise<PlaywrightModule>;
   private launchedBrowser: Awaited<ReturnType<PlaywrightModule['chromium']['launch']>> | null = null;
+  private persistentContext: PlaywrightContext | null = null;
+  private readonly profileDir?: string;
+  private readonly headed: boolean;
 
   constructor(opts: LazyPlaywrightBrowserOpts = {}) {
     this.importPlaywright = opts.importPlaywright ?? (async () => {
       // @ts-expect-error - playwright is an optional peer dep; resolved at runtime
       return (await import('playwright')) as unknown as PlaywrightModule;
     });
+    this.profileDir = opts.profileDir ?? process.env.CROSSWALK_BROWSER_PROFILE;
+    this.headed = opts.headed ?? process.env.CROSSWALK_BROWSER_HEADED === '1';
   }
 
-  private async loadBrowser() {
-    if (this.launchedBrowser) return this.launchedBrowser;
+  /** Acquire a page (persistent profile when configured, else a fresh context)
+   *  and guarantee cleanup of the per-call resource. */
+  private async runWithPage<T>(fn: (page: PlaywrightPage) => Promise<T>): Promise<T> {
     let pw: PlaywrightModule;
     try {
       pw = await this.importPlaywright();
     } catch (e) {
-      throw new BrowserNotInstalledError(
-        `playwright is not installed: ${(e as Error).message}`
-      );
+      throw new BrowserNotInstalledError(`playwright is not installed: ${(e as Error).message}`);
     }
-    this.launchedBrowser = await pw.chromium.launch({ headless: true });
-    return this.launchedBrowser;
+
+    if (this.profileDir) {
+      if (!this.persistentContext) {
+        this.persistentContext = await pw.chromium.launchPersistentContext(this.profileDir, { headless: !this.headed });
+      }
+      const page = await this.persistentContext.newPage();
+      try {
+        return await fn(page);
+      } finally {
+        await page.close();
+      }
+    }
+
+    if (!this.launchedBrowser) {
+      this.launchedBrowser = await pw.chromium.launch({ headless: !this.headed });
+    }
+    const ctx = await this.launchedBrowser.newContext();
+    try {
+      const page = await ctx.newPage();
+      return await fn(page);
+    } finally {
+      await ctx.close();
+    }
   }
 
   async preview(url: string): Promise<BrowserPreview> {
-    const browser = await this.loadBrowser();
-    const ctx = await browser.newContext();
-    try {
-      const page = await ctx.newPage();
+    return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
       const title = await page.title();
       const resolvedUrl = page.url();
       const screenshotPng = await page.screenshot({ fullPage: false });
       const formFields = await page.evaluate(extractFormFieldsScript);
       return { screenshotPng, resolvedUrl, title, formFields };
-    } finally {
-      await ctx.close();
-    }
+    });
   }
 
   async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean } = {}): Promise<BrowserFillResult> {
-    const browser = await this.loadBrowser();
-    const ctx = await browser.newContext();
-    try {
-      const page = await ctx.newPage();
+    return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
       const filled: string[] = [];
       const skipped: string[] = [];
@@ -175,12 +202,14 @@ export class LazyPlaywrightBrowser implements Browser {
 
       const screenshotPng = await page.screenshot({ fullPage: false });
       return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle };
-    } finally {
-      await ctx.close();
-    }
+    });
   }
 
   async close(): Promise<void> {
+    if (this.persistentContext) {
+      await this.persistentContext.close();
+      this.persistentContext = null;
+    }
     if (this.launchedBrowser) {
       await this.launchedBrowser.close();
       this.launchedBrowser = null;

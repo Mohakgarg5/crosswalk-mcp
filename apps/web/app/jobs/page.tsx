@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Field, PageHeader, ErrorNote, Pill } from '@/components/ui';
-import { runTool } from '@/lib/api';
+import { runTool, getSettings } from '@/lib/api';
+
+type AutoApplySummary = { total: number; submitted: number; applied: number; drafted: number; skipped: number; results: { jobId: string; status: string; applicationId?: string; message?: string }[] };
 
 type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; lastCheckedAt?: string };
 
@@ -26,6 +28,33 @@ export default function JobsPage() {
 
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [searchMsg, setSearchMsg] = useState('');
+  const [policy, setPolicy] = useState<'review' | 'auto'>('review');
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [autoResult, setAutoResult] = useState<AutoApplySummary | null>(null);
+
+  useEffect(() => { getSettings().then(s => setPolicy(s.config.submitPolicy)).catch(() => {}); }, []);
+
+  async function autoApplyAll() {
+    if (!result) return;
+    const ids = result.jobs.map(j => j.id);
+    const willSubmit = policy === 'auto';
+    const ok = confirm(
+      `${willSubmit ? 'SUBMIT' : 'Auto-fill (no submit)'} applications to ${ids.length} job(s)?\n\n` +
+      `This tailors a résumé + cover letter for each${willSubmit ? ' and submits it on your behalf' : ', leaving them for your review'}.\n` +
+      `Submit policy is "${policy}" (change it in Settings).`
+    );
+    if (!ok) return;
+    setAutoBusy(true); setAutoResult(null); setErr('');
+    try {
+      const r = await fetch('/api/auto-apply', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobIds: ids })
+      }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      setAutoResult(r.summary as AutoApplySummary);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setAutoBusy(false); }
+  }
 
   async function loadSearches() {
     const r = await fetch('/api/searches').then(x => x.json());
@@ -133,7 +162,25 @@ export default function JobsPage() {
       </div>
 
       {result && (
-        <Card title={`Results (${result.jobs.length})`} subtitle={`queried ${result.meta.companiesQueried} companies · ${result.meta.fetched} fetched · ${result.meta.errors.length} errors`}>
+        <Card title={`Results (${result.jobs.length})`}
+          subtitle={`queried ${result.meta.companiesQueried} companies · ${result.meta.fetched} fetched · ${result.meta.errors.length} errors`}
+          actions={result.jobs.length > 0 && (
+            <Button onClick={autoApplyAll} disabled={autoBusy}>
+              {autoBusy ? 'Applying…' : `${policy === 'auto' ? 'Auto-apply & submit' : 'Auto-fill'} (${result.jobs.length})`}
+            </Button>
+          )}>
+          {autoResult && (
+            <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--panel-2)] p-3 text-sm">
+              <div className="font-medium mb-1">Auto-apply run complete</div>
+              <div className="flex flex-wrap gap-3 text-xs">
+                <Pill tone="ok">{autoResult.submitted} submitted</Pill>
+                <Pill tone="accent">{autoResult.applied} filled</Pill>
+                <Pill tone="muted">{autoResult.drafted} drafted</Pill>
+                <Pill tone="warn">{autoResult.skipped} skipped</Pill>
+              </div>
+              <p className="text-xs text-[var(--muted)] mt-2">See Pipeline for drafts and Alerts for the run summary.</p>
+            </div>
+          )}
           {result.jobs.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No matches. Try broader filters.</p>
           ) : (
