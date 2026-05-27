@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Field, PageHeader, ErrorNote, Pill } from '@/components/ui';
 import { runTool } from '@/lib/api';
 
@@ -17,7 +18,18 @@ export default function JobsPage() {
   const [h1bOnly, setH1bOnly] = useState(false);
   const [result, setResult] = useState<FetchResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState('');
   const [err, setErr] = useState('');
+  const router = useRouter();
+
+  async function draft(jobId: string) {
+    setDrafting(jobId); setErr('');
+    try {
+      const r = await runTool<{ applicationId: string }>('draft_application', { jobId });
+      router.push(`/applications/${r.applicationId}`);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setDrafting(''); }
+  }
 
   async function search() {
     setBusy(true); setErr(''); setResult(null);
@@ -58,7 +70,7 @@ export default function JobsPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-[var(--muted)] text-xs">
-                  <tr><th className="py-2">Title</th><th>Company</th><th>Location</th><th>H-1B</th><th></th></tr>
+                  <tr><th className="py-2">Title</th><th>Company</th><th>Location</th><th>H-1B</th><th></th><th></th></tr>
                 </thead>
                 <tbody>
                   {result.jobs.map(j => (
@@ -67,7 +79,8 @@ export default function JobsPage() {
                       <td className="pr-3">{j.company}</td>
                       <td className="pr-3 text-[var(--muted)]">{j.location ?? '—'}{j.locationType ? ` · ${j.locationType}` : ''}</td>
                       <td className="pr-3">{typeof j.h1bConfidence === 'number' ? <Pill tone={j.h1bConfidence >= 0.5 ? 'ok' : 'muted'}>{j.h1bConfidence.toFixed(2)}</Pill> : '—'}</td>
-                      <td><a href={j.url} target="_blank" rel="noreferrer" className="text-[var(--accent)]">open ↗</a></td>
+                      <td className="pr-3"><a href={j.url} target="_blank" rel="noreferrer" className="text-[var(--accent)]">open ↗</a></td>
+                      <td><button onClick={() => draft(j.id)} disabled={drafting === j.id} className="text-[var(--accent)] disabled:opacity-50">{drafting === j.id ? 'drafting…' : 'draft →'}</button></td>
                     </tr>
                   ))}
                 </tbody>

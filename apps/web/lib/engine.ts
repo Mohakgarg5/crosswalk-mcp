@@ -101,3 +101,11 @@ export async function readProfile(): Promise<Record<string, unknown> | null> {
   const { getProfile } = await rt();
   return getProfile(await db());
 }
+
+export async function readApplication(id: string) {
+  const { getApplication, listEventsForApplication } = await rt();
+  const d = await db();
+  const application = getApplication(d, id);
+  if (!application) return null;
+  return { application, events: listEventsForApplication(d, id) };
+}

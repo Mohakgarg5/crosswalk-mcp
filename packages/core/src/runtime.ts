@@ -29,3 +29,5 @@ export { getConfig, setConfig, DEFAULT_APP_CONFIG } from './store/appConfig.ts';
 export type { AppConfig, SubmitPolicy } from './store/appConfig.ts';
 export { getProfile } from './store/profile.ts';
 export type { Profile } from './store/profile.ts';
+export { getApplication, listEventsForApplication } from './store/application.ts';
+export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
