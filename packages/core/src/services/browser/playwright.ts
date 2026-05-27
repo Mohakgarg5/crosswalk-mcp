@@ -83,7 +83,7 @@ export class LazyPlaywrightBrowser implements Browser {
       try {
         return await fn(page);
       } finally {
-        await page.close();
+        try { await page.close(); } catch { /* ignore cleanup errors */ }
       }
     }
 
@@ -95,7 +95,7 @@ export class LazyPlaywrightBrowser implements Browser {
       const page = await ctx.newPage();
       return await fn(page);
     } finally {
-      await ctx.close();
+      try { await ctx.close(); } catch { /* ignore cleanup errors */ }
     }
   }
 

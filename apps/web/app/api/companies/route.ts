@@ -14,6 +14,9 @@ export async function POST(req: Request) {
     if (!Array.isArray(body.entries) || body.entries.length === 0) {
       return NextResponse.json({ ok: false, error: 'entries array required' }, { status: 400 });
     }
+    if (body.entries.length > 10000) {
+      return NextResponse.json({ ok: false, error: 'max 10000 entries per import' }, { status: 400 });
+    }
     const result = await importCompaniesBulk(body.entries);
     const stats = await companyStats();
     return NextResponse.json({ ok: true, ...result, total: stats.total });

@@ -23,19 +23,25 @@ export function routeEmail(db: Db, email: IncomingEmail): RouteResult {
     FROM application a
     LEFT JOIN job j ON j.id = a.job_id
     LEFT JOIN company c ON c.id = j.company_id
+    WHERE a.status != 'rejected'
     ORDER BY a.created_at DESC, a.rowid DESC
   `).all() as Array<{ applicationId: string; jobTitle: string | null; company: string | null }>;
 
   const hay = `${email.subject}\n${email.body}\n${email.from}`.toLowerCase();
 
+  // Prefer the most specific (longest) matching company name to avoid short
+  // common names winning over a better, longer match.
   let matched: { applicationId: string; company: string | null } | undefined;
   let matchedBy: 'company' | 'jobTitle' | undefined;
+  let bestLen = 0;
   for (const c of candidates) {
-    if (c.company && hay.includes(c.company.toLowerCase())) { matched = c; matchedBy = 'company'; break; }
+    const name = c.company?.toLowerCase();
+    if (name && name.length > bestLen && hay.includes(name)) { matched = c; matchedBy = 'company'; bestLen = name.length; }
   }
   if (!matched) {
     for (const c of candidates) {
-      if (c.jobTitle && hay.includes(c.jobTitle.toLowerCase())) { matched = c; matchedBy = 'jobTitle'; break; }
+      const title = c.jobTitle?.toLowerCase();
+      if (title && title.length > bestLen && hay.includes(title)) { matched = c; matchedBy = 'jobTitle'; bestLen = title.length; }
     }
   }
 

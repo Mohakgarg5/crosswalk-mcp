@@ -10,10 +10,18 @@ import { createNotification } from '../store/notification.ts';
 export function refreshSavedSearch(db: Db, id: string): { newMatches: number; jobIds: string[] } {
   const search = getSavedSearch(db, id);
   if (!search) throw new Error(`unknown saved search: ${id}`);
-  const f = search.filters;
 
+  // First run: establish a baseline (don't treat every pre-existing job as
+  // "new", which would flood notifications and auto-apply to the whole cache).
+  // Only postings seen AFTER this baseline count as new on later runs.
+  if (!search.lastCheckedAt) {
+    touchSavedSearch(db, id, new Date().toISOString());
+    return { newMatches: 0, jobIds: [] };
+  }
+
+  const f = search.filters;
   const where: string[] = ['j.last_seen_at > ?'];
-  const args: unknown[] = [search.lastCheckedAt ?? ''];
+  const args: unknown[] = [search.lastCheckedAt];
   if (f.titleContains) { where.push('LOWER(j.title) LIKE ?'); args.push(`%${f.titleContains.toLowerCase()}%`); }
   if (f.locationContains) { where.push("LOWER(COALESCE(j.location, '')) LIKE ?"); args.push(`%${f.locationContains.toLowerCase()}%`); }
   if (f.remoteOnly) { where.push("j.location_type = 'remote'"); }

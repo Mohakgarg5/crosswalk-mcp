@@ -10,6 +10,10 @@ import { runWatch } from '../src/services/watchEngine.ts';
 import type { Browser } from '../src/services/browser/types.ts';
 import type { SamplingClient } from '../src/sampling/client.ts';
 
+// Real timers here (not fake): the auto-apply path generates a .docx, whose
+// library uses internal timers that fake timers would freeze.
+const tick = () => new Promise(r => setTimeout(r, 1100)); // advance wall-clock past ms granularity
+
 function fakeSampling(): SamplingClient {
   return { complete: async () => 'GENERATED', completeJson: async () => ({}) } as unknown as SamplingClient;
 }
@@ -29,33 +33,37 @@ function seed(db: ReturnType<typeof openDb>) {
 }
 
 describe('runWatch — continuous role-matched auto-apply', () => {
-  it('detects new matches and auto-applies when the search has auto-apply on', async () => {
+  it('baselines on first run, then auto-applies new matches when auto-apply is on', async () => {
     const db = openDb(':memory:');
     seed(db);
     createSavedSearch(db, { name: 'PM', filters: { titleContains: 'PM' }, source: 'companies', autoApply: true });
-    const res = await runWatch({ db, sampling: fakeSampling(), browser: fakeBrowser() });
-    expect(res.totalNew).toBe(1);
-    expect(res.searches[0].autoApplied?.total).toBe(1);
-    expect(listApplications(db).length).toBe(1); // applied on our behalf
+    const deps = { db, sampling: fakeSampling(), browser: fakeBrowser() };
+
+    // First run = baseline: pre-existing jobs are not applied to.
+    const first = await runWatch(deps);
+    expect(first.totalNew).toBe(0);
+    expect(listApplications(db).length).toBe(0);
+
+    // A new matching job appears later → caught and auto-applied.
+    await tick();
+    upsertJobs(db, [{ id: 'g-2', companyId: 'stripe', title: 'Senior PM', url: 'https://x/2', descriptionMd: 'd', raw: {} }]);
+    const second = await runWatch(deps);
+    expect(second.totalNew).toBe(1);
+    expect(listApplications(db).length).toBe(1);
   });
 
   it('only notifies (no apply) when auto-apply is off', async () => {
     const db = openDb(':memory:');
     seed(db);
     createSavedSearch(db, { name: 'PM', filters: { titleContains: 'PM' }, source: 'companies', autoApply: false });
-    const res = await runWatch({ db, sampling: fakeSampling(), browser: fakeBrowser() });
-    expect(res.totalNew).toBe(1);
-    expect(res.searches[0].autoApplied).toBeUndefined();
-    expect(listApplications(db).length).toBe(0);
-  });
+    const deps = { db, sampling: fakeSampling(), browser: fakeBrowser() };
 
-  it('re-running finds nothing new (no duplicate applies)', async () => {
-    const db = openDb(':memory:');
-    seed(db);
-    createSavedSearch(db, { name: 'PM', filters: { titleContains: 'PM' }, source: 'companies', autoApply: true });
-    await runWatch({ db, sampling: fakeSampling(), browser: fakeBrowser() });
-    const second = await runWatch({ db, sampling: fakeSampling(), browser: fakeBrowser() });
-    expect(second.totalNew).toBe(0);
-    expect(listApplications(db).length).toBe(1);
+    await runWatch(deps); // baseline
+    await tick();
+    upsertJobs(db, [{ id: 'g-2', companyId: 'stripe', title: 'Senior PM', url: 'https://x/2', descriptionMd: 'd', raw: {} }]);
+    const r = await runWatch(deps);
+    expect(r.totalNew).toBe(1);
+    expect(r.searches[0].autoApplied).toBeUndefined();
+    expect(listApplications(db).length).toBe(0);
   });
 });

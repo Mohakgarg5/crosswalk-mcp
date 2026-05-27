@@ -18,7 +18,11 @@ export async function POST(req: Request) {
       applyMaxSteps?: number;
     };
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) {
-      setApiKey(body.apiKey.trim());
+      const key = body.apiKey.trim();
+      if (key.length < 8 || key.length > 200) {
+        return NextResponse.json({ ok: false, error: 'API key looks invalid (wrong length)' }, { status: 400 });
+      }
+      setApiKey(key);
     }
     const patch: Record<string, unknown> = {};
     if (typeof body.model === 'string') patch.model = body.model;

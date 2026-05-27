@@ -116,9 +116,22 @@ export async function listSearches() {
   const { listSavedSearches } = await rt();
   return listSavedSearches(await db());
 }
+// Keep only known, well-typed filter keys before persisting (the object comes
+// from the request body).
+function sanitizeFilters(f: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof f.titleContains === 'string') out.titleContains = f.titleContains;
+  if (typeof f.locationContains === 'string') out.locationContains = f.locationContains;
+  if (typeof f.remoteOnly === 'boolean') out.remoteOnly = f.remoteOnly;
+  if (typeof f.h1bSponsorOnly === 'boolean') out.h1bSponsorOnly = f.h1bSponsorOnly;
+  if (typeof f.h1bMinConfidence === 'number') out.h1bMinConfidence = f.h1bMinConfidence;
+  if (Array.isArray(f.companyIds)) out.companyIds = f.companyIds.filter(x => typeof x === 'string');
+  return out;
+}
+
 export async function createSearch(name: string, filters: Record<string, unknown>, source?: 'web' | 'companies', autoApply?: boolean) {
   const { createSavedSearch } = await rt();
-  return createSavedSearch(await db(), { name, filters, source, autoApply });
+  return createSavedSearch(await db(), { name, filters: sanitizeFilters(filters), source, autoApply });
 }
 export async function setSearchAutoApply(id: string, autoApply: boolean) {
   const { setSavedSearchAutoApply } = await rt();
@@ -126,7 +139,12 @@ export async function setSearchAutoApply(id: string, autoApply: boolean) {
 }
 export async function runWatchNow() {
   const { runWatch } = await rt();
-  return runWatch(await buildCtx());
+  const ctx = await buildCtx();
+  try {
+    return await runWatch(ctx);
+  } finally {
+    await ctx.browser.close().catch(() => {});
+  }
 }
 export async function deleteSearch(id: string) {
   const { deleteSavedSearch } = await rt();
@@ -163,7 +181,11 @@ export async function autoApplyJobs(jobIds: string[], submit?: boolean) {
   const { autoApply, getConfig } = await rt();
   const ctx = await buildCtx();
   const doSubmit = submit ?? (getConfig(ctx.db).submitPolicy === 'auto');
-  return autoApply({ jobIds, submit: doSubmit }, ctx);
+  try {
+    return await autoApply({ jobIds, submit: doSubmit }, ctx);
+  } finally {
+    await ctx.browser.close().catch(() => {});
+  }
 }
 
 // --- Role-based discovery + registry growth -----------------------------------
