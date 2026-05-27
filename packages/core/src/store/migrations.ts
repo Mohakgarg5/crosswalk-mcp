@@ -137,6 +137,59 @@ export const migrations: Migration[] = [
       );
     `
   }
+  ,
+  {
+    id: 6,
+    name: 'saved_search_and_notification',
+    sql: `
+      CREATE TABLE saved_search (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        filters_json TEXT NOT NULL,
+        last_checked_at TEXT,
+        created_at TEXT NOT NULL
+      );
+
+      CREATE TABLE notification (
+        id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        title TEXT NOT NULL,
+        body TEXT,
+        ref_id TEXT,
+        read INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_notification_read ON notification(read);
+      CREATE INDEX idx_notification_created ON notification(created_at);
+    `
+  }
+  ,
+  {
+    id: 7,
+    name: 'email',
+    sql: `
+      CREATE TABLE email_account (
+        id INTEGER PRIMARY KEY CHECK (id = 1),
+        provider TEXT NOT NULL,
+        address TEXT NOT NULL,
+        config_json TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE inbound_email (
+        id TEXT PRIMARY KEY,
+        from_addr TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        body TEXT NOT NULL,
+        received_at TEXT NOT NULL,
+        application_id TEXT REFERENCES application(id),
+        matched_by TEXT,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_inbound_email_app ON inbound_email(application_id);
+      CREATE INDEX idx_inbound_email_received ON inbound_email(received_at);
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

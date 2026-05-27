@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Field, PageHeader, ErrorNote, Pill } from '@/components/ui';
 import { runTool } from '@/lib/api';
+
+type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; lastCheckedAt?: string };
 
 type Job = {
   id: string; company: string; title: string; location?: string;
@@ -21,6 +23,48 @@ export default function JobsPage() {
   const [drafting, setDrafting] = useState('');
   const [err, setErr] = useState('');
   const router = useRouter();
+
+  const [searches, setSearches] = useState<SavedSearch[]>([]);
+  const [searchMsg, setSearchMsg] = useState('');
+
+  async function loadSearches() {
+    const r = await fetch('/api/searches').then(x => x.json());
+    if (r.ok) setSearches(r.searches ?? []);
+  }
+  useEffect(() => { loadSearches(); }, []);
+
+  function currentFilters() {
+    return {
+      titleContains: title || undefined,
+      locationContains: location || undefined,
+      remoteOnly: remoteOnly || undefined,
+      h1bSponsorOnly: h1bOnly || undefined
+    };
+  }
+
+  async function saveSearch() {
+    const name = (title || location || 'All jobs') + (remoteOnly ? ' · remote' : '') + (h1bOnly ? ' · H-1B' : '');
+    await fetch('/api/searches', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, filters: currentFilters() })
+    });
+    await loadSearches();
+  }
+
+  async function removeSearch(id: string) {
+    await fetch(`/api/searches?id=${id}`, { method: 'DELETE' });
+    await loadSearches();
+  }
+
+  async function refreshAll() {
+    setSearchMsg('Refreshing…');
+    const r = await fetch('/api/searches', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'refresh' })
+    }).then(x => x.json());
+    setSearchMsg(r.ok ? `${r.result.total} new match(es) — see Alerts.` : (r.error ?? 'failed'));
+    await loadSearches();
+  }
 
   async function draft(jobId: string) {
     setDrafting(jobId); setErr('');
@@ -58,9 +102,35 @@ export default function JobsPage() {
           <label className="flex items-center gap-2"><input type="checkbox" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} /> Remote only</label>
           <label className="flex items-center gap-2"><input type="checkbox" checked={h1bOnly} onChange={e => setH1bOnly(e.target.checked)} /> H-1B sponsors only</label>
         </div>
-        <Button onClick={search} disabled={busy}>{busy ? 'Searching live…' : 'Search jobs'}</Button>
+        <div className="flex items-center gap-3">
+          <Button onClick={search} disabled={busy}>{busy ? 'Searching live…' : 'Search jobs'}</Button>
+          <Button variant="ghost" onClick={saveSearch}>Save this search</Button>
+        </div>
         <ErrorNote>{err}</ErrorNote>
       </Card>
+
+      <div className="mt-4">
+        <Card title={`Saved searches (${searches.length})`}
+          subtitle="Run a refresh to detect newly-posted matches and raise alerts."
+          actions={<Button variant="ghost" onClick={refreshAll}>Refresh all</Button>}>
+          {searchMsg && <div className="mb-3 text-sm text-[var(--accent)]">{searchMsg}</div>}
+          {searches.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">None saved. Set filters above and click “Save this search”.</p>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {searches.map(s => (
+                <li key={s.id} className="flex items-center justify-between py-2.5">
+                  <div>
+                    <div className="text-sm">{s.name}</div>
+                    <div className="text-xs text-[var(--muted)]">{s.lastCheckedAt ? `last checked ${new Date(s.lastCheckedAt).toLocaleString()}` : 'never checked'}</div>
+                  </div>
+                  <button onClick={() => removeSearch(s.id)} className="text-xs text-[var(--muted)] hover:text-[var(--bad)]">delete</button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      </div>
 
       {result && (
         <Card title={`Results (${result.jobs.length})`} subtitle={`queried ${result.meta.companiesQueried} companies · ${result.meta.fetched} fetched · ${result.meta.errors.length} errors`}>

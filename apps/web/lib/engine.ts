@@ -109,3 +109,42 @@ export async function readApplication(id: string) {
   if (!application) return null;
   return { application, events: listEventsForApplication(d, id) };
 }
+
+// --- Discovery alerts ---------------------------------------------------------
+
+export async function listSearches() {
+  const { listSavedSearches } = await rt();
+  return listSavedSearches(await db());
+}
+export async function createSearch(name: string, filters: Record<string, unknown>) {
+  const { createSavedSearch } = await rt();
+  return createSavedSearch(await db(), { name, filters });
+}
+export async function deleteSearch(id: string) {
+  const { deleteSavedSearch } = await rt();
+  deleteSavedSearch(await db(), id);
+}
+export async function refreshSearches() {
+  const { refreshAllSavedSearches } = await rt();
+  return refreshAllSavedSearches(await db());
+}
+export async function listNotifs(unreadOnly = false) {
+  const { listNotifications, unreadCount } = await rt();
+  const d = await db();
+  return { items: listNotifications(d, { unreadOnly }), unread: unreadCount(d) };
+}
+export async function markNotifsRead() {
+  const { markAllRead } = await rt();
+  return markAllRead(await db());
+}
+
+// --- Recruiter email ----------------------------------------------------------
+
+export async function listEmails() {
+  const { listInboundEmails } = await rt();
+  return listInboundEmails(await db());
+}
+export async function ingestEmail(email: { from: string; subject: string; body: string; receivedAt?: string }) {
+  const { routeEmail } = await rt();
+  return routeEmail(await db(), email);
+}

@@ -31,3 +31,16 @@ export { getProfile } from './store/profile.ts';
 export type { Profile } from './store/profile.ts';
 export { getApplication, listEventsForApplication } from './store/application.ts';
 export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
+
+// Discovery alerts (saved searches + notifications)
+export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch } from './store/savedSearch.ts';
+export type { SavedSearch, SavedSearchFilters } from './store/savedSearch.ts';
+export { listNotifications, unreadCount, markAllRead } from './store/notification.ts';
+export type { Notification } from './store/notification.ts';
+export { refreshSavedSearch, refreshAllSavedSearches } from './services/savedSearchEngine.ts';
+
+// Recruiter email routing
+export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/email.ts';
+export type { EmailAccount, InboundEmail } from './store/email.ts';
+export { routeEmail } from './services/emailRouter.ts';
+export type { IncomingEmail, RouteResult } from './services/emailRouter.ts';
