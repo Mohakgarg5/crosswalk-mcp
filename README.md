@@ -69,6 +69,21 @@ That's it. No signup. No API keys. Your data stays in `~/.crosswalk/`.
 
 ---
 
+## Web GUI (run it without an AI host)
+
+Crosswalk now also runs as a **local web app** — same engine, same `~/.crosswalk/state.db`, no MCP host required. Use the MCP server, the GUI, or both; they share one database.
+
+```bash
+npm install          # from the repo root (workspaces)
+npm run gui          # builds the engine, then starts the GUI at http://localhost:3000
+```
+
+Then open **http://localhost:3000**, go to **Settings**, and paste an Anthropic API key (or set `ANTHROPIC_API_KEY`). Discovery and pipeline tracking work without a key; tailoring, fit scoring, and cover letters need one.
+
+The GUI drives the same 18 tools in-process via `crosswalk-mcp/runtime`. The MCP path is unchanged and still key-free (it uses the host's model via sampling). See [`docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md`](docs/superpowers/specs/2026-05-26-crosswalk-gui-design.md) for the design.
+
+---
+
 ## Use with other MCP clients
 
 Crosswalk is a stdio MCP server. The auto-installer above covers Claude Desktop, Cursor, and Windsurf. For other clients, drop a config snippet into the client's MCP config file and restart. (Replace `npx -y crosswalk-mcp@latest` with `node /absolute/path/to/crosswalk-mcp/dist/cli.js` if you've cloned from GitHub instead of installing from npm.)

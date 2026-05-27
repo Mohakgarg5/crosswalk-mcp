@@ -7,12 +7,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
-import type {
-  ToolCtx,
-  Db,
-  AppConfig,
-  SamplingClient as SamplingClientType
-} from 'crosswalk-mcp/runtime';
+import type { ToolCtx, Db, AppConfig } from 'crosswalk-mcp/runtime';
 
 type Runtime = typeof import('crosswalk-mcp/runtime');
 
@@ -64,7 +59,7 @@ export function setApiKey(key: string): void {
 
 // AI features need a key; non-AI tools (fetch_jobs, list_pipeline, ...) don't.
 // Use a stub that only errors when the model is actually invoked.
-async function makeSampling(d: Db): Promise<SamplingClientType> {
+async function makeSampling(d: Db) {
   const { SamplingClient, ApiSamplingBackend, getConfig } = await rt();
   type SdkServer = ConstructorParameters<typeof SamplingClient>[0];
   const apiKey = getApiKey();
@@ -100,4 +95,9 @@ export async function readConfig(): Promise<AppConfig> {
 export async function writeConfig(patch: Partial<AppConfig>): Promise<AppConfig> {
   const { setConfig } = await rt();
   return setConfig(await db(), patch);
+}
+
+export async function readProfile(): Promise<Record<string, unknown> | null> {
+  const { getProfile } = await rt();
+  return getProfile(await db());
 }
