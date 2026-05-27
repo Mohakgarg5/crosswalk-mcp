@@ -63,13 +63,21 @@ describe('autoApply — applies to a batch on the user\'s behalf', () => {
     expect(s.submitted).toBe(0);
   });
 
-  it('honors the anti-spam guardrail (weekly cap 0 → all skipped)', async () => {
+  it('honors the anti-spam weekly cap (cap 1 → first submits, second skipped)', async () => {
+    const db = openDb(':memory:');
+    seed(db);
+    setConfig(db, { weeklyCap: 1 });
+    const s = await autoApply({ jobIds: ['g-1', 'g-2'], submit: true }, { db, sampling: fakeSampling(), browser: fakeBrowser() });
+    expect(s.submitted).toBe(1);
+    expect(s.skipped).toBe(1);
+  });
+
+  it('weekly cap 0 = unlimited → submits all', async () => {
     const db = openDb(':memory:');
     seed(db);
     setConfig(db, { weeklyCap: 0 });
     const s = await autoApply({ jobIds: ['g-1', 'g-2'], submit: true }, { db, sampling: fakeSampling(), browser: fakeBrowser() });
-    expect(s.skipped).toBe(2);
-    expect(s.submitted).toBe(0);
+    expect(s.submitted).toBe(2);
   });
 
   it('records drafted (not failed) when the browser is unavailable', async () => {

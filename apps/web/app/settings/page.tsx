@@ -80,7 +80,7 @@ export default function SettingsPage() {
               {MODELS.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </Field>
-          <Field label="Weekly application cap (anti-spam guardrail)">
+          <Field label="Weekly application cap — set 0 for UNLIMITED (hands-off high volume)">
             <Input type="number" min={0} value={weeklyCap} onChange={e => setWeeklyCap(Number(e.target.value))} />
           </Field>
           <Field label="Default submit policy">

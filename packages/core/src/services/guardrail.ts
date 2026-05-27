@@ -20,22 +20,25 @@ export type GuardrailResult =
 export function checkGuardrail(db: Db, input: GuardrailInput): GuardrailResult {
   const warnings: string[] = [];
 
-  // 1. Weekly cap (configurable via app_config; defaults to WEEKLY_CAP)
+  // 1. Weekly cap (configurable via app_config). A cap <= 0 means UNLIMITED
+  //    (no weekly limit) — for high-volume, hands-off auto-applying.
   const cap = getConfig(db).weeklyCap;
-  const cutoff = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString();
-  const count = (db.prepare(
-    `SELECT COUNT(*) AS n FROM application
-     WHERE created_at >= ?
-       AND status IN ('submitted', 'interviewing', 'rejected', 'offer')`
-  ).get(cutoff) as { n: number }).n;
-  if (count >= cap) {
-    return {
-      allowed: false,
-      reason: `weekly cap reached (${count}/${cap} in the last 7 days). Quality > quantity — review your pipeline before adding more.`
-    };
-  }
-  if (count >= Math.floor(cap * 0.8)) {
-    warnings.push(`approaching weekly cap (${count}/${cap})`);
+  if (cap > 0) {
+    const cutoff = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString();
+    const count = (db.prepare(
+      `SELECT COUNT(*) AS n FROM application
+       WHERE created_at >= ?
+         AND status IN ('submitted', 'interviewing', 'rejected', 'offer')`
+    ).get(cutoff) as { n: number }).n;
+    if (count >= cap) {
+      return {
+        allowed: false,
+        reason: `weekly cap reached (${count}/${cap} in the last 7 days). Raise the cap in Settings (0 = unlimited) to apply to more.`
+      };
+    }
+    if (count >= Math.floor(cap * 0.8)) {
+      warnings.push(`approaching weekly cap (${count}/${cap})`);
+    }
   }
 
   // 2. Duplicate detection
