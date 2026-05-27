@@ -62,7 +62,9 @@ export async function fetchJobs(
   input: FetchJobsInput,
   ctx: { db: Db }
 ): Promise<FetchJobsResult> {
-  const allCompanies = listAllCompanies(ctx.db);
+  // Aggregator-sourced companies ('themuse') aren't queryable by org slug;
+  // they're discovered via role search, so skip them here.
+  const allCompanies = listAllCompanies(ctx.db).filter(c => c.ats !== 'themuse');
   const companies = input.companyIds
     ? allCompanies.filter(c => input.companyIds!.includes(c.id))
     : allCompanies;

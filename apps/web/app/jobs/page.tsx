@@ -31,6 +31,8 @@ export default function JobsPage() {
   const [policy, setPolicy] = useState<'review' | 'auto'>('review');
   const [autoBusy, setAutoBusy] = useState(false);
   const [autoResult, setAutoResult] = useState<AutoApplySummary | null>(null);
+  const [mode, setMode] = useState<'web' | 'companies'>('web');
+  const [pages, setPages] = useState(3);
 
   useEffect(() => { getSettings().then(s => setPolicy(s.config.submitPolicy)).catch(() => {}); }, []);
 
@@ -105,32 +107,60 @@ export default function JobsPage() {
   }
 
   async function search() {
-    setBusy(true); setErr(''); setResult(null);
+    setBusy(true); setErr(''); setResult(null); setAutoResult(null);
     try {
-      const r = await runTool<FetchResult>('fetch_jobs', {
-        titleContains: title || undefined,
-        locationContains: location || undefined,
-        remoteOnly: remoteOnly || undefined,
-        h1bSponsorOnly: h1bOnly || undefined,
-        limit: 50
-      });
-      setResult(r);
+      if (mode === 'web') {
+        const r = await fetch('/api/search-roles', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query: title || undefined, location: location || undefined, pages })
+        }).then(x => x.json());
+        if (!r.ok) throw new Error(r.error);
+        setResult({ jobs: r.jobs, meta: { fetched: r.meta.fetched, afterFilters: r.meta.afterFilters, companiesQueried: r.meta.total, errors: [] } });
+      } else {
+        const r = await runTool<FetchResult>('fetch_jobs', {
+          titleContains: title || undefined,
+          locationContains: location || undefined,
+          remoteOnly: remoteOnly || undefined,
+          h1bSponsorOnly: h1bOnly || undefined,
+          limit: 50
+        });
+        setResult(r);
+      }
     } catch (e) { setErr((e as Error).message); }
     finally { setBusy(false); }
   }
 
   return (
     <>
-      <PageHeader title="Jobs" subtitle="Live roles across 10 ATSs (115 companies). Queries run from your machine." />
+      <PageHeader title="Jobs" subtitle="Search by role across thousands of companies (the open web), or just your watched ATS companies." />
       <Card title="Search">
+        <div className="mb-4 inline-flex rounded-lg border border-[var(--border)] p-1 text-sm">
+          <button onClick={() => setMode('web')}
+            className={`rounded-md px-3 py-1.5 ${mode === 'web' ? 'bg-[var(--accent)] text-[#0b0e14]' : 'text-[var(--muted)]'}`}>
+            Across the web (role-based)
+          </button>
+          <button onClick={() => setMode('companies')}
+            className={`rounded-md px-3 py-1.5 ${mode === 'companies' ? 'bg-[var(--accent)] text-[#0b0e14]' : 'text-[var(--muted)]'}`}>
+            My ATS companies
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-4">
-          <Field label="Title contains"><Input placeholder="product manager" value={title} onChange={e => setTitle(e.target.value)} /></Field>
+          <Field label="Role / title contains"><Input placeholder="product manager" value={title} onChange={e => setTitle(e.target.value)} /></Field>
           <Field label="Location contains"><Input placeholder="New York" value={location} onChange={e => setLocation(e.target.value)} /></Field>
         </div>
-        <div className="flex items-center gap-5 mb-4 text-sm">
-          <label className="flex items-center gap-2"><input type="checkbox" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} /> Remote only</label>
-          <label className="flex items-center gap-2"><input type="checkbox" checked={h1bOnly} onChange={e => setH1bOnly(e.target.checked)} /> H-1B sponsors only</label>
-        </div>
+        {mode === 'companies' ? (
+          <div className="flex items-center gap-5 mb-4 text-sm">
+            <label className="flex items-center gap-2"><input type="checkbox" checked={remoteOnly} onChange={e => setRemoteOnly(e.target.checked)} /> Remote only</label>
+            <label className="flex items-center gap-2"><input type="checkbox" checked={h1bOnly} onChange={e => setH1bOnly(e.target.checked)} /> H-1B sponsors only</label>
+          </div>
+        ) : (
+          <div className="mb-4 text-sm flex items-center gap-3">
+            <span className="text-[var(--muted)]">Depth</span>
+            <input type="number" min={1} max={20} value={pages} onChange={e => setPages(Number(e.target.value))}
+              className="w-20 rounded-lg border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1 outline-none" />
+            <span className="text-[var(--muted)] text-xs">pages (~20 roles each) — more = more to apply to</span>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <Button onClick={search} disabled={busy}>{busy ? 'Searching live…' : 'Search jobs'}</Button>
           <Button variant="ghost" onClick={saveSearch}>Save this search</Button>
@@ -163,7 +193,9 @@ export default function JobsPage() {
 
       {result && (
         <Card title={`Results (${result.jobs.length})`}
-          subtitle={`queried ${result.meta.companiesQueried} companies · ${result.meta.fetched} fetched · ${result.meta.errors.length} errors`}
+          subtitle={mode === 'web'
+            ? `${result.jobs.length} role matches · ${result.meta.companiesQueried.toLocaleString()} open roles indexed across the web`
+            : `queried ${result.meta.companiesQueried} companies · ${result.meta.fetched} fetched · ${result.meta.errors.length} errors`}
           actions={result.jobs.length > 0 && (
             <Button onClick={autoApplyAll} disabled={autoBusy}>
               {autoBusy ? 'Applying…' : `${policy === 'auto' ? 'Auto-apply & submit' : 'Auto-fill'} (${result.jobs.length})`}

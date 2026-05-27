@@ -48,3 +48,9 @@ export type { IncomingEmail, RouteResult } from './services/emailRouter.ts';
 // Autonomous apply ("apply on my behalf")
 export { autoApply } from './services/autoApplyEngine.ts';
 export type { AutoApplyOptions, AutoApplyOutcome, AutoApplySummary } from './services/autoApplyEngine.ts';
+
+// Role-based discovery across thousands of companies + bulk registry growth
+export { searchRoles } from './services/roleSearch.ts';
+export type { RoleSearchOptions, RoleSearchJob, RoleSearchResult } from './services/roleSearch.ts';
+export { importCompanies, countCompanies, listAllCompanies, KNOWN_ATS } from './store/company.ts';
+export type { CompanyImportEntry, Company } from './store/company.ts';

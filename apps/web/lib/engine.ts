@@ -157,3 +157,24 @@ export async function autoApplyJobs(jobIds: string[], submit?: boolean) {
   const doSubmit = submit ?? (getConfig(ctx.db).submitPolicy === 'auto');
   return autoApply({ jobIds, submit: doSubmit }, ctx);
 }
+
+// --- Role-based discovery + registry growth -----------------------------------
+
+export async function searchRolesWeb(opts: { query?: string; category?: string; location?: string; pages?: number }) {
+  const { searchRoles } = await rt();
+  return searchRoles(await db(), opts);
+}
+
+export async function companyStats() {
+  const { countCompanies, listAllCompanies } = await rt();
+  const d = await db();
+  const all = listAllCompanies(d);
+  const byAts: Record<string, number> = {};
+  for (const c of all) byAts[c.ats] = (byAts[c.ats] ?? 0) + 1;
+  return { total: countCompanies(d), byAts };
+}
+
+export async function importCompaniesBulk(entries: { name: string; ats: string; slug: string; h1bConfidence?: number }[]) {
+  const { importCompanies } = await rt();
+  return importCompanies(await db(), entries);
+}

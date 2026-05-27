@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, Button, Input, Field, PageHeader, Pill, ErrorNote } from '@/components/ui';
+import { Card, Button, Input, Textarea, Field, PageHeader, Pill, ErrorNote } from '@/components/ui';
 import { getSettings, saveSettings, type Settings } from '@/lib/api';
 
 const MODELS = ['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5-20251001'];
@@ -15,6 +15,31 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [saved, setSaved] = useState(false);
+
+  const [companies, setCompanies] = useState<{ total: number; byAts: Record<string, number> } | null>(null);
+  const [importText, setImportText] = useState('');
+  const [importMsg, setImportMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+
+  function loadCompanies() {
+    fetch('/api/companies').then(r => r.json()).then(d => { if (d.ok) setCompanies({ total: d.total, byAts: d.byAts }); }).catch(() => {});
+  }
+  useEffect(() => { loadCompanies(); }, []);
+
+  async function importCompanies() {
+    setImporting(true); setImportMsg('');
+    try {
+      const entries = JSON.parse(importText);
+      const r = await fetch('/api/companies', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ entries })
+      }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      setImportMsg(`Imported ${r.imported}, skipped ${r.skipped.length}. Registry now ${r.total} companies.`);
+      setImportText(''); loadCompanies();
+    } catch (e) { setImportMsg(`Error: ${(e as Error).message}`); }
+    finally { setImporting(false); }
+  }
 
   useEffect(() => {
     getSettings().then(v => {
@@ -63,6 +88,24 @@ export default function SettingsPage() {
               <option value="auto">auto-submit (opt-in)</option>
             </select>
           </Field>
+        </Card>
+
+        <Card title={`Open Job Graph — companies (${companies?.total ?? '…'})`}
+          subtitle="Per-company ATS coverage. Grow it to thousands via bulk import. (Role search across the web doesn't need this.)">
+          {companies && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {Object.entries(companies.byAts).map(([ats, n]) => <Pill key={ats}>{ats}: {n}</Pill>)}
+            </div>
+          )}
+          <Field label='Bulk import (JSON array of {"name","ats","slug","h1bConfidence?"})'>
+            <Textarea rows={4} placeholder='[{"name":"Stripe","ats":"greenhouse","slug":"stripe"}, {"name":"Brex","ats":"lever","slug":"brex"}]'
+              value={importText} onChange={e => setImportText(e.target.value)} />
+          </Field>
+          <div className="flex items-center gap-3">
+            <Button onClick={importCompanies} disabled={importing || !importText.trim()}>{importing ? 'Importing…' : 'Import companies'}</Button>
+            {importMsg && <span className="text-sm text-[var(--muted)]">{importMsg}</span>}
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-2">Valid ATSes: greenhouse, lever, ashby, workable, smartrecruiters, bamboohr, recruitee, personio, workday, icims.</p>
         </Card>
 
         <Card title="Autonomous apply (browser)" subtitle="How “apply on your behalf” works, and how to unlock login-walled ATSes.">
