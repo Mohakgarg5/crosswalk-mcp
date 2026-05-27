@@ -9,12 +9,16 @@ export type AppConfig = {
   weeklyCap: number;
   /** Default auto-submit posture for the apply flow. */
   submitPolicy: SubmitPolicy;
+  /** Max wizard pages to navigate when applying (1 = single-page only; raise
+   *  to ~8 for multi-step ATSes like Workday). */
+  applyMaxSteps: number;
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
   model: 'claude-sonnet-4-6',
   weeklyCap: 10,
-  submitPolicy: 'review'
+  submitPolicy: 'review',
+  applyMaxSteps: 1
 };
 
 export function getConfig(db: Db): AppConfig {

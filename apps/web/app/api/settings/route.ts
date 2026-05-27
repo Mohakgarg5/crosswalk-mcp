@@ -15,6 +15,7 @@ export async function POST(req: Request) {
       model?: string;
       weeklyCap?: number;
       submitPolicy?: 'review' | 'auto';
+      applyMaxSteps?: number;
     };
     if (typeof body.apiKey === 'string' && body.apiKey.trim()) {
       setApiKey(body.apiKey.trim());
@@ -23,6 +24,7 @@ export async function POST(req: Request) {
     if (typeof body.model === 'string') patch.model = body.model;
     if (typeof body.weeklyCap === 'number') patch.weeklyCap = body.weeklyCap;
     if (body.submitPolicy === 'review' || body.submitPolicy === 'auto') patch.submitPolicy = body.submitPolicy;
+    if (typeof body.applyMaxSteps === 'number') patch.applyMaxSteps = body.applyMaxSteps;
     const config = Object.keys(patch).length ? await writeConfig(patch) : await readConfig();
     return NextResponse.json({ ok: true, settings: { hasKey: Boolean(getApiKey()), config } });
   } catch (e) {

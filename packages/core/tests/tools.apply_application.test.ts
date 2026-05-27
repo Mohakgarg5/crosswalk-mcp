@@ -297,7 +297,7 @@ describe('tools/apply_application', () => {
     const sampling = makeNoopSampling();
     const out = await applyApplication({ applicationId: 'app1' }, { db, browser, sampling });
 
-    expect(seenOpts).toEqual({ ats: 'greenhouse' });
+    expect(seenOpts).toMatchObject({ ats: 'greenhouse' });
     expect(out.detectedAts).toBe('greenhouse');
   });
 

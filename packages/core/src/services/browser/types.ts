@@ -25,9 +25,9 @@ export interface Browser {
   preview(url: string): Promise<BrowserPreview>;
 
   /**
-   * Open the URL in a headless browser, attempt to fill each field by its kind using common ATS selectors, optionally click the submit button, and return a screenshot. Unmatched fields go to `skipped`. Throws if the browser runtime is not installed.
+   * Open the URL in a headless browser, attempt to fill each field by its kind using common ATS selectors, optionally click the submit button, and return a screenshot. Unmatched fields go to `skipped`. With `maxSteps > 1` it navigates a multi-page wizard (fill → click Next → repeat → Submit). Throws if the browser runtime is not installed.
    */
-  fillForm(url: string, fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean }): Promise<BrowserFillResult>;
+  fillForm(url: string, fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean; maxSteps?: number }): Promise<BrowserFillResult>;
 
   /** Release any resources held by this browser instance. */
   close(): Promise<void>;
@@ -71,4 +71,6 @@ export type BrowserFillResult = {
   postSubmitUrl?: string;
   /** Page title after submit click (post-navigation). Only set when submitClicked is true. */
   postSubmitTitle?: string;
+  /** How many wizard pages were advanced past (Next/Continue clicks) before submit. */
+  stepsAdvanced?: number;
 };

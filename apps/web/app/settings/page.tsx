@@ -12,6 +12,7 @@ export default function SettingsPage() {
   const [model, setModel] = useState('claude-sonnet-4-6');
   const [weeklyCap, setWeeklyCap] = useState(10);
   const [submitPolicy, setSubmitPolicy] = useState<'review' | 'auto'>('review');
+  const [applyMaxSteps, setApplyMaxSteps] = useState(1);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
   const [saved, setSaved] = useState(false);
@@ -47,13 +48,14 @@ export default function SettingsPage() {
       setModel(v.config.model);
       setWeeklyCap(v.config.weeklyCap);
       setSubmitPolicy(v.config.submitPolicy);
+      setApplyMaxSteps(v.config.applyMaxSteps ?? 1);
     }).catch(e => setErr(String(e)));
   }, []);
 
   async function save() {
     setSaving(true); setErr(''); setSaved(false);
     try {
-      const next = await saveSettings({ apiKey: apiKey || undefined, model, weeklyCap, submitPolicy });
+      const next = await saveSettings({ apiKey: apiKey || undefined, model, weeklyCap, submitPolicy, applyMaxSteps });
       setS(next); setApiKey(''); setSaved(true);
     } catch (e) { setErr((e as Error).message); }
     finally { setSaving(false); }
@@ -113,6 +115,10 @@ export default function SettingsPage() {
             With <strong>submit policy = auto</strong>, the Jobs page “Auto-apply & submit” button tailors a
             résumé + cover letter for every result and submits it for you (respecting your weekly cap).
           </p>
+          <Field label="Multi-step wizard depth (max pages to navigate per application)">
+            <Input type="number" min={1} max={15} value={applyMaxSteps} onChange={e => setApplyMaxSteps(Number(e.target.value))} />
+          </Field>
+          <p className="text-xs text-[var(--muted)] mb-3">1 = single-page forms only. Set ~8 to navigate multi-page wizards (Workday-style): fill → Next → … → Submit on the last page.</p>
           <p className="text-sm text-[var(--muted)] mb-2">To apply to sites that require a login (Workday, etc.), run the GUI with a persistent browser profile so you sign in once:</p>
           <pre className="text-xs bg-[var(--panel-2)] border border-[var(--border)] rounded-lg p-3 whitespace-pre-wrap">{`# one-time: install the browser runtime
 npx crosswalk-mcp install-browser

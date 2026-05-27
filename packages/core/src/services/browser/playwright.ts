@@ -110,63 +110,32 @@ export class LazyPlaywrightBrowser implements Browser {
     });
   }
 
-  async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean } = {}): Promise<BrowserFillResult> {
+  async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean; maxSteps?: number } = {}): Promise<BrowserFillResult> {
     return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
-      const filled: string[] = [];
-      const skipped: string[] = [];
+      const maxSteps = Math.max(1, opts.maxSteps ?? 1);
+      const labelOf = (f: FillField) => (f.kind === 'text_by_name' ? `text_by_name:${f.name}` : f.kind);
+      const filledLabels = new Set<string>();
+      let stepsAdvanced = 0;
 
-      for (const field of fields) {
-        if (field.kind === 'text_by_name') {
-          const label = `text_by_name:${field.name}`;
-          if (!isSafeFieldName(field.name)) {
-            skipped.push(label);
-            continue;
-          }
-          const candidates = [
-            `textarea[name="${field.name}"]`,
-            `textarea[id="${field.name}"]`,
-            `input[name="${field.name}"]`,
-            `input[id="${field.name}"]`
-          ];
-          let matched = false;
-          for (const selector of candidates) {
-            const el = await page.$(selector);
-            if (!el) continue;
-            if (typeof el.fill !== 'function') continue;
-            try {
-              await el.fill(field.value);
-            } catch {
-              continue;
-            }
-            matched = true;
-            break;
-          }
-          (matched ? filled : skipped).push(label);
-          continue;
+      // Multi-step wizards: fill the current page, advance via Next/Continue,
+      // repeat. A field skipped on one page may be filled on a later one.
+      for (let step = 1; step <= maxSteps; step++) {
+        for (const field of fields) {
+          const label = labelOf(field);
+          if (filledLabels.has(label)) continue;
+          if (await tryFillField(page, field, opts.ats)) filledLabels.add(label);
         }
-
-        const candidates = selectorsForKind(field.kind, opts.ats);
-        let matched = false;
-        for (const selector of candidates) {
-          const el = await page.$(selector);
-          if (!el) continue;
-          try {
-            if (field.kind === 'resume_file' || field.kind === 'cover_letter_file') {
-              if (typeof el.setInputFiles !== 'function') continue;
-              await el.setInputFiles([field.path]);
-            } else {
-              if (typeof el.fill !== 'function') continue;
-              await el.fill(field.value);
-            }
-          } catch {
-            continue;
-          }
-          matched = true;
-          break;
+        if (step < maxSteps) {
+          const advanced = await clickFirst(page, NEXT_SELECTORS);
+          if (!advanced) break; // no Next button → this is the last page
+          stepsAdvanced++;
+          await new Promise(resolve => setTimeout(resolve, 1500)); // let the next page render
         }
-        (matched ? filled : skipped).push(field.kind);
       }
+
+      const filled = fields.map(labelOf).filter(l => filledLabels.has(l));
+      const skipped = fields.map(labelOf).filter(l => !filledLabels.has(l));
 
       const resolvedUrl = page.url();
       const title = await page.title();
@@ -175,19 +144,7 @@ export class LazyPlaywrightBrowser implements Browser {
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
       if (opts.clickSubmit) {
-        submitClicked = false;
-        for (const selector of SUBMIT_SELECTORS) {
-          const btn = await page.$(selector);
-          if (!btn) continue;
-          if (typeof btn.click !== 'function') continue;
-          try {
-            await btn.click();
-            submitClicked = true;
-            break;
-          } catch {
-            continue;
-          }
-        }
+        submitClicked = await clickFirst(page, SUBMIT_SELECTORS);
         if (submitClicked) {
           try {
             // Best-effort wait for navigation to settle
@@ -201,7 +158,7 @@ export class LazyPlaywrightBrowser implements Browser {
       }
 
       const screenshotPng = await page.screenshot({ fullPage: false });
-      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle };
+      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle, stepsAdvanced };
     });
   }
 
@@ -226,6 +183,72 @@ const SUBMIT_SELECTORS: string[] = [
   'button[data-automation-id*="submit" i]',
   'button[data-automation-id="bottom-navigation-next-button"]'
 ];
+
+/** Buttons that advance a multi-page wizard (tried before deciding a page is the last). */
+const NEXT_SELECTORS: string[] = [
+  'button[data-automation-id="bottom-navigation-next-button"]', // Workday
+  'button[data-automation-id="pageFooterNextButton"]',
+  'button:has-text("Save and Continue")',
+  'button:has-text("Save & Continue")',
+  'button:has-text("Continue")',
+  'button:has-text("Next")',
+  'a:has-text("Continue")',
+  'button[aria-label*="continue" i]',
+  'button[aria-label*="next" i]'
+];
+
+/** Click the first matching, clickable selector. Returns whether one was clicked. */
+async function clickFirst(page: PlaywrightPage, selectors: string[]): Promise<boolean> {
+  for (const selector of selectors) {
+    const btn = await page.$(selector);
+    if (!btn || typeof btn.click !== 'function') continue;
+    try {
+      await btn.click();
+      return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+/** Fill a single field on the current page. Returns whether it matched a selector. */
+async function tryFillField(page: PlaywrightPage, field: FillField, ats: string | undefined): Promise<boolean> {
+  if (field.kind === 'text_by_name') {
+    if (!isSafeFieldName(field.name)) return false;
+    const candidates = [
+      `textarea[name="${field.name}"]`,
+      `textarea[id="${field.name}"]`,
+      `input[name="${field.name}"]`,
+      `input[id="${field.name}"]`
+    ];
+    for (const selector of candidates) {
+      const el = await page.$(selector);
+      if (!el || typeof el.fill !== 'function') continue;
+      try { await el.fill(field.value); return true; } catch { continue; }
+    }
+    return false;
+  }
+
+  const candidates = selectorsForKind(field.kind, ats);
+  for (const selector of candidates) {
+    const el = await page.$(selector);
+    if (!el) continue;
+    try {
+      if (field.kind === 'resume_file' || field.kind === 'cover_letter_file') {
+        if (typeof el.setInputFiles !== 'function') continue;
+        await el.setInputFiles([field.path]);
+      } else {
+        if (typeof el.fill !== 'function') continue;
+        await el.fill(field.value);
+      }
+    } catch {
+      continue;
+    }
+    return true;
+  }
+  return false;
+}
 
 /** Selector candidates, in priority order. First match wins. */
 const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = {

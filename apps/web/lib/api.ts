@@ -13,7 +13,7 @@ export async function runTool<T = unknown>(name: string, input?: unknown): Promi
 
 export type Settings = {
   hasKey: boolean;
-  config: { model: string; weeklyCap: number; submitPolicy: 'review' | 'auto' };
+  config: { model: string; weeklyCap: number; submitPolicy: 'review' | 'auto'; applyMaxSteps: number };
 };
 
 export async function getSettings(): Promise<Settings> {
@@ -26,6 +26,7 @@ export async function saveSettings(patch: {
   model?: string;
   weeklyCap?: number;
   submitPolicy?: 'review' | 'auto';
+  applyMaxSteps?: number;
 }): Promise<Settings> {
   const res = await fetch('/api/settings', {
     method: 'POST',

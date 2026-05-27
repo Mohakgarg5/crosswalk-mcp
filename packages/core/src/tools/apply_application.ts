@@ -8,6 +8,7 @@ import type { SamplingClient } from '../sampling/client.ts';
 import { sampleAnswerForFormField } from '../services/sampling/answerFormField.ts';
 import { getJob } from '../store/job.ts';
 import { getCompany } from '../store/company.ts';
+import { getConfig } from '../store/appConfig.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string(),
@@ -141,7 +142,8 @@ export async function applyApplication(
     fields,
     {
       ...(detectedAts ? { ats: detectedAts } : {}),
-      ...(input.submit ? { clickSubmit: true } : {})
+      ...(input.submit ? { clickSubmit: true } : {}),
+      maxSteps: getConfig(ctx.db).applyMaxSteps
     }
   );
 
