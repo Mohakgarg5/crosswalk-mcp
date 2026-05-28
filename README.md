@@ -143,6 +143,10 @@ npm run watch        # run the always-on watcher daemon
 
 It's also an **MCP server** — use it inside Claude Desktop with `npx crosswalk-mcp install`. Deep docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
+## 🤝 Contributing
+
+Contributions are very welcome — the easiest is adding a company to the registry (a one-line change). See **[CONTRIBUTING.md](CONTRIBUTING.md)** for setup, conventions, and step-by-step recipes (add a company, add an ATS adapter, add a tool, add a migration).
+
 ## License
 
 [MIT](LICENSE) © Mohak Garg.
