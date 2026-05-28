@@ -116,40 +116,57 @@ Use the left-hand menu, roughly in this order:
 
 Crosswalk is also an **MCP server**, so it can plug straight into your AI assistant. Then you just **chat** with it, and it uses the AI you already pay for — **no separate API key needed**. It shares the **same data** as the app, so your profile, résumés, and answer bank carry over.
 
-### Recommended: connect your downloaded copy (newest features)
+### First, build it once
 
-1. In the `crosswalk-mcp-main` folder, build it once (in a terminal):
-   ```bash
-   npm install
-   npm run build:core
-   ```
-2. Connect it to your AI tool, using the **full path** to the folder:
-
-   **Claude Code (command line):**
-   ```bash
-   claude mcp add crosswalk-mcp -- node /FULL/PATH/TO/crosswalk-mcp-main/packages/core/dist/cli.js
-   ```
-
-   **Claude Desktop / Cursor / Windsurf** — add this to the app's MCP config file
-   (Claude Desktop is at `~/Library/Application Support/Claude/claude_desktop_config.json` on Mac, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
-   ```json
-   {
-     "mcpServers": {
-       "crosswalk-mcp": {
-         "command": "node",
-         "args": ["/FULL/PATH/TO/crosswalk-mcp-main/packages/core/dist/cli.js"]
-       }
-     }
-   }
-   ```
-3. Restart the AI app.
-
-### Quicker, but older: one-command install
-
+In the `crosswalk-mcp-main` folder (in a terminal):
 ```bash
-npx crosswalk-mcp install     # auto-detects Claude Desktop / Cursor / Windsurf
+npm install
+npm run build:core
 ```
-> ⚠️ This installs the version published to npm, which can be **behind** the newest features in this repo. For everything in this guide, use the recommended option above.
+
+Then you'll need the **full path** to `packages/core/dist/cli.js`.
+_Tip: on Mac, right-click the `dist` folder → "Copy … as Pathname"; or drag the file into the terminal to print its path._ In the examples below, replace `CLI_PATH` with something like:
+`/Users/you/Desktop/crosswalk-mcp-main/packages/core/dist/cli.js`
+
+### Then connect your AI tool (pick yours)
+
+**Claude Desktop** — edit `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+```json
+{ "mcpServers": { "crosswalk-mcp": { "command": "node", "args": ["CLI_PATH"] } } }
+```
+
+**Claude Code (CLI):**
+```bash
+claude mcp add crosswalk-mcp -- node CLI_PATH
+```
+
+**Cursor** — edit `~/.cursor/mcp.json`:
+```json
+{ "mcpServers": { "crosswalk-mcp": { "command": "node", "args": ["CLI_PATH"] } } }
+```
+
+**OpenAI Codex CLI** — edit `~/.codex/config.toml`:
+```toml
+[mcp_servers.crosswalk-mcp]
+command = "node"
+args = ["CLI_PATH"]
+```
+
+**Gemini CLI** — edit `~/.gemini/settings.json`:
+```json
+{ "mcpServers": { "crosswalk-mcp": { "command": "node", "args": ["CLI_PATH"] } } }
+```
+
+**opencode** — edit `~/.config/opencode/config.json`:
+```json
+{ "mcp": { "crosswalk-mcp": { "type": "local", "enabled": true, "command": ["node", "CLI_PATH"] } } }
+```
+
+**Any other MCP client:** point it at the command `node` with the argument `CLI_PATH` (it's a stdio MCP server).
+
+Then **restart the app**. (These tools occasionally tweak their MCP config format — if it doesn't connect, check your tool's own "MCP servers" docs.)
+
+> **Prefer the published version?** Replace `node CLI_PATH` with `npx -y crosswalk-mcp@latest`, or for Claude Desktop / Cursor / Windsurf just run `npx crosswalk-mcp install` to auto-configure it. ⚠️ The published npm version can be **behind** the newest features in this repo — the local build above is recommended.
 
 ### Then just talk to it
 
