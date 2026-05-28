@@ -1,230 +1,148 @@
 <div align="center">
 
-# Crosswalk
+# Crosswalk 🧭
 
-**A job-search helper that runs on *your* computer, finds jobs that match you, writes a tailored résumé + cover letter for each one, and can even apply for you — hands-off.**
+**A job-search robot that runs on *your* computer. It finds jobs that match you, writes a tailored résumé + cover letter for each, fills in the application, and can even submit it — hands-off.**
 
-Local-first · your data stays on your machine · bring your own AI key.
-
-[What is this?](#-what-is-this-explain-like-im-10) ·
-[Setup](#-setup-step-by-step) ·
-[How to use](#-how-to-use-the-app) ·
-[Apply for me automatically](#-make-it-apply-for-you-automatically) ·
-[Troubleshooting](#-troubleshooting) ·
-[For developers](#-for-developers)
+Everything stays on your machine. Nothing is uploaded to anyone.
 
 </div>
 
 ---
 
-## 🧒 What is this? (explain like I'm 10)
+## 🧒 What is this? (in plain words)
 
-Imagine a robot assistant that lives on your laptop. You tell it:
+You tell it *"I'm looking for **Product Manager** jobs."* Then it:
 
-> "I'm looking for **Product Manager** jobs."
+1. 🔎 Finds Product Manager jobs from thousands of companies.
+2. ✍️ Rewrites your résumé to fit each job (using only true facts from your real résumé).
+3. 📝 Writes a cover letter and answers the application questions.
+4. ✅ Fills in the form — dropdowns, checkboxes and all — and (if you let it) clicks **Submit**.
+5. 👀 Keeps watching, so the moment a new matching job appears, it grabs it.
 
-The robot then:
-1. **Looks** all over the internet for Product Manager jobs (from thousands of companies).
-2. **Rewrites your résumé** so it fits each job (using only true facts from your real résumé).
-3. **Writes a cover letter** for each one.
-4. **Fills in the application form** for you — and, if you let it, **clicks Submit**.
-5. **Keeps watching** so that the moment a new matching job appears, it grabs it.
-6. **Keeps a list** of everything it applied to, and sorts recruiter emails for you.
-
-Everything happens **on your own computer**. Your résumé, your jobs, your history — they live in one file on your machine (`~/.crosswalk/state.db`). Nothing is uploaded to us. There is no "us." 🙂
-
-There are **two ways** to use Crosswalk:
-- **🖥️ The App** — a website that runs *on your own computer* (at `http://localhost:3000`). This guide is mostly about this.
-- **💬 Inside your AI** — if you use **Claude Desktop**, Crosswalk can plug in so you just *chat* with it ("find me PM jobs and apply"). See [For developers](#-for-developers).
+It runs on **your own laptop**. Your résumé and data live in one folder on your computer.
 
 ---
 
-## 🧰 What you need first
+# 🚀 Set it up in 3 easy steps
 
-You need **3 things** (the first two are required, the third is for auto-applying):
+> You only do these once. Total time: about 5 minutes.
 
-| # | Thing | Why | How to get it |
-|---|-------|-----|---------------|
-| 1 | **Node.js** (version 24+) | It runs the app | Go to [nodejs.org](https://nodejs.org), download the "LTS" version, install it like any app. To check it worked, open **Terminal** and type `node -v` — you should see a number like `v24.x`. |
-| 2 | **An Anthropic API key** | This is the "brain" that writes your résumés | Make a free account at [console.anthropic.com](https://console.anthropic.com), go to **API Keys**, click **Create Key**, copy the long string that starts with `sk-ant-...`. (You pay Anthropic a tiny amount per résumé — usually pennies.) |
-| 3 | *(optional)* **The browser tool** | Lets it fill + submit forms for you | One command, shown later. Skip it if you only want it to write résumés and you'll apply yourself. |
+## Step 1 — Install Node.js (the thing that runs the app)
 
-> **"What's a Terminal?"** It's an app where you type commands. On a Mac, press `Cmd+Space`, type "Terminal", press Enter. On Windows, use "PowerShell".
+1. Go to **[nodejs.org](https://nodejs.org)**
+2. Click the **big green button that says "LTS"** (it downloads a file).
+3. Open that file and click **Next → Next → Install** like any normal app.
 
----
+✅ Done. (You only ever do this once, on your computer.)
 
-## 🚀 Setup (step by step)
+## Step 2 — Download Crosswalk
 
-Open your **Terminal** and copy-paste these one at a time:
+1. Go to **[the Crosswalk page on GitHub](https://github.com/Mohakgarg5/crosswalk-mcp)**
+2. Click the green **`<> Code`** button → **Download ZIP**.
+3. Find the downloaded ZIP (usually in your **Downloads** folder) and **double-click it to unzip**.
+4. You now have a folder called **`crosswalk-mcp-main`**. Move it somewhere easy, like your **Desktop**.
 
-**1. Get the code**
-```bash
-git clone https://github.com/Mohakgarg5/crosswalk-mcp.git
-cd crosswalk-mcp
-```
+## Step 3 — Start it (just double-click!)
 
-**2. Install it** (this downloads the parts it needs — takes a minute)
-```bash
-npm install
-```
+Open the `crosswalk-mcp-main` folder and:
 
-**3. Start the app**
-```bash
-npm run gui
-```
+- **On a Mac:** right-click **`start.command`** → click **Open** → click **Open** again.
+  *(You only have to right-click the very first time. After that you can just double-click it.)*
+- **On Windows:** double-click **`start.cmd`**.
+  *(If a blue box says "Windows protected your PC", click **More info → Run anyway**.)*
 
-You'll see a message that it's running. Now open your web browser and go to:
+A window will pop up. The first time it spends a minute getting ready, then your web browser **opens to the app automatically**. 🎉
 
-### 👉 http://localhost:3000
-
-That's it — the app is running on your computer. 🎉
-
-> To **stop** the app, go back to the Terminal and press `Ctrl + C`.
+> 👉 If the browser shows an error at first, wait a few seconds and **refresh the page** — it's just warming up.
+>
+> To **stop** the app, close that window. To start again, double-click `start.command` / `start.cmd` again.
 
 ---
 
-## 📖 How to use the app
+## 🔑 One more thing: add your AI key (so it can write résumés)
 
-When the app opens, use the menu on the left. Here's the order to do things:
+The app needs an "AI brain" to write your résumés. Here's how to get a key:
 
-### Step 1 — Add your API key (one time)
-Click **Settings** → paste your `sk-ant-...` key into the **API key** box → click **Save settings**.
-*(Without a key, it can still find and track jobs, but it can't write résumés.)*
+1. Make a free account at **[console.anthropic.com](https://console.anthropic.com)**.
+2. Click **API Keys → Create Key**, and **copy** the long code (it starts with `sk-ant-`).
+3. In the Crosswalk app, click **Settings** (left menu), paste the key in the **API key** box, and click **Save**.
 
-### Step 2 — Set up your profile
-Click **Profile** → write a few sentences about yourself, like:
-> "Product manager with 3 years at Acme building AI tools. Want senior PM roles in New York or remote. Need visa sponsorship."
-
-Click **Save profile**. The app turns this into a neat structured profile.
-
-### Step 3 — Add your résumé
-Click **Résumés** → give it a name (like "My PM résumé") → paste your résumé text → click **Add résumé**.
-
-### Step 4 — Find jobs (by role, from everywhere)
-Click **Jobs**. Make sure the toggle says **"Across the web (role-based)"** (this searches *everywhere*, not a fixed company list). Type your role (e.g. `product manager`) and click **Search jobs**. You'll get a list of real jobs from lots of companies.
-
-### Step 5 — Apply
-For any job you can:
-- Click **draft →** to make a tailored application you can review (résumé + cover letter), then download or apply, **or**
-- Click **Auto-fill / Auto-apply (N)** at the top of the results to do it for *all* the jobs at once.
-
-### Step 6 — Track everything
-- **Pipeline** shows every application and its status (draft, submitted, interviewing, offer…).
-- **Alerts** shows new job matches and recruiter emails.
-- **Inbox** — paste a recruiter email and it links it to the right application.
+> 💡 It costs a few cents per résumé (you pay Anthropic directly). Finding and tracking jobs works **without** a key — you only need it for writing résumés and answering questions.
 
 ---
 
-## 🤖 Make it apply for you automatically
+## 📖 How to use it
 
-This is the "hands-off" part. Three pieces:
+Use the menu on the left, in this order:
 
-### 1. Save a "watch"
-On the **Jobs** page, search a role, then click **"Save as watch"**. Tick **"auto-apply new matches"** if you want it to apply on its own. A *watch* keeps looking for that role.
-
-### 2. Choose how bold it is (Settings)
-- **Submit policy = review** → it fills applications but leaves the final "Submit" click to you (safe — recommended at first).
-- **Submit policy = auto** → it submits for you.
-- **Weekly cap** → the most applications per week (a safety limit; raise it if you want more).
-
-### 3. Keep it running, even with the app closed
-Run this in a Terminal and leave it open — it checks for new matching jobs every 15 minutes and applies to them:
-```bash
-npm run watch
-```
-Want it to run once (for a scheduled task / cron)?
-```bash
-CROSSWALK_WATCH_ONCE=1 npm run watch
-```
+1. **Profile** — write a few sentences about yourself ("PM with 3 years at Acme, want NYC or remote, need visa sponsorship"). Click Save.
+2. **Résumés** — paste your résumé text, give it a name, click Add.
+3. **Settings → Answer bank** — click **"Load common defaults"** (this fills in safe answers for the standard questions like work authorization and the EEO/diversity questions). Add any of your own, e.g. `salary → $130,000`.
+4. **Jobs** — type a role (like `product manager`), click **Search jobs**. You'll get real jobs from lots of companies.
+5. **Apply** — click **draft →** on a job to review it first, or **Auto-apply** at the top to do them all.
+6. **Pipeline / Alerts / Inbox** — track everything, see new-match alerts, and route recruiter emails.
 
 ---
 
-## 🔐 Applying to sites that make you log in (Workday, etc.)
+## 🤖 Make it apply automatically (hands-off)
 
-Some company sites (especially **Workday**) make you sign in and have **multi-page** application forms. To handle those:
+1. In **Settings**: set **Submit policy = auto** and **Weekly cap = 0** (0 means unlimited).
+2. On **Jobs**: search a role → click **"Save as watch"** and tick **auto-apply new matches**.
+3. Keep it running even with the app closed — in the app's folder, in a terminal:
+   ```
+   npm run watch
+   ```
+   It checks for new matching jobs every 15 minutes and applies to them.
 
-**1. Install the browser tool (one time):**
-```bash
-npx crosswalk-mcp install-browser
-```
-
-**2. In Settings**, set **"Multi-step wizard depth"** to about `8` (so it can click through multi-page forms).
-
-**3. Start the app with a browser that remembers your logins:**
-```bash
-CROSSWALK_BROWSER_PROFILE=~/.crosswalk/chrome CROSSWALK_BROWSER_HEADED=1 npm run gui
-```
-A real browser window opens. **Log into your job-site accounts once** in that window. From then on, Crosswalk reuses those logins to apply for you.
+**For sites that make you log in (like Workday):** see the note inside **Settings → Autonomous apply**.
 
 ---
 
-## 🧪 A safe first test (do this before trusting it)
+## 🧪 Try it safely first (recommended)
 
-Before letting it submit real applications, watch it work once:
+Before letting it submit for real:
+1. **Settings → Submit policy = review** (it will fill the form but NOT click Submit).
+2. Find one job → **draft →** → check the tailored résumé and answers look right.
 
-1. Settings → **Submit policy = review** (so it will NOT click Submit).
-2. Start with the visible browser: `CROSSWALK_BROWSER_PROFILE=~/.crosswalk/chrome CROSSWALK_BROWSER_HEADED=1 npm run gui`
-3. Find one job → open the application → click **"Auto-fill (no submit)"**.
-4. **Watch the browser window** fill the form. Check it looks right. *You* click Submit (or not).
+Once you trust it, switch to **auto**.
 
-Once you trust it on a few forms, flip **Submit policy = auto** for hands-off applying.
-
-> ⚠️ **Be thoughtful.** Auto-submitting many applications with auto-written answers can hurt your chances and may break a site's rules. Start small, review the results, and raise the volume only when you're happy with the quality.
+> ⚠️ **A friendly warning:** submitting *thousands* of auto-written applications can hurt your chances and may break some sites' rules. Start with a few, check the quality, and turn up the volume only when you're happy.
 
 ---
 
-## 💾 Where is my data? (privacy)
-
-- Everything lives in **one folder on your computer**: `~/.crosswalk/`
-- Your résumé, jobs, applications, and settings are in `~/.crosswalk/state.db`. Your API key is in `~/.crosswalk/config.json`.
-- Nothing is sent anywhere except: the job sites (to read/apply), and Anthropic (to write résumés, using *your* key).
-- To wipe everything: delete the `~/.crosswalk` folder.
-
----
-
-## 🔧 Troubleshooting
+## 🆘 Something not working?
 
 | Problem | Fix |
 |---|---|
-| `command not found: node` | Node.js isn't installed — see [What you need first](#-what-you-need-first). |
-| `command not found: npm` | Same — npm comes with Node.js. Reinstall Node.js. |
-| The page won't open at localhost:3000 | Make sure the Terminal still shows the app running. If port 3000 is busy, run `PORT=3001 npm run gui` and open `localhost:3001`. |
-| "No Anthropic API key set" | Go to **Settings** and paste your `sk-ant-...` key. |
-| Auto-apply says "browser not installed" | Run `npx crosswalk-mcp install-browser`. |
-| It can't apply to a Workday job | See [Applying to sites that make you log in](#-applying-to-sites-that-make-you-log-in-workday-etc). |
+| Double-clicking does nothing / "can't be opened" (Mac) | Right-click `start.command` → **Open** → **Open**. |
+| "Windows protected your PC" | Click **More info → Run anyway**. |
+| It says **Node.js is not installed** | Do **Step 1** above, then start again. |
+| Browser page shows an error | Wait a few seconds and **refresh**. It's still warming up. |
+| "No Anthropic API key set" | Add your key in **Settings** (see above). |
 
 ---
 
-## ☁️ Can I put it on a website (deploy it)?
+## 🔒 Your privacy
 
-**Short answer: no, and that's on purpose.** Crosswalk is **local-first** — it needs *your* computer's files, *your* logged-in browser, and *your* AI key to work. A normal cloud host can't drive your browser or use your logins, so deploying the app to the cloud would break the very thing that makes it useful. Run it on your own machine with `npm run gui`. (The code is on GitHub so you — or anyone — can run it locally.)
+Everything lives in one folder on your computer (`~/.crosswalk`). Nothing is uploaded to us — there is no "us." The only things it talks to are the job websites (to find/apply) and Anthropic (to write résumés, using your key). To erase everything, delete the `~/.crosswalk` folder.
 
 ---
 
 ## 👩‍💻 For developers
 
-This is an **npm workspaces** monorepo:
-- `packages/core` — the engine (published as the `crosswalk-mcp` MCP server). All business logic, 10 ATS adapters, the role-aggregator, auto-apply, watcher.
-- `apps/web` — the Next.js GUI (this guide's "App").
-- `scripts/watch.mjs` — the always-on watcher daemon.
+npm-workspaces monorepo: `packages/core` (engine + MCP server, published as `crosswalk-mcp`), `apps/web` (the Next.js GUI), `scripts/watch.mjs` (always-on watcher).
 
 ```bash
-npm test                 # run the test suite (248 tests)
-npm run lint             # type-check core + web
-npm run build:core       # build the engine (emits dist/ + crosswalk-mcp/runtime)
-npm run gui              # build core + start the GUI
-npm run watch            # run the always-on watcher
+npm install          # install everything
+npm test             # run the test suite (260 tests)
+npm run lint         # type-check core + web
+npm run gui          # build the engine + start the GUI (what start.command runs)
+npm run watch        # run the always-on watcher daemon
 ```
 
-**Use it inside Claude Desktop (MCP):** Crosswalk is also a Model Context Protocol server — install it into your AI client and chat to it, using *your* AI's model (zero extra keys):
-```bash
-npx crosswalk-mcp install
-```
-
-Deep technical docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Design specs and implementation plans: [`docs/superpowers/`](docs/superpowers/).
-
----
+It's also an **MCP server** — use it inside Claude Desktop with `npx crosswalk-mcp install`. Deep docs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## License
 
-[MIT](LICENSE) © Mohak Garg. The company → ATS registry (the "Open Job Graph") is MIT-licensed too — PRs welcome.
+[MIT](LICENSE) © Mohak Garg.
