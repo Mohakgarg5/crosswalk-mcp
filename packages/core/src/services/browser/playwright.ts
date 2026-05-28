@@ -20,6 +20,9 @@ type PlaywrightLocator = {
   fill?(value: string): Promise<void>;
   setInputFiles?(files: string | string[]): Promise<void>;
   click?(): Promise<void>;
+  selectOption?(values: string | { label?: string; value?: string }): Promise<string[]>;
+  check?(): Promise<void>;
+  uncheck?(): Promise<void>;
 };
 
 type PlaywrightPage = {
@@ -58,8 +61,11 @@ export class LazyPlaywrightBrowser implements Browser {
 
   constructor(opts: LazyPlaywrightBrowserOpts = {}) {
     this.importPlaywright = opts.importPlaywright ?? (async () => {
-      // @ts-expect-error - playwright is an optional peer dep; resolved at runtime
-      return (await import('playwright')) as unknown as PlaywrightModule;
+      // playwright is an optional peer dep resolved at runtime. Using a
+      // non-literal specifier avoids a compile-time module-resolution error
+      // whether or not playwright is installed in the current environment.
+      const specifier: string = 'playwright';
+      return (await import(specifier)) as unknown as PlaywrightModule;
     });
     this.profileDir = opts.profileDir ?? process.env.CROSSWALK_BROWSER_PROFILE;
     this.headed = opts.headed ?? process.env.CROSSWALK_BROWSER_HEADED === '1';
@@ -114,7 +120,7 @@ export class LazyPlaywrightBrowser implements Browser {
     return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
       const maxSteps = Math.max(1, opts.maxSteps ?? 1);
-      const labelOf = (f: FillField) => (f.kind === 'text_by_name' ? `text_by_name:${f.name}` : f.kind);
+      const labelOf = (f: FillField) => ('name' in f ? `${f.kind}:${f.name}` : f.kind);
       const filledLabels = new Set<string>();
       let stepsAdvanced = 0;
 
@@ -230,6 +236,45 @@ async function tryFillField(page: PlaywrightPage, field: FillField, ats: string 
     return false;
   }
 
+  // --- Choice fields: <select>, radio, checkbox ---
+  if (field.kind === 'select_by_name') {
+    for (const selector of [`select[name="${escAttr(field.name)}"]`, `select[id="${escAttr(field.name)}"]`]) {
+      const el = await page.$(selector);
+      if (!el || typeof el.selectOption !== 'function') continue;
+      try { await el.selectOption({ label: field.value }); return true; } catch { /* fall through to value */ }
+      try { await el.selectOption(field.value); return true; } catch { continue; }
+    }
+    return false;
+  }
+
+  if (field.kind === 'radio_by_name') {
+    for (const selector of [
+      `input[type="radio"][name="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`,
+      `input[type="radio"][id="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`
+    ]) {
+      const el = await page.$(selector);
+      if (!el) continue;
+      try {
+        if (typeof el.check === 'function') { await el.check(); return true; }
+        if (typeof el.click === 'function') { await el.click(); return true; }
+      } catch { continue; }
+    }
+    return false;
+  }
+
+  if (field.kind === 'checkbox_by_name') {
+    for (const selector of [`input[type="checkbox"][name="${escAttr(field.name)}"]`, `input[type="checkbox"][id="${escAttr(field.name)}"]`]) {
+      const el = await page.$(selector);
+      if (!el) continue;
+      try {
+        if (field.checked && typeof el.check === 'function') { await el.check(); return true; }
+        if (!field.checked && typeof el.uncheck === 'function') { await el.uncheck(); return true; }
+        if (typeof el.click === 'function') { await el.click(); return true; }
+      } catch { continue; }
+    }
+    return false;
+  }
+
   const candidates = selectorsForKind(field.kind, ats);
   for (const selector of candidates) {
     const el = await page.$(selector);
@@ -251,7 +296,7 @@ async function tryFillField(page: PlaywrightPage, field: FillField, ats: string 
 }
 
 /** Selector candidates, in priority order. First match wins. */
-const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = {
+const SELECTORS: Record<StaticKind, string[]> = {
   email: [
     'input[type="email"]',
     'input[name="email"]',
@@ -310,7 +355,7 @@ const SELECTORS: Record<Exclude<FillField['kind'], 'text_by_name'>, string[]> = 
   ]
 };
 
-type StaticKind = Exclude<FillField['kind'], 'text_by_name'>;
+type StaticKind = Exclude<FillField['kind'], 'text_by_name' | 'select_by_name' | 'radio_by_name' | 'checkbox_by_name'>;
 
 /** ATS-specific selector overlays. Tried BEFORE generic candidates. */
 const ATS_SELECTORS: Record<string, Partial<Record<StaticKind, string[]>>> = {
@@ -386,6 +431,11 @@ function isSafeFieldName(name: string): boolean {
   return SAFE_FIELD_NAME_RE.test(name);
 }
 
+/** Escape a string for use inside a double-quoted CSS attribute selector. */
+function escAttr(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 /* Runs in the browser page context (Playwright's page.evaluate).
  * DOM globals are not visible to the Node TS compiler, so we type
  * everything as `any` inside this function. The runtime semantics
@@ -411,12 +461,19 @@ const extractFormFieldsScript = (): FormField[] => {
       const parent = e.closest('label');
       if (parent) label = String(parent.textContent ?? '').trim();
     }
+    let options: string[] | undefined;
+    if (tag === 'select') {
+      options = Array.from(e.options as any[])
+        .map(o => String(o.textContent ?? '').trim())
+        .filter((t: string) => t.length > 0);
+    }
     fields.push({
       name,
       type,
       label,
       required: Boolean(e.required),
-      value: typeof e.value === 'string' && e.value.length > 0 ? e.value : undefined
+      value: typeof e.value === 'string' && e.value.length > 0 ? e.value : undefined,
+      options
     });
   }
   return fields;

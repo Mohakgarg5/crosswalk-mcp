@@ -137,6 +137,25 @@ export async function setSearchAutoApply(id: string, autoApply: boolean) {
   const { setSavedSearchAutoApply } = await rt();
   setSavedSearchAutoApply(await db(), id, autoApply);
 }
+// --- Answer bank --------------------------------------------------------------
+
+export async function listAnswerBank() {
+  const { listAnswers } = await rt();
+  return listAnswers(await db());
+}
+export async function addAnswerEntry(label: string, answer: string) {
+  const { addAnswer } = await rt();
+  return addAnswer(await db(), { label, answer });
+}
+export async function deleteAnswerEntry(id: string) {
+  const { deleteAnswer } = await rt();
+  deleteAnswer(await db(), id);
+}
+export async function loadAnswerDefaults() {
+  const { loadDefaults } = await rt();
+  return loadDefaults(await db());
+}
+
 export async function runWatchNow() {
   const { runWatch } = await rt();
   const ctx = await buildCtx();

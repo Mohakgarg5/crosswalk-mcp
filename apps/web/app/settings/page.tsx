@@ -27,6 +27,26 @@ export default function SettingsPage() {
   }
   useEffect(() => { loadCompanies(); }, []);
 
+  const [answers, setAnswers] = useState<Array<{ id: string; label: string; answer: string }>>([]);
+  const [ansLabel, setAnsLabel] = useState('');
+  const [ansAnswer, setAnsAnswer] = useState('');
+  function loadAnswers() {
+    fetch('/api/answers').then(r => r.json()).then(d => { if (d.ok) setAnswers(d.answers); }).catch(() => {});
+  }
+  useEffect(() => { loadAnswers(); }, []);
+  async function addAnswerEntry() {
+    const r = await fetch('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ label: ansLabel, answer: ansAnswer }) }).then(x => x.json());
+    if (r.ok) { setAnsLabel(''); setAnsAnswer(''); setAnswers(r.answers); }
+  }
+  async function loadAnswerDefaults() {
+    const r = await fetch('/api/answers', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'load-defaults' }) }).then(x => x.json());
+    if (r.ok) setAnswers(r.answers);
+  }
+  async function deleteAnswerEntry(id: string) {
+    await fetch(`/api/answers?id=${id}`, { method: 'DELETE' });
+    loadAnswers();
+  }
+
   async function importCompanies() {
     setImporting(true); setImportMsg('');
     try {
@@ -108,6 +128,28 @@ export default function SettingsPage() {
             {importMsg && <span className="text-sm text-[var(--muted)]">{importMsg}</span>}
           </div>
           <p className="text-xs text-[var(--muted)] mt-2">Valid ATSes: greenhouse, lever, ashby, workable, smartrecruiters, bamboohr, recruitee, personio, workday, icims.</p>
+        </Card>
+
+        <Card title={`Answer bank (${answers.length})`}
+          subtitle="Your canonical answers to common application questions (work auth, EEO, salary, “how did you hear”). Matched to dropdowns, radios, checkboxes, and text questions; the AI fills anything not here."
+          actions={<Button variant="ghost" onClick={loadAnswerDefaults}>Load common defaults</Button>}>
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 mb-3">
+            <Input placeholder='question keyword (e.g. "sponsorship")' value={ansLabel} onChange={e => setAnsLabel(e.target.value)} />
+            <Input placeholder='your answer (e.g. "No")' value={ansAnswer} onChange={e => setAnsAnswer(e.target.value)} />
+            <Button onClick={addAnswerEntry} disabled={!ansLabel.trim() || !ansAnswer.trim()}>Add</Button>
+          </div>
+          {answers.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]">None yet. Click “Load common defaults” for safe EEO/work-auth answers, then add your own.</p>
+          ) : (
+            <ul className="divide-y divide-[var(--border)]">
+              {answers.map(a => (
+                <li key={a.id} className="flex items-center justify-between py-2 text-sm">
+                  <span><span className="text-[var(--muted)]">{a.label}</span> → {a.answer}</span>
+                  <button onClick={() => deleteAnswerEntry(a.id)} className="text-xs text-[var(--muted)] hover:text-[var(--bad)]">delete</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         <Card title="Autonomous apply (browser)" subtitle="How “apply on your behalf” works, and how to unlock login-walled ATSes.">

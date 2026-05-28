@@ -9,6 +9,8 @@ import { sampleAnswerForFormField } from '../services/sampling/answerFormField.t
 import { getJob } from '../store/job.ts';
 import { getCompany } from '../store/company.ts';
 import { getConfig } from '../store/appConfig.ts';
+import { matchAnswer } from '../store/answerBank.ts';
+import { resolveChoiceFields } from '../services/resolveChoices.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string(),
@@ -124,7 +126,9 @@ export async function applyApplication(
       const labelOrName = (formField.label || formField.name).toLowerCase();
       if (/(?<![a-z])cover[\s_-]?letter/.test(labelOrName)) continue;
 
-      const answer = await sampleAnswerForFormField({
+      // Answer bank first (deterministic), then fall back to the model.
+      const banked = matchAnswer(ctx.db, formField.label || formField.name);
+      const answer = banked ?? await sampleAnswerForFormField({
         sampling: ctx.sampling,
         formField,
         jobContext,
@@ -135,6 +139,10 @@ export async function applyApplication(
         sampledFields.push(formField.name);
       }
     }
+
+    // Dropdowns / radios / checkboxes (answer bank → model fallback).
+    const choiceFields = await resolveChoiceFields(ctx.db, ctx.sampling, preview.formFields, applicantContext);
+    fields.push(...choiceFields);
   }
 
   const result = await ctx.browser.fillForm(

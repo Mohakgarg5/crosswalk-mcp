@@ -4,6 +4,8 @@ export type FormField = {
   label?: string;
   required: boolean;
   value?: string;
+  /** For <select>: the option labels. For radio/checkbox: this element's value. */
+  options?: string[];
 };
 
 export type BrowserPreview = {
@@ -52,7 +54,10 @@ export type FillField =
   | { kind: 'cover_letter_text'; value: string }
   | { kind: 'cover_letter_file'; path: string }
   | { kind: 'resume_file'; path: string }
-  | { kind: 'text_by_name'; name: string; value: string };
+  | { kind: 'text_by_name'; name: string; value: string }
+  | { kind: 'select_by_name'; name: string; value: string }   // choose the option matching value
+  | { kind: 'radio_by_name'; name: string; value: string }    // select the radio in group `name` with this value
+  | { kind: 'checkbox_by_name'; name: string; checked: boolean };
 
 export type BrowserFillResult = {
   /** Final URL after navigation/redirects. */

@@ -199,6 +199,20 @@ export const migrations: Migration[] = [
       ALTER TABLE saved_search ADD COLUMN auto_apply INTEGER NOT NULL DEFAULT 0;
     `
   }
+  ,
+  {
+    id: 9,
+    name: 'answer_bank',
+    sql: `
+      CREATE TABLE answer_bank (
+        id TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        answer TEXT NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE INDEX idx_answer_bank_label ON answer_bank(label);
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

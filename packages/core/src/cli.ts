@@ -5,8 +5,10 @@ import { pathToFileURL } from 'node:url';
 
 export async function isPlaywrightImportable(): Promise<boolean> {
   try {
-    // @ts-expect-error - playwright is an optional peer dep
-    await import('playwright');
+    // playwright is an optional peer dep; non-literal specifier so this
+    // compiles whether or not it's installed.
+    const specifier: string = 'playwright';
+    await import(specifier);
     return true;
   } catch {
     return false;
