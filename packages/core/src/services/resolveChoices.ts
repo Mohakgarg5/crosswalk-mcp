@@ -57,11 +57,21 @@ export async function resolveChoiceFields(
     if (value) out.push({ kind: 'radio_by_name', name, value });
   }
 
-  // checkboxes — only when the bank gives an affirmative answer
+  // Standard consent / acknowledge patterns — universal "I agree to X" boxes
+  // every candidate must tick to submit (privacy policy, AI-use policy,
+  // demographic-data consent, etc.). Auto-tick when matched; refusing them =
+  // the form refuses to submit. Marketing-style boxes ("Subscribe to our
+  // newsletter", "Send me job alerts") don't match and stay unticked.
+  const STANDARD_CONSENT = /\b(acknowledge|i agree|i confirm|i consent|i accept|i have read|terms (of|and)|privacy policy|disclaimer|certify that|attest that|understand that|authorize|consent to|confirm i have)\b/i;
+
+  // checkboxes — tick when the bank gives an affirmative answer OR the label
+  // is a standard consent/acknowledgement.
   for (const f of formFields) {
     if (f.type !== 'checkbox' || !f.name) continue;
+    const labelText = (f.label || f.name).toLowerCase();
     const bank = matchAnswer(db, f.label || f.name);
-    if (bank && AFFIRMATIVE.test(bank.trim())) {
+    const isStandardConsent = STANDARD_CONSENT.test(labelText);
+    if ((bank && AFFIRMATIVE.test(bank.trim())) || isStandardConsent) {
       out.push({ kind: 'checkbox_by_name', name: f.name, checked: true });
     }
   }
