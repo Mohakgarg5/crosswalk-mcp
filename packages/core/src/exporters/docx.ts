@@ -54,20 +54,58 @@ const HEADING_MAP = {
   3: HeadingLevel.HEADING_3
 } as const;
 
+// Parse inline markdown (**bold**, *italic*, __bold__, _italic_, [text](url))
+// into TextRuns so the rendered DOCX has real formatting instead of literal
+// asterisks/underscores — ATS systems read the raw text and choke on the markers.
+export function parseInline(text: string): TextRun[] {
+  const runs: TextRun[] = [];
+  const pattern = /\*\*([^*\n]+)\*\*|__([^_\n]+)__|\*([^*\n]+)\*|_([^_\n]+)_|\[([^\]]+)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = pattern.exec(text)) !== null) {
+    if (m.index > lastIndex) {
+      runs.push(new TextRun({ text: text.slice(lastIndex, m.index) }));
+    }
+    if (m[1] !== undefined) {
+      runs.push(new TextRun({ text: m[1], bold: true }));
+    } else if (m[2] !== undefined) {
+      runs.push(new TextRun({ text: m[2], bold: true }));
+    } else if (m[3] !== undefined) {
+      runs.push(new TextRun({ text: m[3], italics: true }));
+    } else if (m[4] !== undefined) {
+      runs.push(new TextRun({ text: m[4], italics: true }));
+    } else if (m[5] !== undefined) {
+      const linkText = m[5];
+      const linkUrl = m[6] ?? '';
+      // ATS scrapers pull URLs out of plain text. Render link text plus the URL
+      // in parens so the URL survives (unless they're identical).
+      runs.push(new TextRun({ text: linkText === linkUrl ? linkUrl : `${linkText} (${linkUrl})` }));
+    }
+    lastIndex = pattern.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    runs.push(new TextRun({ text: text.slice(lastIndex) }));
+  }
+  if (runs.length === 0) {
+    runs.push(new TextRun({ text }));
+  }
+  return runs;
+}
+
 function blockToParagraph(b: Block): Paragraph {
   if (b.kind === 'heading') {
     return new Paragraph({
       heading: HEADING_MAP[b.level],
-      children: [new TextRun({ text: b.text })]
+      children: parseInline(b.text)
     });
   }
   if (b.kind === 'bullet') {
     return new Paragraph({
       bullet: { level: 0 },
-      children: [new TextRun({ text: b.text })]
+      children: parseInline(b.text)
     });
   }
-  return new Paragraph({ children: [new TextRun({ text: b.text })] });
+  return new Paragraph({ children: parseInline(b.text) });
 }
 
 export async function mdToDocxBuffer(md: string): Promise<Buffer> {
