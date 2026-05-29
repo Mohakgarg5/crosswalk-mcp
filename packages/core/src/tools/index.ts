@@ -5,6 +5,7 @@ import type { SamplingClient } from '../sampling/client.ts';
 import { setupProfile, setupProfileInput } from './setup_profile.ts';
 import { addResume, addResumeInput } from './add_resume.ts';
 import { listResumesTool, listResumesInput } from './list_resumes.ts';
+import { deleteResumeTool, deleteResumeInput } from './delete_resume.ts';
 import { fetchJobs, fetchJobsInput } from './fetch_jobs.ts';
 import { scoreFit, scoreFitInput } from './score_fit.ts';
 import { explainFit, explainFitInput } from './explain_fit.ts';
@@ -49,6 +50,12 @@ export const toolDefinitions: ToolDef[] = [
     description: 'List all stored resume versions.',
     inputSchema: zodToJsonSchema(listResumesInput),
     run: (i, c) => listResumesTool(listResumesInput.parse(i), c)
+  },
+  {
+    name: 'delete_resume',
+    description: 'Delete a stored resume by id. Cascades through any applications/events/fit-score cache rows that reference it.',
+    inputSchema: zodToJsonSchema(deleteResumeInput),
+    run: (i, c) => deleteResumeTool(deleteResumeInput.parse(i), c)
   },
   {
     name: 'fetch_jobs',

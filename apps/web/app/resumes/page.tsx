@@ -30,6 +30,15 @@ export default function ResumesPage() {
     finally { setBusy(false); }
   }
 
+  async function remove(id: string, removingLabel: string) {
+    if (!confirm(`Delete "${removingLabel}"? Any draft applications using this résumé will also be removed.`)) return;
+    setErr('');
+    try {
+      await runTool('delete_resume', { resumeId: id });
+      await load();
+    } catch (e) { setErr((e as Error).message); }
+  }
+
   return (
     <>
       <PageHeader title="Résumés" subtitle="Paste a résumé; Claude structures it. Store several versions and tailor per job." />
@@ -52,7 +61,16 @@ export default function ResumesPage() {
               {resumes.map(r => (
                 <li key={r.id} className="flex items-center justify-between py-2.5">
                   <span className="text-sm">{r.label}</span>
-                  <Pill>{r.id.slice(0, 8)}</Pill>
+                  <div className="flex items-center gap-2">
+                    <Pill>{r.id.slice(0, 8)}</Pill>
+                    <button
+                      onClick={() => remove(r.id, r.label)}
+                      className="text-xs text-[var(--muted)] hover:text-red-400 transition-colors"
+                      aria-label={`Delete ${r.label}`}
+                    >
+                      delete
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
