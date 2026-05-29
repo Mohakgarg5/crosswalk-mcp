@@ -30,18 +30,40 @@ export function deleteAnswer(db: Db, id: string): void {
 }
 
 /**
- * Find the canonical answer for a form question. Matches the most specific
- * (longest) bank label that appears in the question text. Returns null if none.
+ * Find the canonical answer for a form question. Matches the longest bank
+ * label that appears as a whole word/phrase in the question. Returns null if
+ * none.
+ *
+ * Word-boundary check prevents a label like "relocate" from matching the side
+ * clause "...if you would need to relocate..." in an unrelated long question.
+ * Short labels (≤6 chars) additionally require a short question to fire, so
+ * "no"/"yes" only answer obvious direct questions.
  */
 export function matchAnswer(db: Db, question: string): string | null {
   const q = question.toLowerCase();
+  // Only consider the MAIN question (up to first "?" or first "." or first
+  // newline). The clarifying sentence after ("If you would need to relocate,
+  // please type 'relocating'") was wrongly triggering bank matches like
+  // "relocate" → "Yes" for an address field.
+  const mainQuestionEnd = Math.min(
+    ...[q.indexOf('?'), q.indexOf('. '), q.indexOf('\n')].filter(i => i > 0)
+      .concat([q.length])
+  );
+  const mainQ = q.slice(0, mainQuestionEnd === Infinity ? q.length : mainQuestionEnd + 1);
   let best: string | null = null;
-  let bestLen = 0;
+  let bestScore = 0;
   for (const entry of listAnswers(db)) {
-    const key = entry.label.toLowerCase();
-    if (key && key.length > bestLen && q.includes(key)) {
+    const key = entry.label.toLowerCase().trim();
+    if (!key) continue;
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const wordBoundary = new RegExp(`(^|\\W)${escaped}(\\W|$)`);
+    if (!wordBoundary.test(mainQ)) continue;
+    const isShortKey = key.length <= 6;
+    if (isShortKey && mainQ.length > 80) continue;
+    const score = key.length + (isShortKey && mainQ.length <= 40 ? 5 : 0);
+    if (score > bestScore) {
       best = entry.answer;
-      bestLen = key.length;
+      bestScore = score;
     }
   }
   return best;
