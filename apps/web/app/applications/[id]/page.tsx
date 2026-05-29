@@ -83,6 +83,14 @@ export default function ApplicationDetail() {
     if (r) { setPreview(r); await load(); }
   }
 
+  async function doScoreFit() {
+    if (!app) return;
+    await act('score-fit', async () => {
+      await runTool('explain_fit', { jobId: app.jobId, resumeId: app.resumeId });
+      await load();
+    });
+  }
+
   async function changeStatus(status: string) {
     if (!app) return;
     await act('status', () => runTool('set_status', { applicationId: app.id, status }));
