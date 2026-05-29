@@ -54,10 +54,14 @@ export type FillField =
   | { kind: 'cover_letter_text'; value: string }
   | { kind: 'cover_letter_file'; path: string }
   | { kind: 'resume_file'; path: string }
-  | { kind: 'text_by_name'; name: string; value: string }
-  | { kind: 'select_by_name'; name: string; value: string }   // choose the option matching value
-  | { kind: 'radio_by_name'; name: string; value: string }    // select the radio in group `name` with this value
-  | { kind: 'checkbox_by_name'; name: string; checked: boolean };
+  // `label` is the visible field label text (when known) — used as a fallback
+  // identifier for widgets whose name/id is missing or doesn't match the
+  // expected selector. Particularly helpful for react-select dropdowns where
+  // the input has no name and the only stable identifier is its <label>.
+  | { kind: 'text_by_name'; name: string; value: string; label?: string }
+  | { kind: 'select_by_name'; name: string; value: string; label?: string }   // choose the option matching value
+  | { kind: 'radio_by_name'; name: string; value: string; label?: string }    // select the radio in group `name` with this value
+  | { kind: 'checkbox_by_name'; name: string; checked: boolean; label?: string };
 
 export type BrowserFillResult = {
   /** Final URL after navigation/redirects. */

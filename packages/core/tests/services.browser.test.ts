@@ -246,7 +246,13 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
 
     expect(result.filled).toEqual([]);
     expect(result.skipped).toEqual(['text_by_name:name with spaces"; injection']);
-    expect(dollarMock).not.toHaveBeenCalled();
+    // advanceToForm probes a small set of Apply-button selectors at the start;
+    // none of them should reference the unsafe field name.
+    const unsafeLookups = dollarMock.mock.calls.filter((call: unknown[]) => {
+      const arg = call[0];
+      return typeof arg === 'string' && arg.includes('injection');
+    });
+    expect(unsafeLookups).toEqual([]);
   });
 
   it('fillForm falls back to input[name*="email" i] when no specific selector matches', async () => {

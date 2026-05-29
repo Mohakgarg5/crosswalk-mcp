@@ -18,7 +18,10 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   model: 'claude-sonnet-4-6',
   weeklyCap: 10,
   submitPolicy: 'review',
-  applyMaxSteps: 1
+  // Walk up to 8 wizard pages (covers Workday's typical 3-5 step flow plus
+  // safety margin). Auto-fill on each page; the loop stops when no Next
+  // button is found, so single-page forms still finish in one pass.
+  applyMaxSteps: 8
 };
 
 export function getConfig(db: Db): AppConfig {
