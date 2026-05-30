@@ -19,10 +19,15 @@ export async function POST(req: Request) {
     if (!body.provider || !body.address) {
       return NextResponse.json({ ok: false, error: 'provider and address are required' }, { status: 400 });
     }
+    // Merge over the existing stored config. The GET handler masks the password
+    // (the browser never holds it), so a Save/Test that omits appPassword must
+    // PRESERVE the saved one rather than wipe it. A re-typed password overrides.
+    const existing = await readEmailAccount();
     const acct = {
       provider: body.provider,
       address: body.address,
       config: {
+        ...(existing?.config ?? {}),
         ...(body.appPassword ? { appPassword: body.appPassword } : {}),
         ...(body.host ? { host: body.host } : {}),
         ...(body.port ? { port: body.port } : {}),
