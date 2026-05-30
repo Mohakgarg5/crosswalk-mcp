@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult } from './types.ts';
+import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult, ResolveVerification, VerificationContext } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
 
 /**
@@ -76,6 +76,7 @@ type PlaywrightPage = PlaywrightFrame & {
   screenshot(opts?: { fullPage?: boolean }): Promise<Buffer>;
   frames(): PlaywrightFrame[];
   mainFrame(): PlaywrightFrame;
+  context(): { newPage(): Promise<PlaywrightPage> };
   close(): Promise<void>;
 };
 
@@ -179,8 +180,11 @@ export class LazyPlaywrightBrowser implements Browser {
     });
   }
 
-  async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean; maxSteps?: number } = {}): Promise<BrowserFillResult> {
+  async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean; maxSteps?: number; resolveVerification?: ResolveVerification } = {}): Promise<BrowserFillResult> {
     return this.runWithPage(async (page) => {
+      // Captured up-front so the verification poller only considers emails that
+      // arrived at/after this apply attempt began.
+      const startedAt = new Date().toISOString();
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
       // Many public ATS URLs (Greenhouse job-boards, Lever, Ashby) land on a job
       // description page that hides the application form behind an "Apply" button.
@@ -231,8 +235,50 @@ export class LazyPlaywrightBrowser implements Browser {
         }
       }
 
+      // Email-verification gate: only probed when a resolver was injected, so
+      // default behavior is unchanged. On detection, call back to fetch the
+      // emailed code/link, complete it on this same live page, then submit.
+      let verificationRequired = false;
+      let verificationResolved = false;
+      if (opts.resolveVerification) {
+        const gate = await detectVerificationGate(page);
+        if (gate) {
+          verificationRequired = true;
+          const ctx: VerificationContext = {
+            formUrl: page.url(),
+            startedAt,
+            atsHost: (() => { try { return new URL(page.url()).host; } catch { return undefined; } })()
+          };
+          const outcome = await opts.resolveVerification(ctx);
+          if (outcome?.kind === 'code') {
+            const loc = await firstLocatorAcrossFrames(page, CODE_FIELD_SELECTORS);
+            if (loc?.fill) {
+              await loc.fill(outcome.code);
+              await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              verificationResolved = true;
+            }
+          } else if (outcome?.kind === 'link') {
+            try {
+              // Open the magic link in a sibling page of the SAME context so it
+              // shares cookies/session with the form; the form tab usually
+              // auto-advances once the email is verified.
+              const verifyPage = await page.context().newPage();
+              await verifyPage.goto(outcome.url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
+              await new Promise(resolve => setTimeout(resolve, 2000));
+              try { await verifyPage.close(); } catch { /* ignore cleanup errors */ }
+              await new Promise(resolve => setTimeout(resolve, 1500));
+              await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
+              verificationResolved = true;
+            } catch {
+              verificationResolved = false;
+            }
+          }
+        }
+      }
+
       const screenshotPng = await page.screenshot({ fullPage: true });
-      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle, stepsAdvanced };
+      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved };
     });
   }
 
@@ -377,6 +423,54 @@ async function clickFirstAcrossFrames(page: PlaywrightPage, selectors: string[])
     if (await clickFirst(frame, selectors)) return true;
   }
   return false;
+}
+
+/** Return the first element matching any selector, searching every frame. */
+async function firstLocatorAcrossFrames(page: PlaywrightPage, selectors: string[]): Promise<PlaywrightLocator | null> {
+  for (const frame of allFrames(page)) {
+    for (const sel of selectors) {
+      const loc = await frame.$(sel);
+      if (loc) return loc;
+    }
+  }
+  return null;
+}
+
+const CODE_FIELD_SELECTORS: string[] = [
+  'input[autocomplete="one-time-code"]',
+  'input[name*="otp" i]',
+  'input[name*="code" i]',
+  'input[id*="otp" i]',
+  'input[id*="verif" i]',
+  'input[aria-label*="code" i]',
+  'input[placeholder*="code" i]'
+];
+
+/**
+ * Probe the page (and its frames) for an email-verification gate. Returns
+ * 'code' when a one-time-code input is present, 'link' when it's a "check your
+ * email / we sent you a link" screen with no code field, else null.
+ */
+async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'link' | null> {
+  for (const frame of allFrames(page)) {
+    const kind = await frame.evaluate(() => {
+      // VERIFICATION_PROBE
+      const doc = (globalThis as unknown as { document: any }).document;
+      const inputs = Array.from(doc.querySelectorAll('input')) as any[];
+      const isCode = inputs.some(el => {
+        const hay = `${el.getAttribute('autocomplete') ?? ''} ${el.getAttribute('name') ?? ''} ${el.getAttribute('id') ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('placeholder') ?? ''}`.toLowerCase();
+        return /one-time-code|(^|[^a-z])otp([^a-z]|$)|verif|confirmation code|security code|access code/.test(hay);
+      });
+      if (isCode) return 'code';
+      const bodyText = (doc.body?.innerText ?? '').toLowerCase();
+      if (/(check your (e-?mail|inbox)|we (?:just )?sent you|sent a (?:verification |magic )?link|verify your e-?mail)/.test(bodyText)) {
+        return 'link';
+      }
+      return null;
+    }) as 'code' | 'link' | null;
+    if (kind) return kind;
+  }
+  return null;
 }
 
 /**

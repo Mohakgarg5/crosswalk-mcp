@@ -479,6 +479,124 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.postSubmitTitle).toBeUndefined();
   });
 
+  it('fillForm runs resolveVerification when a code field is detected, types the code, and submits', async () => {
+    const typed: Array<{ selector: string; value: string }> = [];
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Verify'),
+      url: vi.fn().mockReturnValue('https://careers.acme.com/apply'),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89])),
+      $: vi.fn(async (selector: string) => {
+        if (/one-time-code|otp|verif/i.test(selector)) {
+          return { fill: async (v: string) => { typed.push({ selector, value: v }); } };
+        }
+        return null;
+      }),
+      evaluate: vi.fn(async (fn: unknown, ...args: unknown[]) => {
+        const src = String(fn);
+        if (src.includes('VERIFICATION_PROBE')) return { kind: 'code' };
+        return [];
+      }),
+      frames: vi.fn().mockReturnValue([]),
+      mainFrame: vi.fn(),
+      context: vi.fn().mockReturnValue({ newPage: vi.fn() }),
+      close: vi.fn()
+    };
+    fakePage.mainFrame.mockReturnValue(fakePage);
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const resolveVerification = vi.fn().mockResolvedValue({ kind: 'code', code: '424242' });
+    const res = await browser.fillForm('https://careers.acme.com/apply', [], { clickSubmit: true, resolveVerification });
+
+    expect(resolveVerification).toHaveBeenCalledTimes(1);
+    expect(typed.some(t => t.value === '424242')).toBe(true);
+    expect(res.verificationRequired).toBe(true);
+    expect(res.verificationResolved).toBe(true);
+  });
+
+  it('fillForm opens a magic link in a sibling page of the same context, then submits', async () => {
+    const verifyPage = { goto: vi.fn(), close: vi.fn() };
+    const newPage = vi.fn().mockResolvedValue(verifyPage);
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Verify'),
+      url: vi.fn().mockReturnValue('https://careers.acme.com/apply'),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89])),
+      $: vi.fn().mockResolvedValue(null),
+      evaluate: vi.fn(async (fn: unknown) => {
+        const src = String(fn);
+        if (src.includes('VERIFICATION_PROBE')) return 'link';
+        return [];
+      }),
+      frames: vi.fn().mockReturnValue([]),
+      mainFrame: vi.fn(),
+      context: vi.fn().mockReturnValue({ newPage }),
+      close: vi.fn()
+    };
+    fakePage.mainFrame.mockReturnValue(fakePage);
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const url = 'https://careers.acme.com/verify?t=abc';
+    const resolveVerification = vi.fn().mockResolvedValue({ kind: 'link', url });
+    const res = await browser.fillForm('https://careers.acme.com/apply', [], { clickSubmit: true, resolveVerification });
+
+    expect(newPage).toHaveBeenCalledTimes(1);
+    expect(verifyPage.goto).toHaveBeenCalledWith(url, expect.anything());
+    expect(verifyPage.close).toHaveBeenCalled();
+    expect(res.verificationRequired).toBe(true);
+    expect(res.verificationResolved).toBe(true);
+  });
+
+  it('fillForm reports verificationRequired but unresolved when the callback returns null', async () => {
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Verify'),
+      url: vi.fn().mockReturnValue('https://careers.acme.com/apply'),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89])),
+      $: vi.fn().mockResolvedValue(null),
+      evaluate: vi.fn(async (fn: unknown) => {
+        const src = String(fn);
+        if (src.includes('VERIFICATION_PROBE')) return { kind: 'code' };
+        return [];
+      }),
+      frames: vi.fn().mockReturnValue([]),
+      mainFrame: vi.fn(),
+      context: vi.fn().mockReturnValue({ newPage: vi.fn() }),
+      close: vi.fn()
+    };
+    fakePage.mainFrame.mockReturnValue(fakePage);
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const resolveVerification = vi.fn().mockResolvedValue(null);
+    const res = await browser.fillForm('https://careers.acme.com/apply', [], { clickSubmit: true, resolveVerification });
+
+    expect(res.verificationRequired).toBe(true);
+    expect(res.verificationResolved).toBe(false);
+  });
+
+  it('fillForm does not probe for verification when no callback is provided (unchanged behavior)', async () => {
+    const evaluate = vi.fn().mockResolvedValue([]);
+    const fakePage = {
+      goto: vi.fn(), title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x/'), screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      $: vi.fn().mockResolvedValue(null), evaluate, frames: vi.fn().mockReturnValue([]),
+      mainFrame: vi.fn(), context: vi.fn(), close: vi.fn()
+    };
+    fakePage.mainFrame.mockReturnValue(fakePage);
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const res = await browser.fillForm('https://x/', []);
+    expect(res.verificationRequired).toBeFalsy();
+    expect(evaluate.mock.calls.every(c => !String(c[0]).includes('VERIFICATION_PROBE'))).toBe(true);
+  });
+
   it('fillForm continues to next selector when fill() throws', async () => {
     let firstAttemptThrown = false;
     let secondCallCount = 0;
