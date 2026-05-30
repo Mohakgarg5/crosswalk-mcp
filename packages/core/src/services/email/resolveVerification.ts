@@ -40,7 +40,7 @@ export function makeResolveVerification(deps: ResolveVerificationDeps): ResolveV
       let outcome: VerificationOutcome | null = null;
       try {
         const emails = await deps.fetcher(deps.cfg, ctx.startedAt);
-        outcome = extractVerification(emails);
+        outcome = extractVerification(emails, { preferHost: formHost });
       } catch {
         outcome = null; // connection/auth error — treat as not-yet-resolved
       }

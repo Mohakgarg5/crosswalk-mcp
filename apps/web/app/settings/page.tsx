@@ -233,6 +233,9 @@ export default function SettingsPage() {
               <Field label="Secure (TLS)">
                 <input type="checkbox" checked={emailSecure} onChange={e => setEmailSecure(e.target.checked)} />
               </Field>
+              {!emailSecure && (
+                <p className="text-xs text-[var(--danger,#c00)]">⚠️ With TLS off, your app password is sent in clear text — only use this on a trusted network, or leave Secure (TLS) on.</p>
+              )}
             </>
           )}
           <div className="flex items-center gap-3">

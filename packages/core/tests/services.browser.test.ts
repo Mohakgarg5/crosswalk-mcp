@@ -517,7 +517,8 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
   });
 
   it('fillForm opens a magic link in a sibling page of the same context, then submits', async () => {
-    const verifyPage = { goto: vi.fn(), close: vi.fn() };
+    const url = 'https://careers.acme.com/verify?t=abc';
+    const verifyPage = { goto: vi.fn(), close: vi.fn(), url: vi.fn().mockReturnValue(url) };
     const newPage = vi.fn().mockResolvedValue(verifyPage);
     const fakePage = {
       goto: vi.fn(),
@@ -540,7 +541,6 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
 
     const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
-    const url = 'https://careers.acme.com/verify?t=abc';
     const resolveVerification = vi.fn().mockResolvedValue({ kind: 'link', url });
     const res = await browser.fillForm('https://careers.acme.com/apply', [], { clickSubmit: true, resolveVerification });
 
@@ -549,6 +549,35 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(verifyPage.close).toHaveBeenCalled();
     expect(res.verificationRequired).toBe(true);
     expect(res.verificationResolved).toBe(true);
+  });
+
+  it('fillForm does NOT trust a magic link that redirected off the allowlist (SSRF guard)', async () => {
+    // goto follows a redirect that lands on an internal/disallowed host.
+    const verifyPage = { goto: vi.fn(), close: vi.fn(), url: vi.fn().mockReturnValue('http://169.254.169.254/latest/meta-data') };
+    const newPage = vi.fn().mockResolvedValue(verifyPage);
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Verify'),
+      url: vi.fn().mockReturnValue('https://careers.acme.com/apply'),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([0x89])),
+      $: vi.fn().mockResolvedValue(null),
+      evaluate: vi.fn(async (fn: unknown) => (String(fn).includes('VERIFICATION_PROBE') ? 'link' : [])),
+      frames: vi.fn().mockReturnValue([]),
+      mainFrame: vi.fn(),
+      context: vi.fn().mockReturnValue({ newPage }),
+      close: vi.fn()
+    };
+    fakePage.mainFrame.mockReturnValue(fakePage);
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue({ newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() }) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const resolveVerification = vi.fn().mockResolvedValue({ kind: 'link', url: 'https://careers.acme.com/verify?t=abc' });
+    const res = await browser.fillForm('https://careers.acme.com/apply', [], { clickSubmit: true, resolveVerification });
+
+    expect(verifyPage.close).toHaveBeenCalled();      // opened then abandoned
+    expect(res.verificationRequired).toBe(true);
+    expect(res.verificationResolved).toBe(false);     // landed off-allowlist → not trusted
   });
 
   it('fillForm reports verificationRequired but unresolved when the callback returns null', async () => {
