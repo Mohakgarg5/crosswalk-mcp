@@ -52,10 +52,16 @@ function findCode(text: string): string | null {
 
 function findLink(text: string, html: string | undefined): string | null {
   const haystack = `${text}\n${html ?? ''}`;
-  const urls = haystack.match(/https?:\/\/[^\s"'<>)]+/gi) ?? [];
-  // Prefer a URL whose path/query hints at verification.
-  const hinted = urls.find(u => /(verif|confirm|activate|magic|token|otp)/i.test(u));
-  return hinted ?? urls[0] ?? null;
+  // Strip trailing sentence punctuation an email's prose leaves on a URL
+  // ("...verify at https://x/y?t=abc." → drops the period), which would
+  // otherwise hand the browser a broken link.
+  const urls = (haystack.match(/https?:\/\/[^\s"'<>)]+/gi) ?? [])
+    .map(u => u.replace(/[.,!?;:'")\]>]+$/, ''));
+  // Only return a URL that actually hints at verification. We do NOT fall back
+  // to "the first URL in the email" — a "confirm your order"-style message can
+  // pass the subject filter, and its first link (unsubscribe, view-order) is
+  // not a verification link. No hint → null → the apply flow pauses and flags.
+  return urls.find(u => /(verif|confirm|activate|magic|token|otp)/i.test(u)) ?? null;
 }
 
 /**
@@ -66,7 +72,9 @@ function findLink(text: string, html: string | undefined): string | null {
 export function extractVerification(emails: ParsedEmail[]): VerificationOutcome | null {
   const candidates = emails
     .filter(e => VERIFY_RE.test(`${e.subject}\n${e.text}`))
-    .sort((a, b) => b.date.localeCompare(a.date));
+    // Most-recent first. Plain `<`/`>` on ISO-8601 strings is lexicographic =
+    // chronological and locale-independent (unlike localeCompare).
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
   for (const e of candidates) {
     const code = findCode(e.text);

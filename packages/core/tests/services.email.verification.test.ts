@@ -38,6 +38,25 @@ describe('extractVerification', () => {
     expect(out).toEqual({ kind: 'link', url: 'https://login.microsoftonline.com/verify?token=abc123' });
   });
 
+  it('strips trailing sentence punctuation from a magic link', () => {
+    const out = extractVerification([email({
+      subject: 'Verify your email',
+      text: 'Please verify at https://login.microsoftonline.com/verify?token=abc123.'
+    })]);
+    expect(out).toEqual({ kind: 'link', url: 'https://login.microsoftonline.com/verify?token=abc123' });
+  });
+
+  it('does not return a non-verification first URL when the subject only matched "confirm"', () => {
+    // "confirm your order" passes the keyword filter, but its links are not
+    // verification links — extraction must yield null, not the unsubscribe URL.
+    const out = extractVerification([email({
+      from: 'orders@shop.com',
+      subject: 'Confirm your order',
+      text: 'Thanks! View your order at https://shop.com/orders/123 or https://shop.com/unsubscribe'
+    })]);
+    expect(out).toBeNull();
+  });
+
   it('returns null when no email looks like a verification', () => {
     const out = extractVerification([email({ subject: 'Weekly newsletter', text: 'Here are this week jobs.' })]);
     expect(out).toBeNull();
