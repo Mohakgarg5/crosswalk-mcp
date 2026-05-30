@@ -453,21 +453,26 @@ const CODE_FIELD_SELECTORS: string[] = [
  */
 async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'link' | null> {
   for (const frame of allFrames(page)) {
-    const kind = await frame.evaluate(() => {
-      // VERIFICATION_PROBE
-      const doc = (globalThis as unknown as { document: any }).document;
-      const inputs = Array.from(doc.querySelectorAll('input')) as any[];
-      const isCode = inputs.some(el => {
-        const hay = `${el.getAttribute('autocomplete') ?? ''} ${el.getAttribute('name') ?? ''} ${el.getAttribute('id') ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('placeholder') ?? ''}`.toLowerCase();
-        return /one-time-code|(^|[^a-z])otp([^a-z]|$)|verif|confirmation code|security code|access code/.test(hay);
-      });
-      if (isCode) return 'code';
-      const bodyText = (doc.body?.innerText ?? '').toLowerCase();
-      if (/(check your (e-?mail|inbox)|we (?:just )?sent you|sent a (?:verification |magic )?link|verify your e-?mail)/.test(bodyText)) {
-        return 'link';
-      }
-      return null;
-    }) as 'code' | 'link' | null;
+    let kind: 'code' | 'link' | null = null;
+    try {
+      kind = await frame.evaluate(() => {
+        // VERIFICATION_PROBE
+        const doc = (globalThis as unknown as { document: any }).document;
+        const inputs = Array.from(doc.querySelectorAll('input')) as any[];
+        const isCode = inputs.some(el => {
+          const hay = `${el.getAttribute('autocomplete') ?? ''} ${el.getAttribute('name') ?? ''} ${el.getAttribute('id') ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('placeholder') ?? ''}`.toLowerCase();
+          return /one-time-code|(^|[^a-z])otp([^a-z]|$)|verif|confirmation code|security code|access code/.test(hay);
+        });
+        if (isCode) return 'code';
+        const bodyText = (doc.body?.innerText ?? '').toLowerCase();
+        if (/(check your (e-?mail|inbox)|we (?:just )?sent you|sent a (?:verification |magic )?link|verify your e-?mail)/.test(bodyText)) {
+          return 'link';
+        }
+        return null;
+      }) as 'code' | 'link' | null;
+    } catch {
+      continue; // cross-origin frame or evaluate failure — skip it, try the next
+    }
     if (kind) return kind;
   }
   return null;
