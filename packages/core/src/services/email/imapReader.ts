@@ -59,7 +59,10 @@ export const liveImapFetcher: ImapFetcher = async (cfg, sinceISO) => {
   const out: ParsedEmail[] = [];
   await client.connect();
   try {
-    const lock = await client.getMailboxLock('INBOX');
+    // readOnly opens INBOX via EXAMINE, not SELECT — protocol-level guarantee
+    // we never mutate the user's mailbox (the PEEK fetch below already avoids
+    // setting \Seen; this is defense-in-depth matching the read-only intent).
+    const lock = await client.getMailboxLock('INBOX', { readOnly: true });
     try {
       const since = new Date(sinceISO);
       for await (const msg of client.fetch({ since }, { source: true })) {
