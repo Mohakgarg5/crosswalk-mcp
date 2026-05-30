@@ -7,7 +7,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import fs from 'node:fs';
-import type { ToolCtx, Db, AppConfig } from 'crosswalk-mcp/runtime';
+import type { ToolCtx, Db, AppConfig, EmailAccount } from 'crosswalk-mcp/runtime';
 
 type Runtime = typeof import('crosswalk-mcp/runtime');
 
@@ -192,6 +192,32 @@ export async function listEmails() {
 export async function ingestEmail(email: { from: string; subject: string; body: string; receivedAt?: string }) {
   const { routeEmail } = await rt();
   return routeEmail(await db(), email);
+}
+
+// --- Email inbox (verification codes) -----------------------------------------
+
+export async function readEmailAccount(): Promise<EmailAccount | null> {
+  const { getEmailAccount } = await rt();
+  return getEmailAccount(await db());
+}
+
+export async function saveEmailAccount(acct: EmailAccount): Promise<{ ok: true }> {
+  const { setEmailAccount } = await rt();
+  setEmailAccount(await db(), acct);
+  return { ok: true };
+}
+
+/** Try an IMAP login and a since-now fetch; report success/failure to the UI. */
+export async function testEmailConnection(acct: EmailAccount): Promise<{ ok: boolean; error?: string }> {
+  const { imapConfigFromAccount, liveImapFetcher } = await rt();
+  const cfg = imapConfigFromAccount(acct);
+  if (!cfg) return { ok: false, error: 'Missing app password or host.' };
+  try {
+    await liveImapFetcher(cfg, new Date().toISOString());
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 // --- Autonomous apply ---------------------------------------------------------

@@ -48,6 +48,8 @@ export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/ema
 export type { EmailAccount, InboundEmail } from './store/email.ts';
 export { routeEmail } from './services/emailRouter.ts';
 export type { IncomingEmail, RouteResult } from './services/emailRouter.ts';
+export { imapConfigFromAccount, liveImapFetcher } from './services/email/imapReader.ts';
+export type { ImapConfig, ImapFetcher } from './services/email/imapReader.ts';
 
 // Autonomous apply ("apply on my behalf")
 export { autoApply } from './services/autoApplyEngine.ts';
