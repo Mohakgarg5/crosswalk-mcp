@@ -33,6 +33,25 @@ export function listResumes(db: Db): Resume[] {
   }));
 }
 
+// Cascade-delete a résumé and everything that references it (applications,
+// application_event rows, fit-score cache entries). FK enforcement is on, so
+// dependents must go first.
+export function deleteResume(db: Db, id: string): { deleted: boolean } {
+  const exists = db.prepare('SELECT 1 FROM resume WHERE id = ?').get(id);
+  if (!exists) return { deleted: false };
+  const tx = db.transaction(() => {
+    db.prepare(`
+      DELETE FROM application_event
+      WHERE application_id IN (SELECT id FROM application WHERE resume_id = ?)
+    `).run(id);
+    db.prepare('DELETE FROM application WHERE resume_id = ?').run(id);
+    db.prepare('DELETE FROM fit_score_cache WHERE resume_id = ?').run(id);
+    db.prepare('DELETE FROM resume WHERE id = ?').run(id);
+  });
+  tx();
+  return { deleted: true };
+}
+
 export function getResume(db: Db, id: string): Resume | null {
   const r = db.prepare(`
     SELECT id, label, source_path AS sourcePath, raw_text AS rawText,

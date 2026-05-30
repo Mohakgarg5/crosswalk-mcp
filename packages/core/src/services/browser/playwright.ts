@@ -1,5 +1,37 @@
+import { execSync } from 'node:child_process';
 import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
+
+/**
+ * Launch a persistent Chromium context, recovering automatically if the
+ * profile directory is still locked by a stale Chromium process from a prior
+ * Crosswalk run (browser window left open, server killed mid-flight, etc.).
+ * The user shouldn't have to manually `pkill Chrome` between runs.
+ */
+async function launchPersistentWithLockRecovery(
+  pw: PlaywrightModule,
+  profileDir: string,
+  headless: boolean
+): Promise<PlaywrightContext> {
+  try {
+    return await pw.chromium.launchPersistentContext(profileDir, { headless });
+  } catch (e) {
+    const msg = (e as Error).message || '';
+    if (!/already in use|existing browser session|SingletonLock/i.test(msg)) {
+      throw e;
+    }
+    // Stale chromium is holding the profile lock — find and kill it, then retry once.
+    try {
+      execSync(`pgrep -f ${JSON.stringify('--user-data-dir=' + profileDir)} | xargs -r kill -9`, { stdio: 'ignore' });
+    } catch { /* nothing to kill */ }
+    // Remove the SingletonLock file Chrome leaves behind.
+    try {
+      execSync(`rm -f ${JSON.stringify(profileDir + '/SingletonLock')} ${JSON.stringify(profileDir + '/SingletonCookie')} ${JSON.stringify(profileDir + '/SingletonSocket')}`, { stdio: 'ignore' });
+    } catch { /* ignore */ }
+    await new Promise(r => setTimeout(r, 800));
+    return await pw.chromium.launchPersistentContext(profileDir, { headless });
+  }
+}
 
 type PlaywrightContext = {
   newPage(): Promise<PlaywrightPage>;
@@ -23,15 +55,27 @@ type PlaywrightLocator = {
   selectOption?(values: string | { label?: string; value?: string }): Promise<string[]>;
   check?(): Promise<void>;
   uncheck?(): Promise<void>;
+  type?(value: string, opts?: { delay?: number }): Promise<void>;
+  press?(key: string): Promise<void>;
+  focus?(): Promise<void>;
 };
 
-type PlaywrightPage = {
+// A "frame-like" surface — same shape for both Page and Frame from Playwright.
+// Page.$ only searches the main frame; we operate on frames directly so iframe-
+// embedded forms (Stripe → embeds job-boards.greenhouse.io, etc.) actually fill.
+type PlaywrightFrame = {
+  $(selector: string): Promise<PlaywrightLocator | null>;
+  evaluate<T>(fn: () => T): Promise<T>;
+  evaluate<T, A>(fn: (arg: A) => T, arg: A): Promise<T>;
+  url(): string;
+};
+
+type PlaywrightPage = PlaywrightFrame & {
   goto(url: string, opts?: { waitUntil?: string; timeout?: number }): Promise<unknown>;
   title(): Promise<string>;
-  url(): string;
   screenshot(opts?: { fullPage?: boolean }): Promise<Buffer>;
-  evaluate<T>(fn: () => T): Promise<T>;
-  $(selector: string): Promise<PlaywrightLocator | null>;
+  frames(): PlaywrightFrame[];
+  mainFrame(): PlaywrightFrame;
   close(): Promise<void>;
 };
 
@@ -83,13 +127,17 @@ export class LazyPlaywrightBrowser implements Browser {
 
     if (this.profileDir) {
       if (!this.persistentContext) {
-        this.persistentContext = await pw.chromium.launchPersistentContext(this.profileDir, { headless: !this.headed });
+        this.persistentContext = await launchPersistentWithLockRecovery(pw, this.profileDir, !this.headed);
       }
       const page = await this.persistentContext.newPage();
       try {
         return await fn(page);
       } finally {
-        try { await page.close(); } catch { /* ignore cleanup errors */ }
+        // In headed mode keep the page open so the user can review the filled
+        // form and click Submit themselves. They close the window when done.
+        if (!this.headed) {
+          try { await page.close(); } catch { /* ignore cleanup errors */ }
+        }
       }
     }
 
@@ -101,17 +149,32 @@ export class LazyPlaywrightBrowser implements Browser {
       const page = await ctx.newPage();
       return await fn(page);
     } finally {
-      try { await ctx.close(); } catch { /* ignore cleanup errors */ }
+      // Same: in headed mode, leave the context (and its page) open for manual
+      // review. The context leaks until the browser process restarts — fine
+      // for interactive testing, not for unattended automation.
+      if (!this.headed) {
+        try { await ctx.close(); } catch { /* ignore cleanup errors */ }
+      }
     }
   }
 
   async preview(url: string): Promise<BrowserPreview> {
     return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
+      await advanceToForm(page);
       const title = await page.title();
       const resolvedUrl = page.url();
-      const screenshotPng = await page.screenshot({ fullPage: false });
-      const formFields = await page.evaluate(extractFormFieldsScript);
+      const screenshotPng = await page.screenshot({ fullPage: true });
+      // Aggregate fields across the main frame and every iframe — Greenhouse-
+      // embedded forms (Stripe, DoorDash, etc.) live in a child frame.
+      const frames = allFrames(page);
+      const formFields: FormField[] = [];
+      for (const frame of frames) {
+        try {
+          const fromFrame = await frame.evaluate(extractFormFieldsScript);
+          if (Array.isArray(fromFrame)) formFields.push(...fromFrame);
+        } catch { /* cross-origin frame or detached — skip */ }
+      }
       return { screenshotPng, resolvedUrl, title, formFields };
     });
   }
@@ -119,6 +182,11 @@ export class LazyPlaywrightBrowser implements Browser {
   async fillForm(url: string, fields: FillField[], opts: { ats?: string; clickSubmit?: boolean; maxSteps?: number } = {}): Promise<BrowserFillResult> {
     return this.runWithPage(async (page) => {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
+      // Many public ATS URLs (Greenhouse job-boards, Lever, Ashby) land on a job
+      // description page that hides the application form behind an "Apply" button.
+      // Try to advance past it before looking for form fields. No-op if the form
+      // is already on the page or the button isn't found.
+      await advanceToForm(page);
       const maxSteps = Math.max(1, opts.maxSteps ?? 1);
       const labelOf = (f: FillField) => ('name' in f ? `${f.kind}:${f.name}` : f.kind);
       const filledLabels = new Set<string>();
@@ -130,10 +198,10 @@ export class LazyPlaywrightBrowser implements Browser {
         for (const field of fields) {
           const label = labelOf(field);
           if (filledLabels.has(label)) continue;
-          if (await tryFillField(page, field, opts.ats)) filledLabels.add(label);
+          if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
         }
         if (step < maxSteps) {
-          const advanced = await clickFirst(page, NEXT_SELECTORS);
+          const advanced = await clickFirstAcrossFrames(page, NEXT_SELECTORS);
           if (!advanced) break; // no Next button → this is the last page
           stepsAdvanced++;
           await new Promise(resolve => setTimeout(resolve, 1500)); // let the next page render
@@ -150,7 +218,7 @@ export class LazyPlaywrightBrowser implements Browser {
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
       if (opts.clickSubmit) {
-        submitClicked = await clickFirst(page, SUBMIT_SELECTORS);
+        submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
         if (submitClicked) {
           try {
             // Best-effort wait for navigation to settle
@@ -163,7 +231,7 @@ export class LazyPlaywrightBrowser implements Browser {
         }
       }
 
-      const screenshotPng = await page.screenshot({ fullPage: false });
+      const screenshotPng = await page.screenshot({ fullPage: true });
       return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle, stepsAdvanced };
     });
   }
@@ -203,10 +271,85 @@ const NEXT_SELECTORS: string[] = [
   'button[aria-label*="next" i]'
 ];
 
+/**
+ * Buttons that open the application form from a public job-description page
+ * (Greenhouse job-boards, Lever, Ashby, modern Workday postings). Tried in
+ * order; stop at the first match. Specific phrases first so a generic "Apply"
+ * link in a nav menu loses to the primary CTA when both exist.
+ */
+const APPLY_SELECTORS: string[] = [
+  'a:has-text("Apply for this job")',
+  'button:has-text("Apply for this job")',
+  'a:has-text("Apply now")',
+  'button:has-text("Apply now")',
+  'button[data-automation-id="adventureButton"]', // Workday "Apply"
+  'a:has-text("I\'m interested")', // Lever variant
+  'a[href*="/apply"]',
+  'a[href$="#app"]',
+  // Generic primary CTAs — last-resort. Greenhouse job-boards uses a plain
+  // <a>Apply</a> with no other distinguishing text.
+  'a:has-text("Apply")',
+  'button:has-text("Apply")'
+];
+
+/**
+ * If the landed page hides the form behind an Apply button (job-description
+ * page), click it so the form is on screen for fillForm/preview. Always tries
+ * — `clickFirst` is a no-op if no selector matches, and clicking a redundant
+ * Apply on a page that already has the form is harmless (typically scrolls
+ * within the same page).
+ */
+async function advanceToForm(page: PlaywrightPage): Promise<void> {
+  try {
+    const clicked = await clickFirst(page, APPLY_SELECTORS);
+    if (clicked) {
+      // Let the form render — Greenhouse renders client-side, Lever navigates.
+      await new Promise(resolve => setTimeout(resolve, 3000));
+    }
+    // Poll up to 8s for an actual form to appear in any frame. Headed mode
+    // renders visually (slower) and react-mounted iframes can take a second
+    // past navigation to attach. Without this, fill ran on an empty DOM and
+    // every selector returned null.
+    await waitForFormReady(page, 8000);
+  } catch { /* best effort — never block the calling flow */ }
+}
+
+async function waitForFormReady(page: PlaywrightPage, timeoutMs: number): Promise<void> {
+  const pollMs = 400;
+  const maxPolls = Math.ceil(timeoutMs / pollMs);
+  let consecutiveBadEvaluates = 0;
+  for (let i = 0; i < maxPolls; i++) {
+    let totalFields = 0;
+    let anyEvaluateReturnedNumber = false;
+    for (const frame of allFrames(page)) {
+      try {
+        const count = await frame.evaluate(() => {
+          const doc = (globalThis as unknown as { document: any }).document;
+          return doc.querySelectorAll('input:not([type="hidden"]), textarea, select, [role="combobox"]').length;
+        });
+        if (typeof count === 'number') {
+          totalFields += count;
+          anyEvaluateReturnedNumber = true;
+        }
+      } catch { /* skip cross-origin frame */ }
+    }
+    if (totalFields >= 3) return; // 3+ visible fields → form is ready
+    // Test-mocked pages return arrays/undefined from evaluate. Bail after two
+    // such polls so the test suite doesn't sit through the full 8s timeout.
+    if (!anyEvaluateReturnedNumber) {
+      consecutiveBadEvaluates++;
+      if (consecutiveBadEvaluates >= 2) return;
+    } else {
+      consecutiveBadEvaluates = 0;
+    }
+    await new Promise(r => setTimeout(r, pollMs));
+  }
+}
+
 /** Click the first matching, clickable selector. Returns whether one was clicked. */
-async function clickFirst(page: PlaywrightPage, selectors: string[]): Promise<boolean> {
+async function clickFirst(frame: PlaywrightFrame, selectors: string[]): Promise<boolean> {
   for (const selector of selectors) {
-    const btn = await page.$(selector);
+    const btn = await frame.$(selector);
     if (!btn || typeof btn.click !== 'function') continue;
     try {
       await btn.click();
@@ -218,10 +361,238 @@ async function clickFirst(page: PlaywrightPage, selectors: string[]): Promise<bo
   return false;
 }
 
-/** Fill a single field on the current page. Returns whether it matched a selector. */
-async function tryFillField(page: PlaywrightPage, field: FillField, ats: string | undefined): Promise<boolean> {
+/** Return the page's main frame plus every nested frame in document order.
+ * Tests mock Page without a frames() method; fall back to just the page itself. */
+function allFrames(page: PlaywrightPage): PlaywrightFrame[] {
+  if (typeof page.frames !== 'function') return [page];
+  try {
+    const frames = page.frames();
+    return Array.isArray(frames) && frames.length > 0 ? frames : [page];
+  } catch { return [page]; }
+}
+
+/** Like clickFirst but tries the main frame first, then every iframe. */
+async function clickFirstAcrossFrames(page: PlaywrightPage, selectors: string[]): Promise<boolean> {
+  for (const frame of allFrames(page)) {
+    if (await clickFirst(frame, selectors)) return true;
+  }
+  return false;
+}
+
+/**
+ * Handle React-based combobox/dropdown widgets (react-select, downshift, MUI
+ * Autocomplete, etc.) — none are real `<select>` elements. Universal strategy:
+ *   1. Click the combobox input → menu opens
+ *   2. Enumerate the visible option labels
+ *   3. Pick the best label match for the requested value (exact > prefix > substring)
+ *   4. Click that option directly — far more reliable than type + Enter, which
+ *      depends on the widget's internal filter matching exactly
+ *
+ * Returns true ONLY when an option was actually clicked. Type+Enter remains as
+ * a last-resort fallback for widgets that don't render a discoverable menu.
+ */
+async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: string, label?: string): Promise<boolean> {
+  const isUsableName = isSafeFieldName(fieldName);
+  const escaped = isUsableName ? escAttr(fieldName) : '';
+  const inputSelectors = isUsableName ? [
+    `input[role="combobox"][id="${escaped}"]`,
+    `input[role="combobox"][name="${escaped}"]`,
+    `input.select__input[id="${escaped}"]`,
+    `input.select__input[name="${escaped}"]`,
+    `input[id="react-select-${escaped}-input"]`,
+    `input[id*="react-select-${escaped}"][role="combobox"]`,
+    `input[role="combobox"][id*="${escaped}" i]`,
+    `input[role="combobox"][name*="${escaped}" i]`,
+    `input[role="combobox"][aria-label*="${escaped}" i]`
+  ] : [];
+
+  let input: PlaywrightLocator | null = null;
+  for (const selector of inputSelectors) {
+    input = await frame.$(selector);
+    if (input) break;
+  }
+
+  // Label-based fallback: find a `<label>` whose visible text contains the
+  // field's known label (or the field name as a humanised string), then
+  // walk to the associated combobox input. Handles widgets where name/id is
+  // missing or non-semantic (Anthropic "Please identify your race" etc.).
+  if (!input) {
+    const labelText = (label ?? fieldName).trim();
+    if (labelText.length >= 3) {
+      try {
+        const inputHandle = await frame.evaluate<string | null, string>((labelStr: string) => {
+          const doc = (globalThis as unknown as { document: any }).document;
+          const labels = Array.from(doc.querySelectorAll('label, legend, [class*="label"]')) as any[];
+          const wanted = labelStr.toLowerCase();
+          // Score labels: prefer exact match > startsWith > contains.
+          let best: any = null;
+          let bestScore = 0;
+          for (const l of labels) {
+            const t = String(l.textContent ?? '').toLowerCase().trim();
+            if (!t || t.length > 200) continue;
+            let score = 0;
+            if (t === wanted) score = 100;
+            else if (t.startsWith(wanted)) score = 80;
+            else if (wanted.startsWith(t) && t.length >= 5) score = 70;
+            else if (t.includes(wanted)) score = 60;
+            if (score > bestScore) { best = l; bestScore = score; }
+          }
+          if (!best || bestScore < 60) return null;
+          // Resolve the associated input: <label for="X"> → #X, else nearest combobox in subtree/parent.
+          const forAttr = best.getAttribute?.('for');
+          let inp = forAttr ? doc.getElementById(forAttr) : null;
+          if (!inp) {
+            const parent = best.closest('.select__container, fieldset, .field, .question, div') || best.parentElement;
+            inp = parent?.querySelector('input[role="combobox"], input.select__input, select');
+          }
+          if (!inp) return null;
+          // Stamp a temporary marker so we can locate the element from outside evaluate.
+          const marker = `__cw_rsel_${Math.floor(Math.random() * 1e9)}`;
+          inp.setAttribute('data-cw-marker', marker);
+          return marker;
+        }, labelText).catch(() => null);
+        if (inputHandle && typeof inputHandle === 'string') {
+          input = await frame.$(`[data-cw-marker="${inputHandle}"]`);
+        }
+      } catch { /* best-effort */ }
+    }
+  }
+
+  if (!input) return false;
+
+  try {
+    if (typeof input.click === 'function') await input.click();
+    else if (typeof input.focus === 'function') await input.focus();
+    else return false;
+    await new Promise(r => setTimeout(r, 500));
+
+    // Enumerate options from the CURRENTLY-OPEN menu only. react-select
+    // keeps prior dropdowns' options in the DOM as `.select__option`, so a
+    // global selector leaks "United States" into the Gender menu. The open
+    // menu is wrapped in `.select__menu` (react-select) or has a visible
+    // `[role="listbox"]` (MUI/Headless UI).
+    const wanted = value.toLowerCase().trim();
+    const wantedFirstSegment = wanted.split(/[,\(]/)[0].trim();
+    const matchInfo = await frame.evaluate(() => {
+      const doc = (globalThis as unknown as { document: any }).document;
+      const containers = Array.from(doc.querySelectorAll(
+        '.select__menu, [role="listbox"]'
+      )) as any[];
+      const visibleContainers = containers.filter(c => {
+        const rect = c.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      const opts: any[] = [];
+      for (const c of visibleContainers) {
+        opts.push(...Array.from(c.querySelectorAll(
+          '.select__option, [role="option"], [class*="MenuItem"]'
+        )));
+      }
+      return opts.map((o, i) => ({
+        index: i,
+        text: String(o.textContent ?? '').trim()
+      })).filter(o => o.text.length > 0);
+    }).catch(() => [] as Array<{ index: number; text: string }>);
+
+    if (matchInfo.length > 0) {
+      // Stricter scoring. Exact > startsWith > contains-first-segment with
+      // word boundaries. For short values (< 4 chars like "No", "Yes"), only
+      // exact or word-boundary contains qualifies — substring would match
+      // "Norfolk Island" for "No".
+      const isShortValue = wanted.length < 4;
+      // Detect explicit yes/no intent so a long AI answer like "Yes, I have
+      // read the AI partnership guidelines" still picks the bare "Yes" option.
+      const yesIntent = /\byes\b/.test(wanted) && !/\bno\b/.test(wanted);
+      const noIntent = /\bno\b/.test(wanted) && !/\byes\b/.test(wanted);
+      const scored = matchInfo.map(o => {
+        const t = o.text.toLowerCase();
+        const wordBoundaryHit = new RegExp(`(^|\\W)${wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\W|$)`).test(t);
+        let score = 0;
+        if (t === wanted) score = 100;
+        else if (t.startsWith(wanted + ' ') || t.startsWith(wanted + ',') || t.startsWith(wanted + '.')) score = 90;
+        else if (t.startsWith(wanted)) score = 80;
+        else if (wanted.startsWith(t) && t.length >= 3) score = 70;
+        else if (!isShortValue && t.includes(wantedFirstSegment) && wantedFirstSegment.length >= 3) score = 60;
+        else if (wordBoundaryHit) score = 55;
+        else if (!isShortValue && wantedFirstSegment.length >= 3
+                 && wantedFirstSegment.split(/\s+/).every(w => w.length < 3 || t.includes(w))) score = 40;
+        // Intent boosters: if the AI's answer clearly signals Yes or No, and
+        // the option starts with that word, lock in a high score so e.g.
+        // "Yes, I have read..." picks the "Yes" option even when neither
+        // string strictly starts-with the other.
+        if (yesIntent && /^\s*yes\b/.test(t)) score = Math.max(score, 85);
+        if (noIntent && /^\s*no\b/.test(t)) score = Math.max(score, 85);
+        return { ...o, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      const best = scored[0];
+      if (best && best.score >= 55) {
+        const escapedText = best.text.replace(/"/g, '\\"');
+        const candidates = [
+          `.select__menu .select__option:has-text("${escapedText}")`,
+          `[role="listbox"] [role="option"]:has-text("${escapedText}")`,
+          `.select__option:has-text("${escapedText}")`,
+          `[role="option"]:has-text("${escapedText}")`
+        ];
+        for (const sel of candidates) {
+          const opt = await frame.$(sel);
+          if (opt && typeof opt.click === 'function') {
+            try { await opt.click(); await new Promise(r => setTimeout(r, 200)); return true; }
+            catch { /* try next selector */ }
+          }
+        }
+      }
+    }
+    // Fallback: type + Enter — works when the widget filters as you type
+    // (react-select, downshift). We only return true if Enter likely committed
+    // something (i.e. the value isn't ambiguously short).
+    if (typeof input.type === 'function') {
+      await input.type(value, { delay: 20 });
+    } else if (typeof input.fill === 'function') {
+      await input.fill(value);
+    }
+    await new Promise(r => setTimeout(r, 400));
+    if (typeof input.press === 'function') await input.press('Enter');
+    await new Promise(r => setTimeout(r, 200));
+    // Always close any lingering menu so the next field's enumeration isn't
+    // polluted by stale options.
+    if (typeof input.press === 'function') {
+      try { await input.press('Escape'); } catch { /* ignore */ }
+    }
+    return true;
+  } catch { return false; }
+}
+
+/** Try filling a field on the main page first, then each nested frame (Stripe
+ * and other custom-branded ATS pages render the Greenhouse form inside an
+ * iframe — selectors on the parent page see nothing). */
+async function tryFillFieldAcrossFrames(page: PlaywrightPage, field: FillField, ats: string | undefined): Promise<boolean> {
+  for (const frame of allFrames(page)) {
+    if (await tryFillField(frame, field, ats)) return true;
+  }
+  return false;
+}
+
+/** Fill a single field on the given frame. Returns whether it matched a selector. */
+async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string | undefined): Promise<boolean> {
   if (field.kind === 'text_by_name') {
     if (!isSafeFieldName(field.name)) return false;
+    // First check whether `<input id="X">` is actually a react-select combobox.
+    // For those, calling .fill() programmatically succeeds at the DOM level but
+    // the React component never receives an onChange, so the visible dropdown
+    // stays empty (the bug that bit us on Stripe EEO + Anthropic dropdowns).
+    // Route comboboxes straight to the option-click handler.
+    const comboboxSel = [
+      `input[role="combobox"][id="${escAttr(field.name)}"]`,
+      `input[role="combobox"][name="${escAttr(field.name)}"]`,
+      `input.select__input[id="${escAttr(field.name)}"]`,
+      `input.select__input[name="${escAttr(field.name)}"]`
+    ];
+    for (const sel of comboboxSel) {
+      const found = await page.$(sel);
+      if (found) return tryReactSelect(page, field.name, field.value, field.label);
+    }
+    // Regular textarea/input fill path.
     const candidates = [
       `textarea[name="${field.name}"]`,
       `textarea[id="${field.name}"]`,
@@ -233,6 +604,8 @@ async function tryFillField(page: PlaywrightPage, field: FillField, ats: string 
       if (!el || typeof el.fill !== 'function') continue;
       try { await el.fill(field.value); return true; } catch { continue; }
     }
+    // Last-resort react-select fallback (fuzzy id/name + label match).
+    if (await tryReactSelect(page, field.name, field.value, field.label)) return true;
     return false;
   }
 
@@ -244,7 +617,8 @@ async function tryFillField(page: PlaywrightPage, field: FillField, ats: string 
       try { await el.selectOption({ label: field.value }); return true; } catch { /* fall through to value */ }
       try { await el.selectOption(field.value); return true; } catch { continue; }
     }
-    return false;
+    // Fallback to react-select (label-aware).
+    return tryReactSelect(page, field.name, field.value, field.label);
   }
 
   if (field.kind === 'radio_by_name') {
@@ -295,62 +669,112 @@ async function tryFillField(page: PlaywrightPage, field: FillField, ats: string 
   return false;
 }
 
-/** Selector candidates, in priority order. First match wins. */
+/** Selector candidates, in priority order. First match wins. Each list goes
+ * precise → fuzzy: exact name/id, then standard autocomplete attrs, then
+ * substring matches on name/id/placeholder/aria-label so we catch custom
+ * Greenhouse/Lever implementations (Stripe, DoorDash, etc.) that rename fields.
+ */
 const SELECTORS: Record<StaticKind, string[]> = {
   email: [
     'input[type="email"]',
     'input[name="email"]',
     'input[name="job_application[email]"]',
     'input[autocomplete="email"]',
-    'input[name*="email" i]'
+    'input[name*="email" i]',
+    'input[id*="email" i]',
+    'input[aria-label*="email" i]',
+    'input[placeholder*="email" i]'
   ],
   first_name: [
     'input[name="first_name"]',
+    'input[name="firstName"]',
     'input[name="job_application[first_name]"]',
-    'input[autocomplete="given-name"]'
+    'input[autocomplete="given-name"]',
+    'input[id="first_name"]',
+    'input[id="firstName"]',
+    'input[name*="first" i][name*="name" i]',
+    'input[id*="first" i][id*="name" i]',
+    'input[aria-label*="first name" i]',
+    'input[placeholder*="first name" i]'
   ],
   last_name: [
     'input[name="last_name"]',
+    'input[name="lastName"]',
     'input[name="job_application[last_name]"]',
-    'input[autocomplete="family-name"]'
+    'input[autocomplete="family-name"]',
+    'input[id="last_name"]',
+    'input[id="lastName"]',
+    'input[name*="last" i][name*="name" i]',
+    'input[id*="last" i][id*="name" i]',
+    'input[aria-label*="last name" i]',
+    'input[placeholder*="last name" i]'
   ],
   full_name: [
     'input[name="name"]',
     'input[name="full_name"]',
-    'input[autocomplete="name"]'
+    'input[name="fullName"]',
+    'input[autocomplete="name"]',
+    'input[id="full_name"]',
+    'input[id="name"]',
+    'input[aria-label*="full name" i]',
+    'input[placeholder*="full name" i]'
   ],
   phone: [
     'input[type="tel"]',
     'input[name="phone"]',
+    'input[name="phoneNumber"]',
     'input[name="job_application[phone]"]',
     'input[autocomplete="tel"]',
-    'input[name*="phone" i]'
+    'input[name*="phone" i]',
+    'input[name*="mobile" i]',
+    'input[id*="phone" i]',
+    'input[aria-label*="phone" i]',
+    'input[placeholder*="phone" i]'
   ],
   linkedin: [
     'input[name="urls[LinkedIn]"]',
     'input[name="linkedin"]',
-    'input[name*="linkedin" i]'
+    'input[name*="linkedin" i]',
+    'input[id*="linkedin" i]',
+    'input[aria-label*="linkedin" i]',
+    'input[placeholder*="linkedin" i]'
   ],
   website: [
     'input[name="urls[Website]"]',
+    'input[name="urls[Portfolio]"]',
     'input[name="website"]',
-    'input[type="url"]'
+    'input[name="portfolio"]',
+    'input[type="url"]',
+    'input[name*="website" i]',
+    'input[name*="portfolio" i]',
+    'input[id*="website" i]',
+    'input[id*="portfolio" i]',
+    'input[aria-label*="website" i]',
+    'input[aria-label*="portfolio" i]'
   ],
   cover_letter_text: [
     'textarea[name="cover_letter"]',
+    'textarea[name="coverLetter"]',
     'textarea[name="job_application[cover_letter]"]',
     'textarea[id="cover_letter"]',
+    'textarea[id="coverLetter"]',
     'textarea[name*="cover" i]',
-    'textarea[id*="cover" i]'
+    'textarea[id*="cover" i]',
+    'textarea[aria-label*="cover" i]',
+    'textarea[placeholder*="cover" i]'
   ],
   cover_letter_file: [
     'input[type="file"][name*="cover" i]',
     'input[type="file"][name*="letter" i]',
-    'input[type="file"][id*="cover" i]'
+    'input[type="file"][id*="cover" i]',
+    'input[type="file"][aria-label*="cover" i]'
   ],
   resume_file: [
     'input[type="file"][name*="resume" i]',
     'input[type="file"][name*="cv" i]',
+    'input[type="file"][id*="resume" i]',
+    'input[type="file"][aria-label*="resume" i]',
+    'input[type="file"][aria-label*="cv" i]',
     'input[type="file"]'
   ]
 };
@@ -450,17 +874,30 @@ const extractFormFieldsScript = (): FormField[] => {
     if (e.disabled) continue;
     const rect = e.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) continue;
-    const name = e.name || e.id || '(unnamed)';
-    const type = tag === 'input' ? (e.type || 'text') : tag;
-    let label: string | undefined;
+    // react-select internal inputs and similar tracking widgets have no name,
+    // no id, no aria-* metadata, and no associated <label>. We can't reliably
+    // address them and they're not user-facing fields — skip rather than
+    // emit "(unnamed)" rows that downstream code will fail to fill.
+    const ariaLabel = e.getAttribute('aria-label');
+    const ariaLabelledBy = e.getAttribute('aria-labelledby');
+    let derivedLabel: string | undefined;
     if (e.id) {
       const lbl = doc.querySelector(`label[for="${e.id}"]`);
-      if (lbl) label = String(lbl.textContent ?? '').trim();
+      if (lbl) derivedLabel = String(lbl.textContent ?? '').trim();
     }
-    if (!label) {
+    if (!derivedLabel) {
       const parent = e.closest('label');
-      if (parent) label = String(parent.textContent ?? '').trim();
+      if (parent) derivedLabel = String(parent.textContent ?? '').trim();
     }
+    if (!derivedLabel && ariaLabelledBy) {
+      const ref = doc.getElementById(ariaLabelledBy);
+      if (ref) derivedLabel = String(ref.textContent ?? '').trim();
+    }
+    const hasAnyIdentifier = Boolean(e.name) || Boolean(e.id) || Boolean(ariaLabel)
+                          || Boolean(ariaLabelledBy) || Boolean(derivedLabel);
+    if (!hasAnyIdentifier) continue;
+    const name = e.name || e.id || '(unnamed)';
+    const type = tag === 'input' ? (e.type || 'text') : tag;
     let options: string[] | undefined;
     if (tag === 'select') {
       options = Array.from(e.options as any[])
@@ -470,7 +907,7 @@ const extractFormFieldsScript = (): FormField[] => {
     fields.push({
       name,
       type,
-      label,
+      label: derivedLabel ?? ariaLabel ?? undefined,
       required: Boolean(e.required),
       value: typeof e.value === 'string' && e.value.length > 0 ? e.value : undefined,
       options

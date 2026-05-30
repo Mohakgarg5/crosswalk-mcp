@@ -73,10 +73,11 @@ export async function applyApplication(
   const phone = asString(profile.phone);
   if (phone) fields.push({ kind: 'phone', value: phone });
 
-  const linkedin = asString(profile.linkedin);
+  const links = (profile.links ?? {}) as Record<string, unknown>;
+  const linkedin = asString(profile.linkedin) ?? asString(links.linkedin);
   if (linkedin) fields.push({ kind: 'linkedin', value: linkedin });
 
-  const website = asString(profile.website);
+  const website = asString(profile.website) ?? asString(links.website) ?? asString(links.portfolio);
   if (website) fields.push({ kind: 'website', value: website });
 
   const resumeDocxPath = await writeResumeDocxToTemp(app.tailoredResumeMd, app.id);
@@ -92,6 +93,8 @@ export async function applyApplication(
   for (const [name, value] of Object.entries(app.answerPack)) {
     if (typeof value === 'string' && value.length > 0) {
       fields.push({ kind: 'text_by_name', name, value });
+      // We don't have a label from the answer pack, but the apply pass will
+      // also evaluate preview.formFields and may add a label-aware copy below.
     }
   }
 
@@ -114,17 +117,40 @@ export async function applyApplication(
 
   if (preview && preview.formFields.length > 0) {
     const jobContext = job
-      ? `${job.title}${company ? ` at ${company.name}` : ''}`
+      ? `Applying to: ${job.title}${company ? ` at ${company.name}` : ''}`
       : 'a job application';
-    const applicantContext = (app.coverLetterMd && app.coverLetterMd.length > 0)
-      ? app.coverLetterMd.slice(0, 1500)
-      : 'No cover letter on file.';
+    // Bundle the tailored résumé (real work history) + cover letter so the
+    // sampler has the candidate's actual employers/titles/dates, not just
+    // motivational prose. The model was confusing target company with current
+    // employer when only the cover letter was given.
+    const resumeText = app.tailoredResumeMd ? `--- Applicant's résumé (true facts) ---\n${app.tailoredResumeMd.slice(0, 3000)}` : '';
+    const coverText = (app.coverLetterMd && app.coverLetterMd.length > 0)
+      ? `--- Applicant's cover letter ---\n${app.coverLetterMd.slice(0, 1200)}`
+      : '';
+    const applicantContext = [resumeText, coverText].filter(Boolean).join('\n\n') || 'No résumé or cover letter on file.';
+
+    // Skip fields the standard-selector pass already handles via well-known
+    // kinds — re-filling them with a sampled value would be wasted work and
+    // could overwrite a clean value with model output. Match on the field's
+    // name OR label so e.g. "First Name" and "firstName" both qualify.
+    const STANDARD_FIELD_PATTERNS = /^(first[\s_-]?name|last[\s_-]?name|full[\s_-]?name|name|email|phone|mobile|tel|linkedin|website|portfolio|resume|cv|cover[\s_-]?letter)$/i;
 
     for (const formField of preview.formFields) {
-      if (formField.type !== 'textarea') continue;
+      // Sample free-text inputs and textareas. Skip everything else (files,
+      // checkboxes, radios are handled elsewhere; hidden was already filtered).
+      const isFreeText = formField.type === 'textarea'
+        || formField.type === 'text'
+        || formField.type === 'url'
+        || formField.type === 'tel'
+        || formField.type === 'email';
+      if (!isFreeText) continue;
       if (!formField.name || knownNames.has(formField.name)) continue;
       const labelOrName = (formField.label || formField.name).toLowerCase();
       if (/(?<![a-z])cover[\s_-]?letter/.test(labelOrName)) continue;
+      // Skip if this looks like a field the standard-kind pass already fills.
+      const normalizedName = formField.name.replace(/[\[\]]/g, ' ').trim();
+      const normalizedLabel = (formField.label ?? '').trim();
+      if (STANDARD_FIELD_PATTERNS.test(normalizedName) || STANDARD_FIELD_PATTERNS.test(normalizedLabel)) continue;
 
       // Answer bank first (deterministic), then fall back to the model.
       const banked = matchAnswer(ctx.db, formField.label || formField.name);
@@ -135,9 +161,29 @@ export async function applyApplication(
         applicantContext
       });
       if (answer && answer.length > 0) {
-        fields.push({ kind: 'text_by_name', name: formField.name, value: answer });
+        fields.push({ kind: 'text_by_name', name: formField.name, value: answer, label: formField.label });
         sampledFields.push(formField.name);
       }
+    }
+
+    // Completion sweep: every preview field that has a visible label gets a
+    // belt-and-braces label-keyed text_by_name entry, in case the original
+    // name/id couldn't be resolved by selectors (label-based fallback inside
+    // tryReactSelect picks it up). Covers cases where a custom EEO question
+    // like "Please identify your race" has no addressable name/id.
+    for (const formField of preview.formFields) {
+      if (!formField.label) continue;
+      const labelKey = formField.label.toLowerCase().replace(/[*?:]/g, '').trim();
+      if (!labelKey) continue;
+      const banked = matchAnswer(ctx.db, formField.label);
+      if (!banked) continue;
+      // Avoid duplicating answers already pushed under the field's name.
+      const alreadyKeyed = fields.some(f =>
+        ('name' in f) && f.value === banked
+        && (f.name === formField.name || f.label === formField.label)
+      );
+      if (alreadyKeyed) continue;
+      fields.push({ kind: 'text_by_name', name: formField.name || labelKey, value: banked, label: formField.label });
     }
 
     // Dropdowns / radios / checkboxes (answer bank → model fallback).
