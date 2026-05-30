@@ -102,6 +102,16 @@ export async function readProfile(): Promise<Record<string, unknown> | null> {
   return getProfile(await db());
 }
 
+/** Merge structured fields into the profile (no LLM) — used by onboarding. */
+export async function saveProfile(patch: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const { getProfile, upsertProfile } = await rt();
+  const d = await db();
+  const existing = getProfile(d) ?? {};
+  const merged = { ...existing, ...patch };
+  upsertProfile(d, merged);
+  return merged;
+}
+
 export async function readApplication(id: string) {
   const { getApplication, listEventsForApplication } = await rt();
   const d = await db();

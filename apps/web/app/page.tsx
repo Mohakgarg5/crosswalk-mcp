@@ -234,8 +234,7 @@ function EmptyMatches({ hasKey }: { hasKey: boolean }) {
             Add a profile and résumé{hasKey ? '' : ', plus an API key,'} and Crosswalk scores live roles for you.
           </p>
           <div className="mt-4 flex items-center justify-center gap-2">
-            <Link href="/profile"><Button size="sm">Set up profile</Button></Link>
-            <Link href="/resumes"><Button size="sm" variant="ghost">Add résumé</Button></Link>
+            <Link href="/onboarding"><Button size="sm">Get set up — 2 min</Button></Link>
           </div>
         </div>
       </div>
