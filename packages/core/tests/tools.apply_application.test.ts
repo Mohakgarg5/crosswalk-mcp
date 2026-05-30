@@ -370,7 +370,10 @@ describe('tools/apply_application', () => {
         title: 'Apply: PM',
         screenshotPng: Buffer.from([]),
         filled: [], skipped: [],
-        submitClicked: false,
+        // submitClicked is true in the real world: clicking submit is what
+        // triggers the code email and advances to the gate. An unresolved gate
+        // must still NOT count as a real submission.
+        submitClicked: true,
         verificationRequired: true,
         verificationResolved: false
       }))

@@ -226,7 +226,11 @@ export async function applyApplication(
     }
   );
 
-  const submitted = Boolean(result.submitClicked);
+  // A submit button gets clicked to TRIGGER the verification email (it advances
+  // to the code/link screen), so submitClicked can be true while the gate is
+  // still unresolved. That is not a real submission — don't mark it submitted.
+  const verificationPending = Boolean(result.verificationRequired) && !result.verificationResolved;
+  const submitted = Boolean(result.submitClicked) && !verificationPending;
   if (submitted) {
     addEventForApplication(ctx.db, app.id, 'browser_submitted', {
       postSubmitUrl: result.postSubmitUrl ?? null,
@@ -239,7 +243,7 @@ export async function applyApplication(
     }
   }
 
-  if (result.verificationRequired && !result.verificationResolved) {
+  if (verificationPending) {
     addEventForApplication(ctx.db, app.id, 'verification_pending', { url: result.resolvedUrl });
     createNotification(ctx.db, {
       kind: 'verification_pending',
