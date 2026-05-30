@@ -36,7 +36,7 @@ You tell it _"I'm looking for **Product Manager** jobs"_ and it:
 1. 🔎 **Finds** matching jobs across thousands of companies.
 2. ✍️ **Rewrites your résumé** to fit each job — using only true facts from your real résumé.
 3. 📝 **Writes a cover letter** and **answers the application questions** (text, dropdowns, checkboxes, and all).
-4. ✅ **Fills in the form** and, if you allow it, clicks **Submit**.
+4. ✅ **Fills in the form** — including embedded (iframe) forms, searchable dropdowns, multi-page wizards, and the required consent boxes — and, if you allow it, clicks **Submit**.
 5. 👀 **Keeps watching**, so the moment a new matching job is posted, it grabs it.
 
 Everything runs on **your own laptop**. Your résumé, jobs, and history live in one folder on your computer (`~/.crosswalk`). Nothing is uploaded to anyone.
@@ -104,7 +104,7 @@ The app uses an AI ("the brain") to write your résumés and answers. Here's how
 Use the left-hand menu, roughly in this order:
 
 1. **Profile** — write a few sentences about yourself (e.g. _"PM, 3 years at Acme, want NYC or remote, need visa sponsorship"_). Save.
-2. **Résumés** — paste your résumé, name it, click **Add**.
+2. **Résumés** — paste your résumé, name it, click **Add**. (You can delete a résumé later too — it cleans up its applications and cached fit scores.)
 3. **Settings → Answer bank** — click **"Load common defaults"** (safe answers for standard questions like work authorization and the optional EEO/diversity ones), then add your own, e.g. `salary → $130,000`.
 4. **Jobs** — type a role (like `product manager`) and click **Search jobs**. You get real jobs from many companies.
 5. **Apply** — click **draft →** on a job to review it first, or **Auto-apply** at the top of the results to handle them all.
@@ -177,7 +177,7 @@ Then **restart the app**. (These tools occasionally tweak their MCP config forma
 
 ### What's available where
 
-- **In chat (MCP):** the core loop — find jobs (your watched companies), score/explain fit, tailor résumés, draft + **apply** (with the smart form-filling: multi-page wizards, dropdowns, checkboxes, answer bank), track your pipeline, schedule refreshes.
+- **In chat (MCP):** the core loop — find jobs (your watched companies), score/explain fit, tailor résumés, draft + **apply** (with the smart form-filling: iframe-embedded forms, multi-page wizards, searchable dropdowns, checkboxes, required-consent boxes, answer bank), track your pipeline, schedule refreshes.
 - **App + the watcher only (for now):** open-web role search across thousands of companies, batch auto-apply, the continuous watcher, and editing the answer bank.
 
 ---
@@ -251,7 +251,7 @@ An **npm-workspaces monorepo**:
 
 ```bash
 npm install          # install everything
-npm test             # run the test suite (260 tests)
+npm test             # run the test suite (268 tests)
 npm run lint         # type-check core + web (strict TypeScript)
 npm run build:core   # build the engine (what start.command runs as part of `gui`)
 npm run gui          # build core + start the GUI at localhost:3000
