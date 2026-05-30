@@ -1,23 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --bg: #0b0e14;
-  --panel: #121722;
-  --panel-2: #1a2130;
-  --border: #232c3d;
-  --text: #e6eaf2;
-  --muted: #8b97ad;
-  --accent: #6ea8fe;
-  --accent-2: #9b8cff;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --bad: #f87171;
+  /* Paper & forest — warm, calm, local-first */
+  --bg: #f4f1ea;          /* warm paper */
+  --bg-2: #efebe1;        /* deeper paper (gradient stop) */
+  --panel: #fffdf8;       /* card surface, slightly warm white */
+  --panel-2: #f1ede3;     /* inset / hover */
+  --border: #e6e0d2;      /* hairline */
+  --border-strong: #d8d1bf;
+
+  --text: #1b2620;        /* deep ink-green */
+  --muted: #7a847b;       /* secondary text */
+  --faint: #a6ad9f;       /* tertiary */
+
+  --accent: #1f4d38;      /* forest green — primary */
+  --accent-press: #163a2a;
+  --accent-2: #b8842b;    /* warm gold — used sparingly */
+  --on-accent: #f6f3ea;   /* text on the green */
+
+  --ok: #1d7a4d;   --ok-bg: #e2f1e7;
+  --warn: #9a6a16; --warn-bg: #f6ead0;
+  --bad: #b23b2c;  --bad-bg: #f6e0dc;
+  --info: #2f6d8c; --info-bg: #dcebf2;
+
+  /* Match-card tints (rotated across the row) */
+  --tint-butter: #fbf1cd;
+  --tint-sky: #dfeaf5;
+  --tint-mint: #d9eee0;
+  --tint-lav: #e8e3f5;
+  --tint-blush: #f8e3e0;
+
+  --shadow-sm: 0 1px 2px rgba(27, 38, 32, 0.05), 0 1px 1px rgba(27, 38, 32, 0.04);
+  --shadow-md: 0 6px 20px -6px rgba(27, 38, 32, 0.12), 0 2px 6px -2px rgba(27, 38, 32, 0.06);
+  --shadow-lg: 0 18px 40px -12px rgba(27, 38, 32, 0.18);
+
+  --font-display: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --font-body: 'Hanken Grotesk', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 html, body {
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(31, 77, 56, 0.05), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(184, 132, 43, 0.05), transparent 55%),
+    linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+  background-attachment: fixed;
   color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * { box-sizing: border-box; }
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.012em;
+}
+
+/* Quiet, on-brand scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--faint); background-clip: content-box; }
+
+@keyframes cw-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cw-rise { animation: cw-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-rise { animation: none; }
+}
