@@ -240,6 +240,7 @@ Re-download the ZIP from GitHub (or, if you used `git`, run `git pull`), then st
 - Everything lives in **one folder on your computer**: `~/.crosswalk` (data in `state.db`, your API key in `config.json`).
 - **No telemetry, no phone-home, no accounts.** There is no "us."
 - The only network it uses: the job sites (to find/apply) and Anthropic (to write résumés, with your key).
+- **Email inbox (if you set one up):** read **only** — it opens your inbox over IMAP to grab verification codes/links and never marks your mail as read, never sends a thing. Your app password stays in `~/.crosswalk`, is never shown in the browser, and is never sent to the AI. Magic links are only opened if they point at the application's own site or a known ATS — random links in email are ignored.
 - To erase everything: delete the `~/.crosswalk` folder.
 
 ---
@@ -254,7 +255,7 @@ An **npm-workspaces monorepo**:
 
 ```bash
 npm install          # install everything
-npm test             # run the test suite (299 tests)
+npm test             # run the test suite (303 tests)
 npm run lint         # type-check core + web (strict TypeScript)
 npm run build:core   # build the engine (what start.command runs as part of `gui`)
 npm run gui          # build core + start the GUI at localhost:3000
