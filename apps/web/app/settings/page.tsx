@@ -62,6 +62,59 @@ export default function SettingsPage() {
     finally { setImporting(false); }
   }
 
+  // Email inbox (verification codes)
+  const [emailProvider, setEmailProvider] = useState<'gmail' | 'outlook' | 'icloud' | 'custom'>('gmail');
+  const [emailAddress, setEmailAddress] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailHost, setEmailHost] = useState('');
+  const [emailPort, setEmailPort] = useState(993);
+  const [emailSecure, setEmailSecure] = useState(true);
+  const [emailHasPassword, setEmailHasPassword] = useState(false);
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTesting, setEmailTesting] = useState(false);
+  const [emailMsg, setEmailMsg] = useState('');
+
+  function loadEmailAccount() {
+    fetch('/api/email-account').then(r => r.json()).then(d => {
+      if (d.ok && d.account) {
+        const a = d.account as { provider: string; address: string; hasPassword: boolean };
+        if (a.provider === 'gmail' || a.provider === 'outlook' || a.provider === 'icloud' || a.provider === 'custom') setEmailProvider(a.provider);
+        setEmailAddress(a.address);
+        setEmailHasPassword(Boolean(a.hasPassword));
+      }
+    }).catch(() => {});
+  }
+  useEffect(() => { loadEmailAccount(); }, []);
+
+  function emailBody(test: boolean) {
+    return {
+      provider: emailProvider,
+      address: emailAddress,
+      ...(emailPassword ? { appPassword: emailPassword } : {}),
+      ...(emailProvider === 'custom' ? { host: emailHost, port: emailPort, secure: emailSecure } : {}),
+      ...(test ? { test: true } : {})
+    };
+  }
+
+  async function saveEmailAccount() {
+    setEmailSaving(true); setEmailMsg('');
+    try {
+      const r = await fetch('/api/email-account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(emailBody(false)) }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      setEmailMsg('Saved.'); setEmailPassword(''); loadEmailAccount();
+    } catch (e) { setEmailMsg(`Error: ${(e as Error).message}`); }
+    finally { setEmailSaving(false); }
+  }
+
+  async function testEmailConnection() {
+    setEmailTesting(true); setEmailMsg('');
+    try {
+      const r = await fetch('/api/email-account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(emailBody(true)) }).then(x => x.json());
+      setEmailMsg(r.ok ? 'Connection OK.' : `Failed: ${r.error}`);
+    } catch (e) { setEmailMsg(`Error: ${(e as Error).message}`); }
+    finally { setEmailTesting(false); }
+  }
+
   useEffect(() => {
     getSettings().then(v => {
       setS(v);
@@ -150,6 +203,44 @@ export default function SettingsPage() {
               ))}
             </ul>
           )}
+        </Card>
+
+        <Card title="Email inbox (for verification codes)" subtitle="Lets the auto-apply flow read one-time verification codes sent during sign-up/apply.">
+          <div className="mb-2">{emailHasPassword ? <Pill tone="ok">inbox configured</Pill> : <Pill tone="warn">no inbox set</Pill>}</div>
+          <Field label="Provider">
+            <select value={emailProvider} onChange={e => setEmailProvider(e.target.value as 'gmail' | 'outlook' | 'icloud' | 'custom')}
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--panel-2)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]">
+              <option value="gmail">gmail</option>
+              <option value="outlook">outlook</option>
+              <option value="icloud">icloud</option>
+              <option value="custom">custom</option>
+            </select>
+          </Field>
+          <Field label="Email address">
+            <Input type="email" placeholder="you@example.com" value={emailAddress} onChange={e => setEmailAddress(e.target.value)} />
+          </Field>
+          <Field label="App password">
+            <Input type="password" placeholder={emailHasPassword ? '••••• (saved)' : 'app password'} value={emailPassword} onChange={e => setEmailPassword(e.target.value)} />
+          </Field>
+          {emailProvider === 'custom' && (
+            <>
+              <Field label="IMAP host">
+                <Input placeholder="imap.example.com" value={emailHost} onChange={e => setEmailHost(e.target.value)} />
+              </Field>
+              <Field label="Port">
+                <Input type="number" min={1} value={emailPort} onChange={e => setEmailPort(Number(e.target.value))} />
+              </Field>
+              <Field label="Secure (TLS)">
+                <input type="checkbox" checked={emailSecure} onChange={e => setEmailSecure(e.target.checked)} />
+              </Field>
+            </>
+          )}
+          <div className="flex items-center gap-3">
+            <Button onClick={saveEmailAccount} disabled={emailSaving || !emailAddress.trim()}>{emailSaving ? 'Saving…' : 'Save'}</Button>
+            <Button variant="ghost" onClick={testEmailConnection} disabled={emailTesting || !emailAddress.trim()}>{emailTesting ? 'Testing…' : 'Test connection'}</Button>
+            {emailMsg && <span className="text-sm text-[var(--muted)]">{emailMsg}</span>}
+          </div>
+          <p className="text-xs text-[var(--muted)] mt-2">Gmail/iCloud need an app password, not your login password — generate one in your account&apos;s security settings.</p>
         </Card>
 
         <Card title="Autonomous apply (browser)" subtitle="How “apply on your behalf” works, and how to unlock login-walled ATSes.">

@@ -17,3 +17,15 @@ describe('app_config store', () => {
     expect(getConfig(db)).toMatchObject({ weeklyCap: 50, submitPolicy: 'auto' });
   });
 });
+
+describe('appConfig verificationTimeoutMs', () => {
+  it('defaults to 90 seconds', () => {
+    expect(DEFAULT_APP_CONFIG.verificationTimeoutMs).toBe(90_000);
+  });
+
+  it('persists an override', () => {
+    const db = openDb(':memory:');
+    setConfig(db, { verificationTimeoutMs: 120_000 });
+    expect(getConfig(db).verificationTimeoutMs).toBe(120_000);
+  });
+});

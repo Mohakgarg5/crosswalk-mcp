@@ -12,6 +12,10 @@ export type AppConfig = {
   /** Max wizard pages to navigate when applying (1 = single-page only; raise
    *  to ~8 for multi-step ATSes like Workday). */
   applyMaxSteps: number;
+  /** How long (ms) to poll the inbox for a verification code/link before
+   *  pausing-and-flagging the application. Only used when an email inbox is
+   *  configured. */
+  verificationTimeoutMs: number;
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -21,7 +25,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   // Walk up to 8 wizard pages (covers Workday's typical 3-5 step flow plus
   // safety margin). Auto-fill on each page; the loop stops when no Next
   // button is found, so single-page forms still finish in one pass.
-  applyMaxSteps: 8
+  applyMaxSteps: 8,
+  verificationTimeoutMs: 90_000
 };
 
 export function getConfig(db: Db): AppConfig {
