@@ -37,7 +37,8 @@ You tell it _"I'm looking for **Product Manager** jobs"_ and it:
 2. ✍️ **Rewrites your résumé** to fit each job — using only true facts from your real résumé.
 3. 📝 **Writes a cover letter** and **answers the application questions** (text, dropdowns, checkboxes, and all).
 4. ✅ **Fills in the form** — including embedded (iframe) forms, searchable dropdowns, multi-page wizards, and the required consent boxes — and, if you allow it, clicks **Submit**.
-5. 👀 **Keeps watching**, so the moment a new matching job is posted, it grabs it.
+5. 📧 **Gets past email verification** — if a site emails you a code or a "verify your email" link mid-application, it reads your inbox, enters the code (or opens the link), and finishes. (Optional — set it up under **Settings → Email inbox**.)
+6. 👀 **Keeps watching**, so the moment a new matching job is posted, it grabs it.
 
 Everything runs on **your own laptop**. Your résumé, jobs, and history live in one folder on your computer (`~/.crosswalk`). Nothing is uploaded to anyone.
 
@@ -108,7 +109,8 @@ Use the left-hand menu, roughly in this order:
 3. **Settings → Answer bank** — click **"Load common defaults"** (safe answers for standard questions like work authorization and the optional EEO/diversity ones), then add your own, e.g. `salary → $130,000`.
 4. **Jobs** — type a role (like `product manager`) and click **Search jobs**. You get real jobs from many companies.
 5. **Apply** — click **draft →** on a job to review it first, or **Auto-apply** at the top of the results to handle them all.
-6. **Pipeline / Alerts / Inbox** — track every application, see new-match alerts, and route recruiter emails to the right application.
+6. **Settings → Email inbox** _(optional)_ — paste an **app password** for your email so the agent can read verification codes/links and finish those applications on its own. Leave it blank to skip — you'll just complete those few by hand. (Gmail/iCloud need an _app password_, not your login password — make one in your account's security settings.)
+7. **Pipeline / Alerts / Inbox** — track every application, see new-match alerts, and route recruiter emails to the right application.
 
 ---
 
@@ -177,7 +179,7 @@ Then **restart the app**. (These tools occasionally tweak their MCP config forma
 
 ### What's available where
 
-- **In chat (MCP):** the core loop — find jobs (your watched companies), score/explain fit, tailor résumés, draft + **apply** (with the smart form-filling: iframe-embedded forms, multi-page wizards, searchable dropdowns, checkboxes, required-consent boxes, answer bank), track your pipeline, schedule refreshes.
+- **In chat (MCP):** the core loop — find jobs (your watched companies), score/explain fit, tailor résumés, draft + **apply** (with the smart form-filling: iframe-embedded forms, multi-page wizards, searchable dropdowns, checkboxes, required-consent boxes, emailed verification codes/links, answer bank), track your pipeline, schedule refreshes.
 - **App + the watcher only (for now):** open-web role search across thousands of companies, batch auto-apply, the continuous watcher, and editing the answer bank.
 
 ---
@@ -223,6 +225,7 @@ Once you trust it, switch to **auto**.
 | Port `3000` is busy | Close other apps using it, or in a terminal run `PORT=3001 npm run gui` and open `localhost:3001`. |
 | "No Anthropic API key set" | Add your key in **Settings** (see [Add your AI key](#add-your-ai-key)). |
 | Auto-apply says "browser not installed" | In a terminal: `npx crosswalk-mcp install-browser`. |
+| An application is flagged **"Email verification needed"** | The site emailed a code/link the agent couldn't read in time. Add your inbox under **Settings → Email inbox** (app password), or finish that one by hand — the form is already filled. |
 
 ---
 
@@ -251,7 +254,7 @@ An **npm-workspaces monorepo**:
 
 ```bash
 npm install          # install everything
-npm test             # run the test suite (268 tests)
+npm test             # run the test suite (299 tests)
 npm run lint         # type-check core + web (strict TypeScript)
 npm run build:core   # build the engine (what start.command runs as part of `gui`)
 npm run gui          # build core + start the GUI at localhost:3000
