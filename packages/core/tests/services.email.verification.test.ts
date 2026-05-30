@@ -52,7 +52,10 @@ describe('extractVerification', () => {
   });
 
   it('ignores long digit strings that are not codes (e.g. phone/year)', () => {
-    const out = extractVerification([email({ subject: 'Newsletter', text: 'Call 18005551234 in 2026.' })]);
+    // Subject matches the verification filter so the email reaches findCode —
+    // this exercises findCode's rejection of an 11-digit phone and a 4-digit
+    // year, rather than passing vacuously on the subject filter.
+    const out = extractVerification([email({ subject: 'Your verification code', text: 'Call 18005551234 in 2026.' })]);
     expect(out).toBeNull();
   });
 });
