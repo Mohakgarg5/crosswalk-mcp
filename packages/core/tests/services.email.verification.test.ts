@@ -77,6 +77,31 @@ describe('extractVerification', () => {
     const out = extractVerification([email({ subject: 'Your verification code', text: 'Call 18005551234 in 2026.' })]);
     expect(out).toBeNull();
   });
+
+  it('extracts a code from an HTML-only body (no plain text part)', () => {
+    const out = extractVerification([email({
+      subject: 'Verify your email',
+      text: '',
+      html: '<html><body><p>Your verification code is <b>903184</b>.</p></body></html>'
+    })]);
+    expect(out).toEqual({ kind: 'code', code: '903184' });
+  });
+
+  it('still sorts correctly when a date is malformed (treated as oldest)', () => {
+    const out = extractVerification([
+      email({ text: 'Your code is 555000', date: 'not-a-date' }),
+      email({ text: 'Your code is 222222', date: '2026-05-29T12:05:00.000Z' })
+    ]);
+    expect(out).toEqual({ kind: 'code', code: '222222' });
+  });
+
+  it('prefers a code from an email matching the form host over a more recent unrelated one', () => {
+    const out = extractVerification([
+      email({ from: 'noreply@greenhouse.io', subject: 'Your code', text: 'code: 111111', date: '2026-05-29T12:09:00.000Z' }),
+      email({ from: 'security@acme.com', subject: 'Your verification code', text: 'code: 999000', date: '2026-05-29T12:00:00.000Z' })
+    ], { preferHost: 'careers.acme.com' });
+    expect(out).toEqual({ kind: 'code', code: '999000' });
+  });
 });
 
 describe('isAllowedLinkHost', () => {

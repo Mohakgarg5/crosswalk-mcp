@@ -1,6 +1,9 @@
 import { execSync } from 'node:child_process';
 import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult, ResolveVerification, VerificationContext } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
+// Pure URL-safety util (no email/IMAP logic) — used to re-validate a magic
+// link's host after the browser follows any redirects.
+import { isAllowedLinkHost } from '../email/verification.ts';
 
 /**
  * Launch a persistent Chromium context, recovering automatically if the
@@ -266,10 +269,18 @@ export class LazyPlaywrightBrowser implements Browser {
               const verifyPage = await page.context().newPage();
               await verifyPage.goto(outcome.url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
               await new Promise(resolve => setTimeout(resolve, 2000));
+              // SSRF guard: the resolver allowlisted the INITIAL url, but goto
+              // follows redirects in this session-sharing context. If it landed
+              // somewhere off the allowlist (open-redirect → internal host, etc.),
+              // abandon it — don't trust the page and don't mark resolved.
+              const landed = verifyPage.url();
+              const landedSafe = isAllowedLinkHost(landed, ctx.atsHost);
               try { await verifyPage.close(); } catch { /* ignore cleanup errors */ }
-              await new Promise(resolve => setTimeout(resolve, 1500));
-              submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS) || submitClicked;
-              verificationResolved = true;
+              if (landedSafe) {
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS) || submitClicked;
+                verificationResolved = true;
+              }
             } catch {
               verificationResolved = false;
             }
@@ -436,14 +447,23 @@ async function firstLocatorAcrossFrames(page: PlaywrightPage, selectors: string[
   return null;
 }
 
+// Ordered specific → general. The generic "code" inputs explicitly EXCLUDE the
+// common non-OTP uses (promo/coupon/zip/postal/area/country/dial/discount) so we
+// never type a verification code into, say, a coupon field that happens to be on
+// the same page.
+const CODE_EXCLUSIONS = ':not([name*="promo" i]):not([name*="coupon" i]):not([name*="discount" i]):not([name*="zip" i]):not([name*="postal" i]):not([name*="area" i]):not([name*="country" i]):not([name*="dial" i])';
 const CODE_FIELD_SELECTORS: string[] = [
   'input[autocomplete="one-time-code"]',
   'input[name*="otp" i]',
-  'input[name*="code" i]',
   'input[id*="otp" i]',
+  'input[name*="one-time" i]',
+  'input[name*="onetime" i]',
+  'input[name*="verif" i]',
   'input[id*="verif" i]',
-  'input[aria-label*="code" i]',
-  'input[placeholder*="code" i]'
+  `input[name*="code" i]${CODE_EXCLUSIONS}`,
+  `input[id*="code" i]${CODE_EXCLUSIONS}`,
+  `input[aria-label*="code" i]${CODE_EXCLUSIONS}`,
+  `input[placeholder*="code" i]${CODE_EXCLUSIONS}`
 ];
 
 /**
@@ -465,7 +485,12 @@ async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'l
         });
         if (isCode) return 'code';
         const bodyText = (doc.body?.innerText ?? '').toLowerCase();
-        if (/(check your (e-?mail|inbox)|we (?:just )?sent you|sent a (?:verification |magic )?link|verify your e-?mail)/.test(bodyText)) {
+        // Don't treat a post-submit success page ("Thanks for applying, check
+        // your email for next steps") as a verification gate — that would
+        // mislabel a completed submission as pending.
+        const looksSubmitted = /(application (?:submitted|received|complete)|thank you for applying|successfully (?:submitted|applied)|we(?:'ve| have) received your application)/.test(bodyText);
+        const looksLikeLinkGate = /(verify your e-?mail|confirm your e-?mail|we (?:just )?sent you (?:a|an) (?:verification|confirmation|magic) (?:e-?mail|link)|click the (?:link|button) (?:we sent|in the e-?mail))/.test(bodyText);
+        if (looksLikeLinkGate && !looksSubmitted) {
           return 'link';
         }
         return null;
