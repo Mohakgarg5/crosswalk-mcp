@@ -59,9 +59,11 @@ testable with injected fakes.
 - **`services/email/verification.ts`** — pure function. Given a batch of recent
   emails (+ optional domain hint from the form URL), select the verification
   email and extract `{ kind: 'code', code }` (regex for a 4–8 char OTP) or
-  `{ kind: 'link', url }` (a verify/confirm anchor). Falls back to the existing
-  `SamplingClient` only when the regex is ambiguous. Returns `null` if nothing
-  matches.
+  `{ kind: 'link', url }` (a verify/confirm anchor). Returns `null` if nothing
+  matches. **Implemented as pure regex only — no model fallback** (kept simple
+  per YAGNI; an ambiguous email the regex can't parse falls through to
+  pause-and-flag, the documented failure mode). A `SamplingClient` fallback can
+  be added later if real emails defeat the regex.
 - **`services/email/resolveVerification.ts`** — orchestrator that becomes the
   callback. Polls `imapReader` every ~5s from when the apply began, up to a
   configurable timeout (default 90s), runs `verification.ts`, and returns the

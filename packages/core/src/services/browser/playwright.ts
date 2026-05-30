@@ -254,7 +254,7 @@ export class LazyPlaywrightBrowser implements Browser {
             const loc = await firstLocatorAcrossFrames(page, CODE_FIELD_SELECTORS);
             if (loc?.fill) {
               await loc.fill(outcome.code);
-              await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
+              submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS) || submitClicked;
               await new Promise(resolve => setTimeout(resolve, 2000));
               verificationResolved = true;
             }
@@ -268,7 +268,7 @@ export class LazyPlaywrightBrowser implements Browser {
               await new Promise(resolve => setTimeout(resolve, 2000));
               try { await verifyPage.close(); } catch { /* ignore cleanup errors */ }
               await new Promise(resolve => setTimeout(resolve, 1500));
-              await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
+              submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS) || submitClicked;
               verificationResolved = true;
             } catch {
               verificationResolved = false;
