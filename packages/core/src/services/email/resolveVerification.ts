@@ -46,11 +46,10 @@ export function makeResolveVerification(deps: ResolveVerificationDeps): ResolveV
       }
 
       if (outcome) {
-        if (outcome.kind === 'link' && !isAllowedLinkHost(outcome.url, formHost)) {
-          // Unsafe host — refuse to open it; keep waiting for a safer signal.
-        } else {
-          return outcome;
-        }
+        // A code is always safe; a link is only safe if its host is allowlisted
+        // or matches the form. An unsafe link → keep waiting for a safer signal.
+        const safe = outcome.kind !== 'link' || isAllowedLinkHost(outcome.url, formHost);
+        if (safe) return outcome;
       }
 
       if (now() - start >= deps.timeoutMs) return null;
