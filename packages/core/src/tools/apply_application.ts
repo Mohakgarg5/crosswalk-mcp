@@ -11,6 +11,11 @@ import { getCompany } from '../store/company.ts';
 import { getConfig } from '../store/appConfig.ts';
 import { matchAnswer } from '../store/answerBank.ts';
 import { resolveChoiceFields } from '../services/resolveChoices.ts';
+import { getEmailAccount } from '../store/email.ts';
+import { createNotification } from '../store/notification.ts';
+import { imapConfigFromAccount, liveImapFetcher } from '../services/email/imapReader.ts';
+import { makeResolveVerification } from '../services/email/resolveVerification.ts';
+import type { ResolveVerification } from '../services/browser/types.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string(),
@@ -40,6 +45,10 @@ export type ApplyApplicationResult = {
   detectedAts: string | null;
   /** URL after submit click (post-navigation). Only set when submit succeeded. */
   postSubmitUrl?: string;
+  /** True if the form demanded an emailed verification code/link. */
+  verificationRequired?: boolean;
+  /** True if that verification was resolved automatically. */
+  verificationResolved?: boolean;
 };
 
 function asString(v: unknown): string | undefined {
@@ -179,7 +188,7 @@ export async function applyApplication(
       if (!banked) continue;
       // Avoid duplicating answers already pushed under the field's name.
       const alreadyKeyed = fields.some(f =>
-        ('name' in f) && f.value === banked
+        f.kind === 'text_by_name' && f.value === banked
         && (f.name === formField.name || f.label === formField.label)
       );
       if (alreadyKeyed) continue;
@@ -191,13 +200,29 @@ export async function applyApplication(
     fields.push(...choiceFields);
   }
 
+  // Build a verification callback only when an inbox is configured with usable
+  // IMAP credentials. Without it, fillForm behaves exactly as before.
+  let resolveVerification: ResolveVerification | undefined;
+  const acct = getEmailAccount(ctx.db);
+  if (acct) {
+    const imapCfg = imapConfigFromAccount(acct);
+    if (imapCfg) {
+      resolveVerification = makeResolveVerification({
+        fetcher: liveImapFetcher,
+        cfg: imapCfg,
+        timeoutMs: getConfig(ctx.db).verificationTimeoutMs
+      });
+    }
+  }
+
   const result = await ctx.browser.fillForm(
     app.deepLink,
     fields,
     {
       ...(detectedAts ? { ats: detectedAts } : {}),
       ...(input.submit ? { clickSubmit: true } : {}),
-      maxSteps: getConfig(ctx.db).applyMaxSteps
+      maxSteps: getConfig(ctx.db).applyMaxSteps,
+      ...(resolveVerification ? { resolveVerification } : {})
     }
   );
 
@@ -214,6 +239,18 @@ export async function applyApplication(
     }
   }
 
+  if (result.verificationRequired && !result.verificationResolved) {
+    addEventForApplication(ctx.db, app.id, 'verification_pending', { url: result.resolvedUrl });
+    createNotification(ctx.db, {
+      kind: 'verification_pending',
+      title: 'Email verification needed',
+      body: `${result.title || 'An application'} asked for an emailed code/link we couldn't read in time. The form is filled — finish it by hand.`,
+      refId: app.id
+    });
+  } else if (result.verificationResolved) {
+    addEventForApplication(ctx.db, app.id, 'email_verified', { url: result.resolvedUrl });
+  }
+
   return {
     applicationId: app.id,
     deepLink: app.deepLink,
@@ -227,6 +264,8 @@ export async function applyApplication(
     coverLetterDocxPath,
     sampledFields,
     detectedAts,
-    postSubmitUrl: result.postSubmitUrl
+    postSubmitUrl: result.postSubmitUrl,
+    verificationRequired: result.verificationRequired,
+    verificationResolved: result.verificationResolved
   };
 }

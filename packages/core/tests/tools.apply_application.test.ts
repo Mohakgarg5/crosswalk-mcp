@@ -4,7 +4,9 @@ import { upsertCompany } from '../src/store/company.ts';
 import { upsertJobs } from '../src/store/job.ts';
 import { addResume } from '../src/store/resume.ts';
 import { upsertProfile } from '../src/store/profile.ts';
-import { createApplication } from '../src/store/application.ts';
+import { createApplication, listEventsForApplication } from '../src/store/application.ts';
+import { setEmailAccount } from '../src/store/email.ts';
+import { listNotifications } from '../src/store/notification.ts';
 import { applyApplication } from '../src/tools/apply_application.ts';
 import type { Browser, FillField } from '../src/services/browser/types.ts';
 import type { SamplingClient } from '../src/sampling/client.ts';
@@ -358,5 +360,61 @@ describe('tools/apply_application', () => {
 
     expect(seenOpts?.clickSubmit).toBeUndefined();
     expect(out.submitted).toBe(false);
+  });
+
+  it('pauses-and-flags when a verification gate is unresolved', async () => {
+    setEmailAccount(db, { provider: 'gmail', address: 'me@gmail.com', config: { appPassword: 'x' } });
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (_url: string, _fields: FillField[]) => ({
+        resolvedUrl: 'https://apply.example.com/job/12345',
+        title: 'Apply: PM',
+        screenshotPng: Buffer.from([]),
+        filled: [], skipped: [],
+        submitClicked: false,
+        verificationRequired: true,
+        verificationResolved: false
+      }))
+    });
+    const sampling = makeNoopSampling();
+    const res = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+
+    expect(res.submitted).toBe(false);
+    expect(res.verificationRequired).toBe(true);
+    expect(res.verificationResolved).toBe(false);
+
+    const notifs = listNotifications(db);
+    const pending = notifs.filter(n => n.kind === 'verification_pending');
+    expect(pending.length).toBe(1);
+    expect(pending[0].refId).toBe('app1');
+
+    const events = listEventsForApplication(db, 'app1');
+    expect(events.some(e => e.kind === 'verification_pending')).toBe(true);
+    expect(events.some(e => e.kind === 'browser_submitted')).toBe(false);
+  });
+
+  it('records email_verified and submits when a verification gate is resolved', async () => {
+    setEmailAccount(db, { provider: 'gmail', address: 'me@gmail.com', config: { appPassword: 'x' } });
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (_url: string, _fields: FillField[]) => ({
+        resolvedUrl: 'https://apply.example.com/job/12345',
+        title: 'Apply: PM',
+        screenshotPng: Buffer.from([]),
+        filled: [], skipped: [],
+        submitClicked: true,
+        verificationRequired: true,
+        verificationResolved: true
+      }))
+    });
+    const sampling = makeNoopSampling();
+    const res = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+
+    expect(res.submitted).toBe(true);
+    expect(res.verificationResolved).toBe(true);
+
+    const notifs = listNotifications(db);
+    expect(notifs.some(n => n.kind === 'verification_pending')).toBe(false);
+
+    const events = listEventsForApplication(db, 'app1');
+    expect(events.some(e => e.kind === 'email_verified')).toBe(true);
   });
 });
