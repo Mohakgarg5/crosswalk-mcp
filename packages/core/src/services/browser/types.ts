@@ -8,6 +8,24 @@ export type FormField = {
   options?: string[];
 };
 
+/** What the apply flow knows when it hits a verification gate. */
+export type VerificationContext = {
+  /** URL of the form that triggered the gate. */
+  formUrl: string;
+  /** ISO timestamp captured when the apply began — only emails at/after this count. */
+  startedAt: string;
+  /** Host of the form (e.g. "boards.greenhouse.io"), used as a link-safety hint. */
+  atsHost?: string;
+};
+
+/** The resolved verification: a typed code to enter, or a link to open. */
+export type VerificationOutcome =
+  | { kind: 'code'; code: string }
+  | { kind: 'link'; url: string };
+
+/** Injected into fillForm; returns the outcome or null if it couldn't be resolved. */
+export type ResolveVerification = (ctx: VerificationContext) => Promise<VerificationOutcome | null>;
+
 export type BrowserPreview = {
   /** PNG bytes of the rendered page (above the fold). */
   screenshotPng: Buffer;
@@ -29,7 +47,7 @@ export interface Browser {
   /**
    * Open the URL in a headless browser, attempt to fill each field by its kind using common ATS selectors, optionally click the submit button, and return a screenshot. Unmatched fields go to `skipped`. With `maxSteps > 1` it navigates a multi-page wizard (fill → click Next → repeat → Submit). Throws if the browser runtime is not installed.
    */
-  fillForm(url: string, fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean; maxSteps?: number }): Promise<BrowserFillResult>;
+  fillForm(url: string, fields: FillField[], opts?: { ats?: string; clickSubmit?: boolean; maxSteps?: number; resolveVerification?: ResolveVerification }): Promise<BrowserFillResult>;
 
   /** Release any resources held by this browser instance. */
   close(): Promise<void>;
@@ -82,4 +100,8 @@ export type BrowserFillResult = {
   postSubmitTitle?: string;
   /** How many wizard pages were advanced past (Next/Continue clicks) before submit. */
   stepsAdvanced?: number;
+  /** True if a verification gate (code field or magic-link screen) was detected. */
+  verificationRequired?: boolean;
+  /** True if the gate was detected AND the callback resolved it (code entered / link opened). */
+  verificationResolved?: boolean;
 };
