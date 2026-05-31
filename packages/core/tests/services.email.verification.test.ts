@@ -30,6 +30,25 @@ describe('extractVerification', () => {
     expect(out).toEqual({ kind: 'code', code: '552210' });
   });
 
+  it('extracts the real Greenhouse code (mixed letters+digits after "...code into the field: X")', () => {
+    // Exact phrasing from a live Greenhouse "Security code" email. A cue-based
+    // matcher would wrongly grab "into"/"field" — the code is the alphanumeric
+    // token. Case must be preserved (TCI6Qwrz, not TCI6QWRZ).
+    const out = extractVerification([email({
+      subject: 'Security code for your application to Chorus Innovations',
+      text: 'Hi Mohak, Copy and paste this code into the security code field on your application: TCI6Qwrz After you enter the code, resubmit your application.'
+    })]);
+    expect(out).toEqual({ kind: 'code', code: 'TCI6Qwrz' });
+  });
+
+  it('extracts another real mixed-case Greenhouse code', () => {
+    const out = extractVerification([email({
+      subject: 'Security code for your application to Faire',
+      text: 'Copy and paste this code into the security code field on your application: ROAJDU1W After you enter the code, resubmit your application.'
+    })]);
+    expect(out).toEqual({ kind: 'code', code: 'ROAJDU1W' });
+  });
+
   it('extracts a magic link when no code is present', () => {
     const out = extractVerification([email({
       subject: 'Verify your email',
