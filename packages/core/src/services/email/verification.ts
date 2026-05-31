@@ -74,14 +74,20 @@ export function isAllowedLinkHost(url: string, formHost: string | undefined): bo
 }
 
 function findCode(body: string): string | null {
-  // Prefer a code that follows an explicit "code"/"otp"/"is" cue, to avoid
-  // matching phone numbers, years, or order ids.
-  const cue = /(?:code|otp|pin)\s*(?:is|:|=)?\s*([A-Z0-9]{4,8})\b/i.exec(body);
-  if (cue) return cue[1].toUpperCase();
-  // Fall back to a standalone 6-digit group (the most common OTP length).
-  const six = /\b(\d{6})\b/.exec(body);
-  if (six) return six[1];
-  return null;
+  // Codes live in prose, never in URLs (query strings are full of code-shaped
+  // junk like ?id=ab12cd), so drop URLs before scanning.
+  const prose = body.replace(/https?:\/\/[^\s]+/gi, ' ');
+  // Modern OTPs mix LETTERS and DIGITS (e.g. TCI6Qwrz, ROAJDU1W, G8L4ER4x).
+  // Requiring both is what stops us grabbing an ordinary word that happens to
+  // follow "code" — real emails say "paste this code into the security code
+  // field on your application: TCI6Qwrz", and a cue-based match would wrongly
+  // return "into"/"field". Case is preserved — these codes are case-sensitive.
+  const mixed = (prose.match(/\b[A-Za-z0-9]{5,12}\b/g) ?? [])
+    .filter(t => /[A-Za-z]/.test(t) && /\d/.test(t));
+  if (mixed.length) return mixed[0];
+  // Otherwise the classic standalone 6-digit numeric code.
+  const six = /\b(\d{6})\b/.exec(prose);
+  return six ? six[1] : null;
 }
 
 function findLink(body: string): string | null {
