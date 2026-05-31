@@ -1,6 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
-import Sidebar from '@/components/Sidebar';
+import AppShell from '@/components/AppShell';
 
 export const metadata: Metadata = {
   title: 'Crosswalk',
@@ -11,12 +11,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="flex-1 px-8 py-8">
-            <div className="mx-auto max-w-5xl">{children}</div>
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

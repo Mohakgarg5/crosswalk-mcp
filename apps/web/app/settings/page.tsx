@@ -244,6 +244,9 @@ export default function SettingsPage() {
             {emailMsg && <span className="text-sm text-[var(--muted)]">{emailMsg}</span>}
           </div>
           <p className="text-xs text-[var(--muted)] mt-2">Gmail/iCloud need an app password, not your login password — generate one in your account&apos;s security settings.</p>
+          <p className="text-xs text-[var(--muted)] mt-2">
+            <span className="font-medium text-[var(--text)]">Tip:</span> on Gmail, put a tagged alias like <code className="text-[var(--accent)]">you+apply@gmail.com</code> on your applications. It still lands in your inbox, and Crosswalk only reads the verification mail — your personal email stays private.
+          </p>
         </Card>
 
         <Card title="Autonomous apply (browser)" subtitle="How “apply on your behalf” works, and how to unlock login-walled ATSes.">
