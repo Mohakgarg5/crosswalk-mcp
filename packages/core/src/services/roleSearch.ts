@@ -57,6 +57,30 @@ function slugify(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'unknown';
 }
 
+/** Map a free-text role query to a Muse category so the API does the heavy
+ * filtering server-side. Without this, we fetch N pages of *all* categories
+ * and a title grep leaves almost nothing (the "1 result" bug). Order matters:
+ * more specific patterns first. */
+const CATEGORY_PATTERNS: Array<[RegExp, string]> = [
+  [/product\s*(manager|management|owner)|(^|\s)pm($|\s)/i, 'Product Management'],
+  [/project\s*manager|program\s*manager|scrum/i, 'Project Management'],
+  [/data\s*scien|machine\s*learning|(^|\s)ml($|\s)|(^|\s)ai($|\s)/i, 'Data Science'],
+  [/data\b|analytics|analyst/i, 'Data and Analytics'],
+  [/design|(^|\s)ux($|\s)|(^|\s)ui($|\s)/i, 'Design and UX'],
+  [/software|developer|engineer|swe|frontend|backend|full[\s-]?stack/i, 'Software Engineering'],
+  [/marketing|growth|seo|content/i, 'Advertising and Marketing'],
+  [/sales|account\s*executive|business\s*development/i, 'Sales'],
+  [/recruit|talent|people\s*ops|(^|\s)hr($|\s)/i, 'Recruiting'],
+  [/customer\s*(success|support|service)/i, 'Customer Service'],
+  [/finance|accounting|controller/i, 'Accounting and Finance']
+];
+
+export function deriveCategory(query?: string): string | undefined {
+  if (!query) return undefined;
+  for (const [re, cat] of CATEGORY_PATTERNS) if (re.test(query)) return cat;
+  return undefined;
+}
+
 function normalize(r: MuseJob): RoleSearchJob {
   const companyName = r.company?.name ?? 'Unknown';
   const companySlug = r.company?.short_name ?? slugify(companyName);
@@ -81,6 +105,9 @@ export async function searchRoles(
   fetchImpl: typeof fetch = fetch
 ): Promise<RoleSearchResult> {
   const pages = Math.min(Math.max(opts.pages ?? 1, 1), MAX_PAGES);
+  // Explicit category wins; otherwise derive one from the query so the API
+  // filters server-side instead of us grepping titles out of random pages.
+  const category = opts.category ?? deriveCategory(opts.query);
   const raw: MuseJob[] = [];
   let total = 0;
   let pagesFetched = 0;
@@ -88,7 +115,7 @@ export async function searchRoles(
   for (let p = 1; p <= pages; p++) {
     const url = new URL(MUSE_API);
     url.searchParams.set('page', String(p));
-    if (opts.category) url.searchParams.set('category', opts.category);
+    if (category) url.searchParams.set('category', category);
     if (opts.location) url.searchParams.set('location', opts.location);
 
     const res = await fetchImpl(url.toString());
@@ -101,10 +128,16 @@ export async function searchRoles(
   }
 
   const q = opts.query?.toLowerCase().trim();
-  const jobs = raw
-    .filter(r => r && typeof r.name === 'string')
-    .filter(r => !q || r.name.toLowerCase().includes(q))
-    .map(normalize);
+  const valid = raw.filter(r => r && typeof r.name === 'string');
+  // When the category is doing the filtering (explicit or derived), keep the
+  // whole category and just rank title matches first — "Director, Product"
+  // belongs in a "product manager" search. Without a category, the title
+  // filter is all we have.
+  const titleMatch = (r: MuseJob) => !q || r.name.toLowerCase().includes(q);
+  const jobs = (category
+    ? [...valid].sort((a, b) => Number(titleMatch(b)) - Number(titleMatch(a)))
+    : valid.filter(titleMatch)
+  ).map(normalize);
 
   // Persist as regular jobs so draft/auto-apply/pipeline work on them.
   for (const j of jobs) {
