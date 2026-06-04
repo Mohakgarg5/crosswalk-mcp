@@ -14,7 +14,7 @@ describe('runtime library entry', () => {
     expect(typeof runtime.getProfile).toBe('function');
     expect(runtime.paths).toBeDefined();
     expect(Array.isArray(runtime.toolDefinitions)).toBe(true);
-    expect(runtime.toolDefinitions.length).toBe(19);
+    expect(runtime.toolDefinitions.length).toBe(20);
   });
 
   it('self-registers all 10 ATS adapters on import', () => {

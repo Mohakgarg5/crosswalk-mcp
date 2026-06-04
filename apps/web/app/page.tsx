@@ -11,6 +11,11 @@ type Item = {
   company: string; deepLink: string; createdAt: string; submittedAt?: string;
 };
 
+type Match = {
+  jobId: string; title: string; company: string; location?: string;
+  url: string; score: number; topStrengths: string[];
+};
+
 const STATUS_TONE: Record<string, 'muted' | 'ok' | 'warn' | 'bad' | 'info'> = {
   draft: 'muted', submitted: 'info', interviewing: 'warn', rejected: 'bad', offer: 'ok'
 };
@@ -40,6 +45,9 @@ export default function Dashboard() {
   const [draft, setDraft] = useState('');
   const [tab, setTab] = useState<string>('all');
   const [setUp, setSetUp] = useState<boolean | null>(null); // profile + résumé exist
+  const [matches, setMatches] = useState<Match[] | null>(null);
+  const [scoring, setScoring] = useState(false);
+  const [matchErr, setMatchErr] = useState('');
 
   useEffect(() => {
     getSettings().then(setSettings).catch(() => {});
@@ -55,7 +63,20 @@ export default function Dashboard() {
         setSetUp(Boolean(prof.name || prof.email) && (r.resumes?.length ?? 0) > 0);
       })
       .catch(() => setSetUp(false));
+    // Cached scores only — free and instant. Fresh scoring is the button below.
+    runTool<{ matches: Match[] }>('top_matches', { limit: 4 })
+      .then(r => setMatches(r.matches))
+      .catch(() => setMatches([]));
   }, []);
+
+  async function scoreMatches() {
+    setScoring(true); setMatchErr('');
+    try {
+      const r = await runTool<{ matches: Match[] }>('top_matches', { limit: 4, scoreMissing: true, maxToScore: 8 });
+      setMatches(r.matches);
+    } catch (e) { setMatchErr((e as Error).message); }
+    finally { setScoring(false); }
+  }
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: items?.length ?? 0 };
@@ -142,9 +163,48 @@ export default function Dashboard() {
       <section className="cw-rise" style={{ animationDelay: '120ms' }}>
         <div className="mb-3 flex items-end justify-between">
           <h2 className="font-display text-[19px] font-semibold">Top matches</h2>
-          <Link href="/jobs" className="text-[13px] font-medium text-[var(--accent)] hover:underline">Browse all jobs →</Link>
+          <div className="flex items-center gap-4">
+            {matches && matches.length > 0 && (
+              <button onClick={scoreMatches} disabled={scoring}
+                className="text-[13px] font-medium text-[var(--accent)] hover:underline disabled:opacity-50">
+                {scoring ? 'Scoring…' : '↻ Score new jobs'}
+              </button>
+            )}
+            <Link href="/jobs" className="text-[13px] font-medium text-[var(--accent)] hover:underline">Browse all jobs →</Link>
+          </div>
         </div>
-        <EmptyMatches hasKey={!!settings?.hasKey} setUp={!!setUp} />
+        {matchErr && <div className="mb-3 rounded-xl border border-[var(--bad)]/30 bg-[var(--bad-bg)] px-3.5 py-2.5 text-sm text-[var(--bad)]">{matchErr}</div>}
+        {matches && matches.length > 0 ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {matches.map((m, i) => (
+              <a key={m.jobId} href={m.url} target="_blank" rel="noreferrer"
+                className="rounded-2xl border border-[var(--border)] p-4 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-0.5"
+                style={{ background: TINTS[i % TINTS.length] }}>
+                <div className="flex items-start justify-between">
+                  <div className="text-[12px] text-[var(--muted)]">{m.location ?? '—'}</div>
+                  <MatchRing value={Math.round(m.score * 100)} />
+                </div>
+                <div className="mt-3 font-display text-[17px] font-semibold leading-tight">{m.title}</div>
+                <div className="mt-1 text-[13px] text-[var(--muted)]">{m.company}</div>
+                {m.topStrengths.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-1.5">
+                    {m.topStrengths.slice(0, 2).map(t => (
+                      <span key={t} className="rounded-full bg-[var(--panel)]/70 px-2 py-0.5 text-[11px] text-[var(--muted)]">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </a>
+            ))}
+          </div>
+        ) : (
+          <EmptyMatches
+            hasKey={!!settings?.hasKey}
+            setUp={!!setUp}
+            scoring={scoring}
+            onScore={scoreMatches}
+            canScore={!!setUp && (items !== null)}
+          />
+        )}
       </section>
 
       {/* All applications */}
@@ -211,9 +271,12 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
   );
 }
 
-/* Illustrative match cards over an empty pipeline. Before setup the CTA sends
-   you to onboarding; once profile + résumé exist it points at job search. */
-function EmptyMatches({ hasKey, setUp }: { hasKey: boolean; setUp: boolean }) {
+/* Illustrative match cards shown only while there are no real scored matches.
+   Before setup the CTA sends you to onboarding; once profile + résumé exist
+   it scores your fetched jobs right here (or sends you to search if none). */
+function EmptyMatches({ hasKey, setUp, scoring, onScore, canScore }: {
+  hasKey: boolean; setUp: boolean; scoring: boolean; onScore: () => void; canScore: boolean;
+}) {
   const samples = [
     { role: 'Senior Product Manager', loc: 'Remote', match: 73, tags: ['product', 'b2b saas'] },
     { role: 'AI Product Manager', loc: 'New York, NY', match: 71, tags: ['llm', '0→1'] },
@@ -241,12 +304,19 @@ function EmptyMatches({ hasKey, setUp }: { hasKey: boolean; setUp: boolean }) {
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-6 py-5 text-center shadow-[var(--shadow-lg)]">
           {setUp ? (
             <>
-              <p className="font-display text-[17px] font-semibold">You’re all set — find roles to score</p>
+              <p className="font-display text-[17px] font-semibold">
+                {canScore ? 'Score your jobs to see real matches' : 'You’re all set — find roles to score'}
+              </p>
               <p className="mx-auto mt-1 max-w-xs text-[13px] text-[var(--muted)]">
-                Search jobs and Crosswalk rates each one against your résumé. Matches show up here.
+                Crosswalk rates each fetched job against your résumé (a few cents per batch).
               </p>
               <div className="mt-4 flex items-center justify-center gap-2">
-                <Link href="/jobs"><Button size="sm">Search jobs →</Button></Link>
+                {canScore && (
+                  <Button size="sm" onClick={onScore} disabled={scoring}>
+                    {scoring ? 'Scoring your jobs…' : 'Score my matches'}
+                  </Button>
+                )}
+                <Link href="/jobs"><Button size="sm" variant="ghost">Search jobs →</Button></Link>
               </div>
             </>
           ) : (

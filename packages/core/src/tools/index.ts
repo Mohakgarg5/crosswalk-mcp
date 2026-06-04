@@ -8,6 +8,7 @@ import { listResumesTool, listResumesInput } from './list_resumes.ts';
 import { deleteResumeTool, deleteResumeInput } from './delete_resume.ts';
 import { fetchJobs, fetchJobsInput } from './fetch_jobs.ts';
 import { scoreFit, scoreFitInput } from './score_fit.ts';
+import { topMatches, topMatchesInput } from './top_matches.ts';
 import { explainFit, explainFitInput } from './explain_fit.ts';
 import { tailorResumeTool, tailorResumeInput } from './tailor_resume.ts';
 import { draftApplication, draftApplicationInput } from './draft_application.ts';
@@ -68,6 +69,12 @@ export const toolDefinitions: ToolDef[] = [
     description: 'Score a job against a stored resume. Returns numeric score + structured strengths/gaps.',
     inputSchema: zodToJsonSchema(scoreFitInput),
     run: (i, c) => scoreFit(scoreFitInput.parse(i), c)
+  },
+  {
+    name: 'top_matches',
+    description: 'Best-fit jobs for a stored resume, from cached fit scores. Optionally scores recent unscored jobs first (one model call each).',
+    inputSchema: zodToJsonSchema(topMatchesInput),
+    run: (i, c) => topMatches(topMatchesInput.parse(i), c)
   },
   {
     name: 'explain_fit',
