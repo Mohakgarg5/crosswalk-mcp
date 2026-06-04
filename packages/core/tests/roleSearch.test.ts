@@ -59,14 +59,44 @@ describe('searchRoles — role-based discovery across companies', () => {
     expect(new URL(urls[0]).searchParams.get('category')).toBe('Product Management');
   });
 
-  it('with a derived category, keeps category jobs whose titles do not contain the query (title matches first)', async () => {
+  it('drops category jobs whose titles share no tokens with the query (Muse miscategorization)', async () => {
+    const db = openDb(':memory:');
+    const noisy = {
+      total: 3, page_count: 1,
+      results: [
+        {
+          id: 301, name: 'Assistant Manager - Shoppes on Maine', // retail, miscategorized by Muse
+          refs: { landing_page: 'https://www.themuse.com/jobs/gapinc/am' },
+          locations: [{ name: 'Maine' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'Gap Inc', short_name: 'gapinc' }
+        },
+        {
+          id: 302, name: 'Senior Scrum Master', // also miscategorized
+          refs: { landing_page: 'https://www.themuse.com/jobs/x/ssm' },
+          locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'X', short_name: 'x' }
+        },
+        {
+          id: 303, name: 'Group Product Manager, Payments',
+          refs: { landing_page: 'https://www.themuse.com/jobs/stripe/gpm' },
+          locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'Stripe', short_name: 'stripe' }
+        }
+      ]
+    };
+    const f = (async () => ({ ok: true, json: async () => noisy })) as unknown as typeof fetch;
+    const r = await searchRoles(db, { query: 'product manager' }, f);
+    expect(r.jobs.map(j => j.title)).toEqual(['Group Product Manager, Payments']);
+  });
+
+  it('keeps titles containing all query tokens in any order or phrasing', async () => {
     const db = openDb(':memory:');
     const pmFixture = {
       total: 2, page_count: 1,
       results: [
         {
-          id: 201, name: 'Director, Product', publication_date: '2026-05-25T00:00:00Z',
-          refs: { landing_page: 'https://www.themuse.com/jobs/acme/dp' },
+          id: 201, name: 'Product Operations Manager', publication_date: '2026-05-25T00:00:00Z',
+          refs: { landing_page: 'https://www.themuse.com/jobs/acme/pom' },
           locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
           company: { name: 'Acme', short_name: 'acme' }
         },
@@ -81,8 +111,8 @@ describe('searchRoles — role-based discovery across companies', () => {
     const f = (async () => ({ ok: true, json: async () => pmFixture })) as unknown as typeof fetch;
     const r = await searchRoles(db, { query: 'product manager' }, f);
     expect(r.jobs.length).toBe(2);
-    expect(r.jobs[0].title).toBe('Senior Product Manager'); // title match ranked first
-    expect(r.jobs[1].title).toBe('Director, Product');
+    expect(r.jobs[0].title).toBe('Senior Product Manager'); // exact-phrase match ranked first
+    expect(r.jobs[1].title).toBe('Product Operations Manager'); // token match kept, ranked after
   });
 
   it('an explicit category wins over the derived one and disables title narrowing', async () => {

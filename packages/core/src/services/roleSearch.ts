@@ -129,15 +129,20 @@ export async function searchRoles(
 
   const q = opts.query?.toLowerCase().trim();
   const valid = raw.filter(r => r && typeof r.name === 'string');
-  // When the category is doing the filtering (explicit or derived), keep the
-  // whole category and just rank title matches first — "Director, Product"
-  // belongs in a "product manager" search. Without a category, the title
-  // filter is all we have.
-  const titleMatch = (r: MuseJob) => !q || r.name.toLowerCase().includes(q);
-  const jobs = (category
-    ? [...valid].sort((a, b) => Number(titleMatch(b)) - Number(titleMatch(a)))
-    : valid.filter(titleMatch)
-  ).map(normalize);
+  // Muse categories are noisy ("Product Management" contains retail GMs and
+  // scrum masters), so a query always narrows: every query token must appear
+  // in the title. Exact-phrase matches rank first. An EXPLICIT category from
+  // the caller is trusted as-is — no title narrowing.
+  const tokens = (q ?? '').split(/[^a-z0-9]+/).filter(Boolean);
+  const phraseMatch = (r: MuseJob) => !q || r.name.toLowerCase().includes(q);
+  const tokenMatch = (r: MuseJob) => {
+    const t = r.name.toLowerCase();
+    return tokens.every(tok => t.includes(tok));
+  };
+  const narrowed = opts.category || !q ? valid : valid.filter(tokenMatch);
+  const jobs = [...narrowed]
+    .sort((a, b) => Number(phraseMatch(b)) - Number(phraseMatch(a)))
+    .map(normalize);
 
   // Persist as regular jobs so draft/auto-apply/pipeline work on them.
   for (const j of jobs) {

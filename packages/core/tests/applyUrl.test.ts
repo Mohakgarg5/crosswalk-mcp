@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { extractApplyLink, resolveExternalApplyUrl } from '../src/services/applyUrl.ts';
+import { extractApplyLink, resolveExternalApplyUrl, resolveApplyTarget } from '../src/services/applyUrl.ts';
 
 describe('services/applyUrl — external apply-link resolution for aggregator listings', () => {
   it('extracts an escaped applyLink from Muse Next.js page data', () => {
@@ -27,5 +27,12 @@ describe('services/applyUrl — external apply-link resolution for aggregator li
   it('resolveExternalApplyUrl returns undefined on fetch failure', async () => {
     const f = (async () => { throw new Error('network'); }) as unknown as typeof fetch;
     expect(await resolveExternalApplyUrl('https://www.themuse.com/jobs/acme/pm', f)).toBeUndefined();
+  });
+
+  it('resolveApplyTarget reports gone for 404/410 listings (expired jobs)', async () => {
+    const f404 = (async () => ({ ok: false, status: 404 })) as unknown as typeof fetch;
+    expect(await resolveApplyTarget('https://www.themuse.com/jobs/gapinc/dead', f404)).toEqual({ gone: true });
+    const f410 = (async () => ({ ok: false, status: 410 })) as unknown as typeof fetch;
+    expect(await resolveApplyTarget('https://www.themuse.com/jobs/gapinc/dead', f410)).toEqual({ gone: true });
   });
 });

@@ -16,7 +16,7 @@ import { createNotification } from '../store/notification.ts';
 import { imapConfigFromAccount, liveImapFetcher } from '../services/email/imapReader.ts';
 import { makeResolveVerification } from '../services/email/resolveVerification.ts';
 import type { ResolveVerification } from '../services/browser/types.ts';
-import { resolveExternalApplyUrl } from '../services/applyUrl.ts';
+import { resolveApplyTarget } from '../services/applyUrl.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string(),
@@ -127,8 +127,12 @@ export async function applyApplication(
   // the listing page is how fake "submitted" statuses happen.
   let applyUrl = app.deepLink;
   if (detectedAts === 'themuse' || /(^|\.)themuse\.com$/.test(safeHost(app.deepLink))) {
-    const external = await resolveExternalApplyUrl(app.deepLink, ctx.fetchImpl);
-    if (!external) {
+    const target = await resolveApplyTarget(app.deepLink, ctx.fetchImpl);
+    if (target.gone) {
+      addEventForApplication(ctx.db, app.id, 'listing_expired', { url: app.deepLink });
+      throw new Error('This listing has expired or been removed — the job is no longer accepting applications through this link.');
+    }
+    if (!target.url) {
       addEventForApplication(ctx.db, app.id, 'apply_url_unresolved', { url: app.deepLink });
       createNotification(ctx.db, {
         kind: 'manual_apply_needed',
@@ -138,8 +142,8 @@ export async function applyApplication(
       });
       throw new Error(`This listing has no application form — apply on the company site: ${app.deepLink}`);
     }
-    addEventForApplication(ctx.db, app.id, 'apply_url_resolved', { from: app.deepLink, to: external });
-    applyUrl = external;
+    addEventForApplication(ctx.db, app.id, 'apply_url_resolved', { from: app.deepLink, to: target.url });
+    applyUrl = target.url;
     detectedAts = null; // the ATS behind the redirect is unknown
   }
 
@@ -251,6 +255,18 @@ export async function applyApplication(
       ...(resolveVerification ? { resolveVerification } : {})
     }
   );
+
+  // Nothing filled at all usually means there was no reachable form — e.g. an
+  // account-gated ATS (Workday sign-in wall). Don't leave the user guessing.
+  if (result.filled.length === 0) {
+    addEventForApplication(ctx.db, app.id, 'nothing_filled', { url: result.resolvedUrl });
+    createNotification(ctx.db, {
+      kind: 'manual_apply_needed',
+      title: 'Form needs you — likely an account sign-in',
+      body: `No fields could be filled on this page (often a Workday-style account wall). Finish it by hand: ${result.resolvedUrl || applyUrl}`,
+      refId: app.id
+    });
+  }
 
   // A submit button gets clicked to TRIGGER the verification email (it advances
   // to the code/link screen), so submitClicked can be true while the gate is
