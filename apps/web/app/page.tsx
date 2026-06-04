@@ -39,12 +39,22 @@ export default function Dashboard() {
   const [chips, setChips] = useState<string[]>(['product manager']);
   const [draft, setDraft] = useState('');
   const [tab, setTab] = useState<string>('all');
+  const [setUp, setSetUp] = useState<boolean | null>(null); // profile + résumé exist
 
   useEffect(() => {
     getSettings().then(setSettings).catch(() => {});
     runTool<{ items?: Item[] }>('list_pipeline', {})
       .then(r => setItems(r.items ?? []))
       .catch(() => setItems([]));
+    Promise.all([
+      fetch('/api/profile').then(r => r.json()),
+      runTool<{ resumes?: unknown[] }>('list_resumes', {})
+    ])
+      .then(([p, r]) => {
+        const prof = (p?.profile ?? {}) as Record<string, unknown>;
+        setSetUp(Boolean(prof.name || prof.email) && (r.resumes?.length ?? 0) > 0);
+      })
+      .catch(() => setSetUp(false));
   }, []);
 
   const counts = useMemo(() => {
@@ -134,7 +144,7 @@ export default function Dashboard() {
           <h2 className="font-display text-[19px] font-semibold">Top matches</h2>
           <Link href="/jobs" className="text-[13px] font-medium text-[var(--accent)] hover:underline">Browse all jobs →</Link>
         </div>
-        <EmptyMatches hasKey={!!settings?.hasKey} />
+        <EmptyMatches hasKey={!!settings?.hasKey} setUp={!!setUp} />
       </section>
 
       {/* All applications */}
@@ -201,9 +211,9 @@ function Stat({ label, value, hint, tone }: { label: string; value: string; hint
   );
 }
 
-/* Illustrative match cards over an empty pipeline — shows the shape of what
-   Crosswalk surfaces once a profile + résumé are set up, with a clear CTA. */
-function EmptyMatches({ hasKey }: { hasKey: boolean }) {
+/* Illustrative match cards over an empty pipeline. Before setup the CTA sends
+   you to onboarding; once profile + résumé exist it points at job search. */
+function EmptyMatches({ hasKey, setUp }: { hasKey: boolean; setUp: boolean }) {
   const samples = [
     { role: 'Senior Product Manager', loc: 'Remote', match: 73, tags: ['product', 'b2b saas'] },
     { role: 'AI Product Manager', loc: 'New York, NY', match: 71, tags: ['llm', '0→1'] },
@@ -229,13 +239,27 @@ function EmptyMatches({ hasKey }: { hasKey: boolean }) {
       {/* Soft overlay CTA — the cards above are a preview of the real thing */}
       <div className="absolute inset-0 grid place-items-center rounded-2xl bg-[var(--bg)]/55 backdrop-blur-[2px]">
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-6 py-5 text-center shadow-[var(--shadow-lg)]">
-          <p className="font-display text-[17px] font-semibold">Set up to see your real matches</p>
-          <p className="mx-auto mt-1 max-w-xs text-[13px] text-[var(--muted)]">
-            Add a profile and résumé{hasKey ? '' : ', plus an API key,'} and Crosswalk scores live roles for you.
-          </p>
-          <div className="mt-4 flex items-center justify-center gap-2">
-            <Link href="/onboarding"><Button size="sm">Get set up — 2 min</Button></Link>
-          </div>
+          {setUp ? (
+            <>
+              <p className="font-display text-[17px] font-semibold">You’re all set — find roles to score</p>
+              <p className="mx-auto mt-1 max-w-xs text-[13px] text-[var(--muted)]">
+                Search jobs and Crosswalk rates each one against your résumé. Matches show up here.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <Link href="/jobs"><Button size="sm">Search jobs →</Button></Link>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-display text-[17px] font-semibold">Set up to see your real matches</p>
+              <p className="mx-auto mt-1 max-w-xs text-[13px] text-[var(--muted)]">
+                Add a profile and résumé{hasKey ? '' : ', plus an API key,'} and Crosswalk scores live roles for you.
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <Link href="/onboarding"><Button size="sm">Get set up — 2 min</Button></Link>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
