@@ -3,6 +3,12 @@
 /** Registered by ApiKeyDialog (mounted in AppShell). Resolves true once a key is saved. */
 let requestApiKey: (() => Promise<boolean>) | null = null;
 
+/**
+ * Register the handler runTool awaits when a tool fails with NO_API_KEY.
+ * The handler must coalesce concurrent callers — return the same pending
+ * promise while a prompt is open — or each waiting call opens its own prompt.
+ * Pass null to deregister (dialog unmount).
+ */
 export function onApiKeyNeeded(fn: (() => Promise<boolean>) | null) {
   requestApiKey = fn;
 }
