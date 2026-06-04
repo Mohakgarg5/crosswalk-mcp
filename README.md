@@ -16,7 +16,9 @@ Local-first · your data never leaves your machine · bring your own AI.
 - [Two ways to use it](#two-ways-to-use-it)
 - [Quick setup (3 steps)](#quick-setup-3-steps)
 - [Add your AI key](#add-your-ai-key)
+- [Connect your email inbox (Gmail app password)](#connect-your-email-inbox-gmail-app-password)
 - [How to use the app](#how-to-use-the-app)
+- [What it can and can't auto-apply to](#what-it-can-and-cant-auto-apply-to)
 - [Use it inside Claude or other AI tools](#use-it-inside-claude-or-other-ai-tools)
 - [Run it automatically (hands-off)](#run-it-automatically-hands-off)
 - [Try it safely first](#try-it-safely-first)
@@ -97,6 +99,29 @@ The app uses an AI ("the brain") to write your résumés and answers. Here's how
 3. In the app, click **Settings**, paste it in the **API key** box, and click **Save**.
 
 > 💡 You pay Anthropic directly — usually a few cents per résumé. **Finding and tracking jobs works without a key**; you only need it for writing résumés and answers.
+>
+> Don't want to set it up ahead of time? Fine — the first time an AI action needs a key, the app asks for it right there in a popup, saves it, and continues.
+
+---
+
+## Connect your email inbox (Gmail app password)
+
+_Optional, but it lets the agent finish applications that email you a verification code or link._ There is **no "Sign in with Google" button** — Crosswalk reads your inbox locally over IMAP using an **app password**, which is a special 16-character password that only works for this one purpose and can be revoked anytime.
+
+**Gmail — step by step:**
+
+1. App passwords require 2-Step Verification. If you don't have it: [myaccount.google.com/security](https://myaccount.google.com/security) → **2-Step Verification** → turn it on.
+2. Go to **[myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)** (sign in if asked).
+3. Under "App name" type `Crosswalk`, click **Create**, and **copy the 16-character password** it shows (spaces don't matter).
+4. In the app: **Settings → Email inbox** → provider **gmail** → enter your Gmail address and paste the app password → **Test connection** → **Save**.
+
+**iCloud Mail:** [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → **App-Specific Passwords** → generate one, then same as step 4 with provider **icloud**.
+
+**Outlook/Hotmail:** works with your normal password in many cases; if not, create an app password at [account.microsoft.com/security](https://account.microsoft.com/security).
+
+> 💡 **Privacy tip:** put a tagged alias like `you+apply@gmail.com` on your applications (set it in your Profile). It still lands in your inbox, Crosswalk only reads the verification mail, and your personal address stays off job-site mailing lists.
+>
+> 🔒 Read-only: Crosswalk never sends mail, never marks anything read, and the password never leaves `~/.crosswalk` on your machine.
 
 ---
 
@@ -109,8 +134,24 @@ Use the left-hand menu, roughly in this order:
 3. **Settings → Answer bank** — click **"Load common defaults"** (safe answers for standard questions like work authorization and the optional EEO/diversity ones), then add your own, e.g. `salary → $130,000`.
 4. **Jobs** — type a role (like `product manager`) and click **Search jobs**. You get real jobs from many companies.
 5. **Apply** — click **draft →** on a job to review it first, or **Auto-apply** at the top of the results to handle them all.
-6. **Settings → Email inbox** _(optional)_ — paste an **app password** for your email so the agent can read verification codes/links and finish those applications on its own. Leave it blank to skip — you'll just complete those few by hand. (Gmail/iCloud need an _app password_, not your login password — make one in your account's security settings.)
+6. **Settings → Email inbox** _(optional)_ — paste an **app password** for your email so the agent can read verification codes/links and finish those applications on its own. Step-by-step: [Connect your email inbox](#connect-your-email-inbox-gmail-app-password). Leave it blank to skip — you'll just complete those few by hand.
 7. **Pipeline / Alerts / Inbox** — track every application, see new-match alerts, and route recruiter emails to the right application.
+
+---
+
+## What it can and can't auto-apply to
+
+Honesty section. An application is only marked **submitted** when there's real evidence (the page navigated to a confirmation, showed a "thank you", or passed an email-verification gate) — a mere button click is never trusted. When something can't be finished automatically, you get an **alert** with the link to finish it yourself instead of a fake green checkmark.
+
+| Situation | What happens |
+|---|---|
+| Direct ATS forms (Greenhouse, Lever, Ashby, …) | ✅ Fills and submits end-to-end, including multi-page wizards and emailed verification codes. |
+| Job-board listings (The Muse) | It resolves the **"Apply on company site"** link and fills the real form behind it. |
+| Account-walled sites (Workday & friends) | ⚠️ It can't create accounts for you. You get a **"Form needs you"** alert with the direct link — finish it by hand. |
+| Expired/removed listings | ⚠️ Told straight: _"This listing has expired."_ Job boards keep dead listings around; it's them, not you. |
+| Submit clicked but nothing confirmed | ⚠️ Stays in your pipeline as a draft with a **"Submission not confirmed"** alert — check it manually. |
+
+**The real proof an application landed is the confirmation email from the company.** If you connected your inbox, watch for it; no email after an hour usually means it needs your hand.
 
 ---
 
