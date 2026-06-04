@@ -16,6 +16,7 @@ import { createNotification } from '../store/notification.ts';
 import { imapConfigFromAccount, liveImapFetcher } from '../services/email/imapReader.ts';
 import { makeResolveVerification } from '../services/email/resolveVerification.ts';
 import type { ResolveVerification } from '../services/browser/types.ts';
+import { resolveExternalApplyUrl } from '../services/applyUrl.ts';
 
 export const applyApplicationInput = z.object({
   applicationId: z.string(),
@@ -55,9 +56,13 @@ function asString(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
 }
 
+function safeHost(url: string): string {
+  try { return new URL(url).host; } catch { return ''; }
+}
+
 export async function applyApplication(
   input: z.infer<typeof applyApplicationInput>,
-  ctx: { db: Db; browser: Browser; sampling: SamplingClient }
+  ctx: { db: Db; browser: Browser; sampling: SamplingClient; fetchImpl?: typeof fetch }
 ): Promise<ApplyApplicationResult> {
   const app = getApplication(ctx.db, input.applicationId);
   if (!app) throw new Error(`unknown application: ${input.applicationId}`);
@@ -115,11 +120,32 @@ export async function applyApplication(
 
   const job = getJob(ctx.db, app.jobId);
   const company = job ? getCompany(ctx.db, job.companyId) : null;
-  const detectedAts = company ? company.ats : null;
+  let detectedAts = company ? company.ats : null;
+
+  // Aggregator listings (The Muse) carry no application form — resolve the
+  // "Apply on company site" target and fill THAT, or refuse loudly. Filling
+  // the listing page is how fake "submitted" statuses happen.
+  let applyUrl = app.deepLink;
+  if (detectedAts === 'themuse' || /(^|\.)themuse\.com$/.test(safeHost(app.deepLink))) {
+    const external = await resolveExternalApplyUrl(app.deepLink, ctx.fetchImpl);
+    if (!external) {
+      addEventForApplication(ctx.db, app.id, 'apply_url_unresolved', { url: app.deepLink });
+      createNotification(ctx.db, {
+        kind: 'manual_apply_needed',
+        title: 'Apply on the company site',
+        body: `Couldn't find the application form behind this listing. Open it and apply manually: ${app.deepLink}`,
+        refId: app.id
+      });
+      throw new Error(`This listing has no application form — apply on the company site: ${app.deepLink}`);
+    }
+    addEventForApplication(ctx.db, app.id, 'apply_url_resolved', { from: app.deepLink, to: external });
+    applyUrl = external;
+    detectedAts = null; // the ATS behind the redirect is unknown
+  }
 
   let preview: Awaited<ReturnType<Browser['preview']>> | null = null;
   try {
-    preview = await ctx.browser.preview(app.deepLink);
+    preview = await ctx.browser.preview(applyUrl);
   } catch {
     preview = null;
   }
@@ -216,7 +242,7 @@ export async function applyApplication(
   }
 
   const result = await ctx.browser.fillForm(
-    app.deepLink,
+    applyUrl,
     fields,
     {
       ...(detectedAts ? { ats: detectedAts } : {}),
@@ -230,7 +256,27 @@ export async function applyApplication(
   // to the code/link screen), so submitClicked can be true while the gate is
   // still unresolved. That is not a real submission — don't mark it submitted.
   const verificationPending = Boolean(result.verificationRequired) && !result.verificationResolved;
-  const submitted = Boolean(result.submitClicked) && !verificationPending;
+  // A click alone is not a submission — require evidence: the page navigated
+  // somewhere new, a confirmation page appeared, or a verification gate was
+  // genuinely resolved. A false "submitted" is the worst failure mode here.
+  const navigated = Boolean(result.postSubmitUrl) && result.postSubmitUrl !== result.resolvedUrl;
+  const CONFIRMATION_RE = /thank|confirm|received|success|submitted|application complete/i;
+  const confirmed = CONFIRMATION_RE.test(result.postSubmitTitle ?? '') || CONFIRMATION_RE.test(result.postSubmitUrl ?? '');
+  const evidence = navigated || confirmed || Boolean(result.verificationResolved);
+  const submitted = Boolean(result.submitClicked) && !verificationPending && evidence;
+  if (Boolean(result.submitClicked) && !verificationPending && !evidence) {
+    addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
+      url: result.resolvedUrl,
+      postSubmitUrl: result.postSubmitUrl ?? null,
+      postSubmitTitle: result.postSubmitTitle ?? null
+    });
+    createNotification(ctx.db, {
+      kind: 'submit_unconfirmed',
+      title: 'Submission not confirmed',
+      body: `A submit button was clicked but nothing confirmed the application went through. Check it yourself: ${applyUrl}`,
+      refId: app.id
+    });
+  }
   if (submitted) {
     addEventForApplication(ctx.db, app.id, 'browser_submitted', {
       postSubmitUrl: result.postSubmitUrl ?? null,

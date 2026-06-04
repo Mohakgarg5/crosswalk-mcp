@@ -420,4 +420,92 @@ describe('tools/apply_application', () => {
     const events = listEventsForApplication(db, 'app1');
     expect(events.some(e => e.kind === 'email_verified')).toBe(true);
   });
+
+  it('does NOT mark submitted when the click produced no evidence (same URL, no confirmation)', async () => {
+    // The GE Vernova bug: a random submit-shaped button on a listing page got
+    // clicked, page didn't navigate, nothing confirmed — yet status flipped.
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (url: string) => ({
+        resolvedUrl: url, title: 'Some Job at Acme | The Muse',
+        screenshotPng: Buffer.from([]),
+        filled: [], skipped: [],
+        submitClicked: true,
+        postSubmitUrl: url,                       // same page — no navigation
+        postSubmitTitle: 'Some Job at Acme | The Muse'
+      }))
+    });
+    const sampling = makeNoopSampling();
+    const res = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+
+    expect(res.submitted).toBe(false);
+    const events = listEventsForApplication(db, 'app1');
+    expect(events.some(e => e.kind === 'browser_submitted')).toBe(false);
+    expect(events.some(e => e.kind === 'submit_unconfirmed')).toBe(true);
+    const notifs = listNotifications(db);
+    expect(notifs.some(n => n.kind === 'submit_unconfirmed')).toBe(true);
+  });
+
+  it('marks submitted when the page did not navigate but shows a confirmation title', async () => {
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (url: string) => ({
+        resolvedUrl: url, title: 'Apply: PM',
+        screenshotPng: Buffer.from([]),
+        filled: ['email'], skipped: [],
+        submitClicked: true,
+        postSubmitUrl: url,
+        postSubmitTitle: 'Thank you for applying!'
+      }))
+    });
+    const sampling = makeNoopSampling();
+    const res = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+    expect(res.submitted).toBe(true);
+  });
+
+  it('resolves the external apply URL for aggregator (themuse) listings before filling', async () => {
+    upsertCompany(db, { id: 'themuse:acme', name: 'Acme', ats: 'themuse', atsOrgSlug: 'acme' });
+    upsertJobs(db, [{ id: 'themuse:9', companyId: 'themuse:acme', title: 'PM', url: 'https://www.themuse.com/jobs/acme/pm', raw: {} }]);
+    createApplication(db, {
+      id: 'app2', jobId: 'themuse:9', resumeId: 'r1',
+      tailoredResumeMd: '# Jane', coverLetterMd: '', answerPack: {},
+      deepLink: 'https://www.themuse.com/jobs/acme/pm'
+    });
+    const seenUrls: string[] = [];
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (url: string) => {
+        seenUrls.push(url);
+        return {
+          resolvedUrl: url, title: 'Apply', screenshotPng: Buffer.from([]),
+          filled: [], skipped: []
+        };
+      })
+    });
+    const fetchImpl = (async () => ({
+      ok: true,
+      text: async () => '\\"applyLink\\":\\"https://boards.greenhouse.io/acme/jobs/9\\"'
+    })) as unknown as typeof fetch;
+    const sampling = makeNoopSampling();
+    await applyApplication({ applicationId: 'app2' }, { db, browser, sampling, fetchImpl });
+
+    expect(seenUrls).toEqual(['https://boards.greenhouse.io/acme/jobs/9']);
+    const events = listEventsForApplication(db, 'app2');
+    expect(events.some(e => e.kind === 'apply_url_resolved')).toBe(true);
+  });
+
+  it('refuses to fill an aggregator listing when the external apply URL cannot be resolved', async () => {
+    upsertCompany(db, { id: 'themuse:acme', name: 'Acme', ats: 'themuse', atsOrgSlug: 'acme' });
+    upsertJobs(db, [{ id: 'themuse:9', companyId: 'themuse:acme', title: 'PM', url: 'https://www.themuse.com/jobs/acme/pm', raw: {} }]);
+    createApplication(db, {
+      id: 'app2', jobId: 'themuse:9', resumeId: 'r1',
+      tailoredResumeMd: '# Jane', coverLetterMd: '', answerPack: {},
+      deepLink: 'https://www.themuse.com/jobs/acme/pm'
+    });
+    const browser = makeDefaultBrowser();
+    const fetchImpl = (async () => ({ ok: true, text: async () => 'no link in here' })) as unknown as typeof fetch;
+    const sampling = makeNoopSampling();
+
+    await expect(
+      applyApplication({ applicationId: 'app2' }, { db, browser, sampling, fetchImpl })
+    ).rejects.toThrow(/apply on the company site/i);
+    expect(browser.fillForm).not.toHaveBeenCalled();
+  });
 });
