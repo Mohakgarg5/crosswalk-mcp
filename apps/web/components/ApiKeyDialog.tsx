@@ -25,7 +25,10 @@ export default function ApiKeyDialog() {
       }
       return pendingRef.current;
     });
-    return () => onApiKeyNeeded(null);
+    return () => {
+      settle(false); // resolve any waiting runTool callers as "cancelled"
+      onApiKeyNeeded(null);
+    };
   }, []);
 
   function settle(saved: boolean) {
@@ -58,9 +61,9 @@ export default function ApiKeyDialog() {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4">
-      <div className="cw-rise w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[var(--shadow-lg)]">
+      <div className="cw-rise w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[var(--shadow-lg)]" role="dialog" aria-modal="true" aria-labelledby="api-key-dialog-title">
         <div className="text-[12px] font-medium uppercase tracking-[0.14em] text-[var(--accent)]">AI BRAIN</div>
-        <h2 className="font-display mt-2 text-[22px] font-semibold leading-tight">Add your Anthropic API key</h2>
+        <h2 id="api-key-dialog-title" className="font-display mt-2 text-[22px] font-semibold leading-tight">Add your Anthropic API key</h2>
         <p className="mt-2 text-[13px] text-[var(--muted)]">
           This action needs AI. Get a key at <span className="text-[var(--accent)]">console.anthropic.com</span> — it's
           stored only in <code className="text-[var(--accent)]">~/.crosswalk</code> and never leaves your machine.
