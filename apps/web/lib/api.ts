@@ -1,12 +1,29 @@
 // Client-side helpers that call the in-process engine via API routes.
 
-export async function runTool<T = unknown>(name: string, input?: unknown): Promise<T> {
+/** Registered by ApiKeyDialog (mounted in AppShell). Resolves true once a key is saved. */
+let requestApiKey: (() => Promise<boolean>) | null = null;
+
+export function onApiKeyNeeded(fn: (() => Promise<boolean>) | null) {
+  requestApiKey = fn;
+}
+
+type ToolResponse = { ok: boolean; result?: unknown; error?: string; code?: string };
+
+async function callTool(name: string, input?: unknown): Promise<ToolResponse> {
   const res = await fetch('/api/tool', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ name, input })
   });
-  const data = await res.json();
+  return res.json();
+}
+
+export async function runTool<T = unknown>(name: string, input?: unknown): Promise<T> {
+  let data = await callTool(name, input);
+  // Missing key: ask for one in place, then retry the call exactly once.
+  if (!data.ok && data.code === 'NO_API_KEY' && requestApiKey) {
+    if (await requestApiKey()) data = await callTool(name, input);
+  }
   if (!data.ok) throw new Error(data.error || `tool ${name} failed`);
   return data.result as T;
 }
