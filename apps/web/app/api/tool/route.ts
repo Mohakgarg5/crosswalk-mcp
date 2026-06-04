@@ -11,9 +11,7 @@ export async function POST(req: Request) {
     const result = await runTool(name, input);
     return NextResponse.json({ ok: true, result });
   } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: (e as Error).message, code: (e as { code?: string }).code },
-      { status: 400 }
-    );
+    const err = e as Error & { code?: string };
+    return NextResponse.json({ ok: false, error: err.message, code: err.code }, { status: 400 });
   }
 }
