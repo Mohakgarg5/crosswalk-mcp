@@ -66,7 +66,9 @@ async function makeSampling(d: Db) {
   if (!apiKey) {
     const stub = {
       createMessage: async () => {
-        throw new Error('No Anthropic API key set. Add one in Settings to use AI features.');
+        const err = new Error('No Anthropic API key set. Add one to use AI features.');
+        (err as Error & { code?: string }).code = 'NO_API_KEY';
+        throw err;
       }
     };
     return new SamplingClient(stub as unknown as SdkServer);
