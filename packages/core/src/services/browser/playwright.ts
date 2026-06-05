@@ -350,6 +350,18 @@ const APPLY_SELECTORS: string[] = [
 ];
 
 /**
+ * Workday interstitial: clicking "Apply" opens a chooser (Autofill with
+ * Resume / Apply Manually / Use My Last Application). Pick manual — the
+ * other two depend on Workday's parser or a previous application.
+ */
+const WORKDAY_CHOOSER_SELECTORS: string[] = [
+  'a[data-automation-id="applyManually"]',
+  'button[data-automation-id="applyManually"]',
+  'a:has-text("Apply Manually")',
+  'button:has-text("Apply Manually")'
+];
+
+/**
  * If the landed page hides the form behind an Apply button (job-description
  * page), click it so the form is on screen for fillForm/preview. Always tries
  * — `clickFirst` is a no-op if no selector matches, and clicking a redundant
@@ -362,6 +374,10 @@ async function advanceToForm(page: PlaywrightPage): Promise<void> {
     if (clicked) {
       // Let the form render — Greenhouse renders client-side, Lever navigates.
       await new Promise(resolve => setTimeout(resolve, 3000));
+      // Workday's Apply opens a chooser instead of the form — take the
+      // manual-apply path when it's there (no-op everywhere else).
+      const chose = await clickFirst(page, WORKDAY_CHOOSER_SELECTORS);
+      if (chose) await new Promise(resolve => setTimeout(resolve, 3000));
     }
     // Poll up to 8s for an actual form to appear in any frame. Headed mode
     // renders visually (slower) and react-mounted iframes can take a second

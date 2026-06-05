@@ -225,6 +225,46 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.skipped).toEqual(['text_by_name:unknown_field']);
   });
 
+  it('fillForm clicks through Workday\'s two-step Apply (Apply → Apply Manually) before filling', async () => {
+    const clicks: string[] = [];
+    let applyClicked = false;
+    const fakePage = {
+      goto: vi.fn(),
+      title: vi.fn().mockResolvedValue('Workday Job'),
+      url: vi.fn().mockReturnValue('https://acme.wd1.myworkdayjobs.com/job/1'),
+      $: vi.fn(async (selector: string) => {
+        if (selector === 'button[data-automation-id="adventureButton"]') {
+          return { click: async () => { applyClicked = true; clicks.push(selector); } };
+        }
+        // The chooser only exists after the Apply click — like the real modal.
+        if (applyClicked && selector === 'a[data-automation-id="applyManually"]') {
+          return { click: async () => { clicks.push(selector); } };
+        }
+        if (selector === 'input[data-automation-id="email"]') {
+          return { fill: async () => {} };
+        }
+        return null;
+      }),
+      evaluate: vi.fn().mockResolvedValue(3), // form ready immediately
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([])),
+      close: vi.fn()
+    };
+    const fakeContext = { newPage: vi.fn().mockResolvedValue(fakePage), close: vi.fn() };
+    const fakeBrowser = { newContext: vi.fn().mockResolvedValue(fakeContext), close: vi.fn() };
+    const fakePw = { chromium: { launch: vi.fn().mockResolvedValue(fakeBrowser) } };
+
+    const browser = new LazyPlaywrightBrowser({ importPlaywright: async () => fakePw as never });
+    const result = await browser.fillForm('https://acme.wd1.myworkdayjobs.com/job/1', [
+      { kind: 'email', value: 'a@b.co' }
+    ], { ats: 'workday' });
+
+    expect(clicks).toEqual([
+      'button[data-automation-id="adventureButton"]',
+      'a[data-automation-id="applyManually"]'
+    ]);
+    expect(result.filled).toEqual(['email']);
+  }, 20000);
+
   it('fillForm rejects text_by_name fields with unsafe names without attempting selector lookups', async () => {
     const dollarMock = vi.fn(async () => null);
     const fakePage = {
