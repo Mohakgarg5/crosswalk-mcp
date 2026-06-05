@@ -807,22 +807,25 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
         }
       }
     }
-    // Fallback: type + Enter — works when the widget filters as you type
-    // (react-select, downshift). We only return true if Enter likely committed
-    // something (i.e. the value isn't ambiguously short).
+    // Fallback: type + select — works when the widget filters as you type
+    // (react-select, downshift, location autocompletes). Async suggestion
+    // lookups (Google Places) take >1s; pressing Enter too early commits
+    // nothing, and a blind Escape afterwards CLEARS whatever did commit.
     if (typeof input.type === 'function') {
-      await input.type(value, { delay: 20 });
+      await input.type(value, { delay: 30 });
     } else if (typeof input.fill === 'function') {
       await input.fill(value);
     }
-    await new Promise(r => setTimeout(r, 400));
-    if (typeof input.press === 'function') await input.press('Enter');
-    await new Promise(r => setTimeout(r, 200));
-    // Always close any lingering menu so the next field's enumeration isn't
-    // polluted by stale options.
+    await new Promise(r => setTimeout(r, 1500)); // let async suggestions load
     if (typeof input.press === 'function') {
-      try { await input.press('Escape'); } catch { /* ignore */ }
+      try { await input.press('ArrowDown'); } catch { /* no menu — Enter may still commit */ }
+      await new Promise(r => setTimeout(r, 200));
+      await input.press('Enter');
     }
+    await new Promise(r => setTimeout(r, 400));
+    // No Escape here: on a committed react-select it clears the selection,
+    // and option-menu pollution is already handled by the visible-container
+    // filter in the enumeration above.
     return true;
   } catch { return false; }
 }
