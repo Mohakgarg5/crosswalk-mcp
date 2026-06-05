@@ -53,7 +53,11 @@ export async function resolveChoiceFields(
     if (!chosenLabel) chosenLabel = await chooseFormOption({ sampling, label: name, options: labels, context });
     if (!chosenLabel) continue;
     const opt = opts.find(o => (o.label || o.value) === chosenLabel) ?? opts.find(o => (o.label || '').includes(chosenLabel!));
-    const value = opt?.value ?? chosenLabel;
+    // Boards like Ashby give every radio value="on" — a value-attr selector
+    // would always hit the first option. Pass the label through so the fill
+    // path can target the radio by its visible text instead.
+    const degenerateValues = opts.every(o => !o.value || o.value === 'on');
+    const value = degenerateValues ? (opt?.label ?? chosenLabel) : (opt?.value ?? chosenLabel);
     if (value) out.push({ kind: 'radio_by_name', name, value });
   }
 

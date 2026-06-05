@@ -231,6 +231,13 @@ export class LazyPlaywrightBrowser implements Browser {
         // enabled submit control first.
         await waitForSubmitEnabled(page, 45_000);
         submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
+        if (!submitClicked && submitClickErrors.length === 0) {
+          // No button found at all — boards that re-render after uploads
+          // (Ashby) detach it briefly. Give it one more patient attempt.
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          await waitForSubmitEnabled(page, 20_000);
+          submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
+        }
         if (!submitClicked && submitClickErrors.some(e => /Timeout/i.test(e))) {
           // Last resort: dispatch the click directly on the element — covers
           // sticky overlays (cookie banners) obscuring the hit point.
@@ -326,7 +333,11 @@ const SUBMIT_SELECTORS: string[] = [
   'button[id*="submit" i]',
   'button[name*="submit" i]',
   'button[data-automation-id*="submit" i]',
-  'button[data-automation-id="bottom-navigation-next-button"]'
+  'button[data-automation-id="bottom-navigation-next-button"]',
+  // Text fallbacks — some boards (Ashby re-renders) momentarily detach the
+  // typed button; the visible label is the stable thing.
+  'button:has-text("Submit application")',
+  'button:has-text("Submit")'
 ];
 
 /** Buttons that advance a multi-page wizard (tried before deciding a page is the last). */
@@ -845,12 +856,18 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
   if (field.kind === 'radio_by_name') {
     for (const selector of [
       `input[type="radio"][name="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`,
-      `input[type="radio"][id="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`
+      `input[type="radio"][id="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`,
+      // Label-text fallback: boards like Ashby give every radio value="on",
+      // so the option's visible label is the only way to target it. Clicking
+      // the label checks its radio.
+      `label:has(input[type="radio"][name="${escAttr(field.name)}"]):has-text("${escAttr(field.value)}")`
     ]) {
       const el = await page.$(selector);
       if (!el) continue;
       try {
         if (typeof el.check === 'function') { await el.check(); return true; }
+      } catch { /* labels can't check() — click below */ }
+      try {
         if (typeof el.click === 'function') { await el.click(); return true; }
       } catch { continue; }
     }

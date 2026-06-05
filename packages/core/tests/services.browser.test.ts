@@ -517,7 +517,7 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     expect(result.submitClicked).toBe(false);
     expect(result.postSubmitUrl).toBeUndefined();
     expect(result.postSubmitTitle).toBeUndefined();
-  });
+  }, 30000); // the no-button path includes a one-time 5s re-render retry
 
   it('fillForm runs resolveVerification when a code field is detected, types the code, and submits', async () => {
     const typed: Array<{ selector: string; value: string }> = [];
