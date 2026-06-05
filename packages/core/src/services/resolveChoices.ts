@@ -68,10 +68,34 @@ export async function resolveChoiceFields(
   // newsletter", "Send me job alerts") don't match and stay unticked.
   const STANDARD_CONSENT = /\b(acknowledge|i agree|i confirm|i consent|i accept|i have read|terms (of|and)|privacy policy|disclaimer|certify that|attest that|understand that|authorize|consent to|confirm i have)\b/i;
 
-  // checkboxes — tick when the bank gives an affirmative answer OR the label
-  // is a standard consent/acknowledgement.
+  // Single-select checkbox groups — Lever renders one-of-N questions
+  // ("Previously employed here?" No / Yes-Intern / Yes-FT) as checkboxes
+  // sharing a name. Treat them like radio groups: pick one option and click
+  // it by label (the radio fill path handles checkboxes too).
+  const cbGroups = new Map<string, Array<{ label?: string; value?: string }>>();
   for (const f of formFields) {
     if (f.type !== 'checkbox' || !f.name) continue;
+    const arr = cbGroups.get(f.name) ?? [];
+    arr.push({ label: f.label, value: f.value });
+    cbGroups.set(f.name, arr);
+  }
+  const groupedCheckboxNames = new Set([...cbGroups.entries()].filter(([, o]) => o.length >= 2).map(([n]) => n));
+  for (const [name, opts] of cbGroups) {
+    if (opts.length < 2) continue;
+    const labels = opts.map(o => o.label || '').filter(Boolean);
+    if (labels.length < 2) continue;
+    const bank = matchAnswer(db, name) ?? matchAnswer(db, labels.join(' '));
+    let chosenLabel = bank ? fuzzyPick(labels, bank) : null;
+    if (!chosenLabel) chosenLabel = await chooseFormOption({ sampling, label: name, options: labels, context });
+    if (!chosenLabel) continue;
+    out.push({ kind: 'radio_by_name', name, value: chosenLabel });
+  }
+
+  // checkboxes — tick when the bank gives an affirmative answer OR the label
+  // is a standard consent/acknowledgement. (Skip members of single-select
+  // groups handled above.)
+  for (const f of formFields) {
+    if (f.type !== 'checkbox' || !f.name || groupedCheckboxNames.has(f.name)) continue;
     const labelText = (f.label || f.name).toLowerCase();
     const bank = matchAnswer(db, f.label || f.name);
     const isStandardConsent = STANDARD_CONSENT.test(labelText);

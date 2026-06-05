@@ -245,8 +245,20 @@ export class LazyPlaywrightBrowser implements Browser {
         }
         if (submitClicked) {
           try {
-            // Best-effort wait for navigation to settle
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // Wait for the submission to land: ATS POSTs + redirects routinely
+            // take 5-10s. A flat 2s wait screenshotted the form mid-flight and
+            // made real submissions look unconfirmed.
+            const preUrl = page.url();
+            // Real pages expose waitForLoadState; test mocks don't — they get
+            // a single short wait instead of the patient poll.
+            const patient = typeof (page as { waitForLoadState?: unknown }).waitForLoadState === 'function';
+            for (let i = 0; i < (patient ? 30 : 1); i++) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+              const nowUrl = page.url();
+              if (nowUrl !== preUrl) break;
+              const title = await page.title().catch(() => '');
+              if (/thank|received|submitted|confirmation/i.test(title ?? '')) break;
+            }
             postSubmitUrl = page.url();
             postSubmitTitle = await page.title();
           } catch {
@@ -871,6 +883,34 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
         if (typeof el.click === 'function') { await el.click(); return true; }
       } catch { continue; }
     }
+    // Sibling-label fallback: Ashby renders <input id=…><label for=…> pairs
+    // (the label does NOT wrap the input), so CSS :has() can't reach them.
+    // Match the radio by its group name + associated label text in the DOM.
+    try {
+      const clicked = await page.evaluate(
+        ({ name, value }: { name: string; value: string }) => {
+          const doc = (globalThis as unknown as { document: any }).document;
+          // Ashby prefixes group names with a per-page-load instance id, so
+          // the name captured at preview time won't equal the one at fill
+          // time. The `__systemfield_…` (or generally `__…`) suffix is stable.
+          const suffix = name.includes('__') ? name.slice(name.indexOf('__')) : null;
+          // Checkboxes included: Lever single-select groups are checkboxes.
+          const radios = (Array.from(doc.querySelectorAll('input[type="radio"], input[type="checkbox"]')) as any[])
+            .filter((x: any) => x.name === name || (suffix && typeof x.name === 'string' && x.name.endsWith(suffix)));
+          for (const r of radios) {
+            const lbl = (r.id && doc.querySelector(`label[for="${r.id}"]`)) || r.closest('label');
+            const text = (lbl?.textContent || '').trim();
+            if (text && (text === value || text.includes(value) || value.includes(text))) {
+              (lbl ?? r).click();
+              return true;
+            }
+          }
+          return false;
+        },
+        { name: field.name, value: field.value }
+      );
+      if (clicked === true) return true;
+    } catch { /* cross-origin or mocked page — give up on this field */ }
     return false;
   }
 
