@@ -470,8 +470,8 @@ describe('services/browser/LazyPlaywrightBrowser', () => {
     let submitClicked = false;
     const fakePage = {
       goto: vi.fn(),
-      title: vi.fn().mockResolvedValueOnce('Apply').mockResolvedValueOnce('Thank You'),
-      url: vi.fn().mockReturnValueOnce('https://x').mockReturnValueOnce('https://x/thank-you'),
+      title: vi.fn().mockResolvedValueOnce('Apply').mockResolvedValue('Thank You'),
+      url: vi.fn().mockReturnValueOnce('https://x').mockReturnValueOnce('https://x').mockReturnValue('https://x/thank-you'),
       $: vi.fn(async (selector: string) => {
         if (selector === 'button[type="submit"]') {
           return { click: async () => { submitClicked = true; } };
