@@ -64,16 +64,23 @@ export const liveImapFetcher: ImapFetcher = async (cfg, sinceISO) => {
     // setting \Seen; this is defense-in-depth matching the read-only intent).
     const lock = await client.getMailboxLock('INBOX', { readOnly: true });
     try {
-      const since = new Date(sinceISO);
+      // IMAP SINCE is DAY-granular, and Gmail evaluates the day in Pacific
+      // Time — a "since 01:30 UTC June 5" search returns NOTHING until PT
+      // rolls over (07:00 UTC). Over-fetch by 36h and post-filter precisely
+      // on the parsed Date header.
+      const since = new Date(new Date(sinceISO).getTime() - 36 * 3600_000);
+      const cutoffMs = new Date(sinceISO).getTime() - 120_000; // 2min clock slack
       for await (const msg of client.fetch({ since }, { source: true })) {
         if (!msg.source) continue;
         const parsed = await simpleParser(msg.source);
+        const when = parsed.date ?? new Date();
+        if (when.getTime() < cutoffMs) continue;
         out.push({
           from: parsed.from?.text ?? '',
           subject: parsed.subject ?? '',
           text: parsed.text ?? '',
           html: typeof parsed.html === 'string' ? parsed.html : undefined,
-          date: (parsed.date ?? new Date()).toISOString()
+          date: when.toISOString()
         });
       }
     } finally {
