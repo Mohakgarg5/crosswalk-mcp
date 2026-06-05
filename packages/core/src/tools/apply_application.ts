@@ -272,7 +272,11 @@ export async function applyApplication(
       resolveVerification = makeResolveVerification({
         fetcher: liveImapFetcher,
         cfg: imapCfg,
-        timeoutMs: getConfig(ctx.db).verificationTimeoutMs
+        timeoutMs: getConfig(ctx.db).verificationTimeoutMs,
+        // Each poll opens a fresh IMAP session; 5s polling trips Gmail's
+        // connection throttling and every fetch silently fails. 20s is
+        // 12 polls per 4-minute window — plenty, and under the radar.
+        intervalMs: 20_000
       });
     }
   }
