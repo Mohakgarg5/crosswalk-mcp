@@ -4,9 +4,17 @@ import type { FormField, FillField } from './browser/types.ts';
 import { matchAnswer } from '../store/answerBank.ts';
 import { chooseFormOption } from './sampling/chooseOption.ts';
 
+const ALIAS_GROUPS: string[][] = [
+  ['united states', 'us', 'usa', 'u.s.', 'u.s.a.', 'united states of america'],
+  ['united kingdom', 'uk', 'great britain', 'gb'],
+  ['united arab emirates', 'uae']
+];
+
 function fuzzyPick(options: string[], answer: string): string | null {
   const a = answer.toLowerCase();
+  const grp = ALIAS_GROUPS.find(g => g.includes(a));
   return options.find(o => o.toLowerCase() === a)
+    ?? (grp ? options.find(o => grp.includes(o.toLowerCase())) ?? null : null)
     ?? options.find(o => o.toLowerCase().includes(a) || a.includes(o.toLowerCase()))
     ?? null;
 }

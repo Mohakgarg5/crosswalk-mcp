@@ -768,6 +768,14 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
       // read the AI partnership guidelines" still picks the bare "Yes" option.
       const yesIntent = /\byes\b/.test(wanted) && !/\bno\b/.test(wanted);
       const noIntent = /\bno\b/.test(wanted) && !/\byes\b/.test(wanted);
+      // Common-entity aliases: "United States" must match an option that just
+      // says "US" (Stripe), and vice versa.
+      const ALIASES: string[][] = [
+        ['united states', 'us', 'usa', 'u.s.', 'u.s.a.', 'united states of america'],
+        ['united kingdom', 'uk', 'great britain', 'gb'],
+        ['united arab emirates', 'uae']
+      ];
+      const aliasGroup = ALIASES.find(g => g.includes(wanted));
       const scored = matchInfo.map(o => {
         const t = o.text.toLowerCase();
         const wordBoundaryHit = new RegExp(`(^|\\W)${wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(\\W|$)`).test(t);
@@ -786,6 +794,7 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
         // string strictly starts-with the other.
         if (yesIntent && /^\s*yes\b/.test(t)) score = Math.max(score, 85);
         if (noIntent && /^\s*no\b/.test(t)) score = Math.max(score, 85);
+        if (aliasGroup && aliasGroup.includes(t)) score = Math.max(score, 95);
         return { ...o, score };
       });
       scored.sort((a, b) => b.score - a.score);
