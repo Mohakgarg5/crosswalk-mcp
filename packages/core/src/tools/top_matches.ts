@@ -14,6 +14,9 @@ export const topMatchesInput = z.object({
   scoreMissing: z.boolean().optional(),
   /** Cap on how many unscored jobs to score in this call. */
   maxToScore: z.number().int().positive().max(20).optional(),
+  /** Only score jobs posted within this many days (default 14) — applying to
+   * stale postings is mostly wasted effort. Jobs without a date are kept. */
+  sinceDays: z.number().int().positive().optional(),
   resumeId: z.string().optional()
 });
 
@@ -24,6 +27,7 @@ export type TopMatch = {
   location?: string;
   locationType?: string;
   url: string;
+  postedAt?: string;
   score: number;
   topStrengths: string[];
   topGaps: string[];
@@ -52,7 +56,7 @@ export async function topMatches(
   let scored = 0;
   if (input.scoreMissing) {
     const have = new Set(listCachedFits(ctx.db).filter(f => f.resumeId === resume.id).map(f => f.jobId));
-    const candidates = listJobs(ctx.db)
+    const candidates = listJobs(ctx.db, { sinceDays: input.sinceDays ?? 14 })
       .filter(j => !have.has(j.id))
       .slice(0, input.maxToScore ?? 6);
     for (const job of candidates) {
@@ -80,6 +84,7 @@ export async function topMatches(
         location: job.location,
         locationType: job.locationType,
         url: job.url,
+        postedAt: job.postedAt,
         score: f.score,
         topStrengths: f.topStrengths,
         topGaps: f.topGaps

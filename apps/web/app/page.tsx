@@ -13,7 +13,7 @@ type Item = {
 
 type Match = {
   jobId: string; title: string; company: string; location?: string;
-  url: string; score: number; topStrengths: string[];
+  url: string; postedAt?: string; score: number; topStrengths: string[];
 };
 
 const STATUS_TONE: Record<string, 'muted' | 'ok' | 'warn' | 'bad' | 'info'> = {
@@ -76,6 +76,22 @@ export default function Dashboard() {
       setMatches(r.matches);
     } catch (e) { setMatchErr((e as Error).message); }
     finally { setScoring(false); }
+  }
+
+  const [applying, setApplying] = useState(''); // jobId being applied to
+  async function applyTo(jobId: string) {
+    setApplying(jobId); setMatchErr('');
+    try {
+      const r = await fetch('/api/auto-apply', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobIds: [jobId] })
+      }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      const outcome = r.summary?.results?.[0];
+      if (outcome?.applicationId) { router.push(`/applications/${outcome.applicationId}`); return; }
+      throw new Error(outcome?.message || 'could not start the application');
+    } catch (e) { setMatchErr((e as Error).message); }
+    finally { setApplying(''); }
   }
 
   const counts = useMemo(() => {
@@ -177,14 +193,20 @@ export default function Dashboard() {
         {matches && matches.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {matches.map((m, i) => (
-              <a key={m.jobId} href={m.url} target="_blank" rel="noreferrer"
-                className="rounded-2xl border border-[var(--border)] p-4 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-0.5"
+              <div key={m.jobId}
+                className="flex flex-col rounded-2xl border border-[var(--border)] p-4 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-0.5"
                 style={{ background: TINTS[i % TINTS.length] }}>
                 <div className="flex items-start justify-between">
-                  <div className="text-[12px] text-[var(--muted)]">{m.location ?? '—'}</div>
+                  <div className="text-[12px] text-[var(--muted)]">
+                    {m.location ?? '—'}
+                    {m.postedAt && <span className="ml-1.5 text-[var(--faint)]">· {timeAgo(m.postedAt)}</span>}
+                  </div>
                   <MatchRing value={Math.round(m.score * 100)} />
                 </div>
-                <div className="mt-3 font-display text-[17px] font-semibold leading-tight">{m.title}</div>
+                <a href={m.url} target="_blank" rel="noreferrer"
+                  className="mt-3 font-display text-[17px] font-semibold leading-tight hover:underline">
+                  {m.title}
+                </a>
                 <div className="mt-1 text-[13px] text-[var(--muted)]">{m.company}</div>
                 {m.topStrengths.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
@@ -193,7 +215,12 @@ export default function Dashboard() {
                     ))}
                   </div>
                 )}
-              </a>
+                <div className="mt-auto pt-4">
+                  <Button size="sm" onClick={() => applyTo(m.jobId)} disabled={!!applying}>
+                    {applying === m.jobId ? 'Applying…' : 'Apply →'}
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         ) : (

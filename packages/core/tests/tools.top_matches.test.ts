@@ -14,9 +14,9 @@ describe('tools/top_matches', () => {
     db = openDb(':memory:');
     upsertCompany(db, { id: 'stripe', name: 'Stripe', ats: 'greenhouse', atsOrgSlug: 'stripe' });
     upsertJobs(db, [
-      { id: 'j1', companyId: 'stripe', title: 'PM, Payments', location: 'NYC', url: 'https://x/1', raw: {} },
-      { id: 'j2', companyId: 'stripe', title: 'PM, Terminal', location: 'Remote', locationType: 'remote', url: 'https://x/2', raw: {} },
-      { id: 'j3', companyId: 'stripe', title: 'PM, Billing', location: 'SF', url: 'https://x/3', raw: {} }
+      { id: 'j1', companyId: 'stripe', title: 'PM, Payments', location: 'NYC', url: 'https://x/1', postedAt: new Date(Date.now() - 2 * 86400_000).toISOString(), raw: {} },
+      { id: 'j2', companyId: 'stripe', title: 'PM, Terminal', location: 'Remote', locationType: 'remote', url: 'https://x/2', postedAt: new Date(Date.now() - 5 * 86400_000).toISOString(), raw: {} },
+      { id: 'j3', companyId: 'stripe', title: 'PM, Billing', location: 'SF', url: 'https://x/3', postedAt: new Date(Date.now() - 40 * 86400_000).toISOString(), raw: {} }
     ]);
     addResume(db, { id: 'r1', label: 'PM', rawText: 'pm', parsed: {} });
   });
@@ -32,7 +32,17 @@ describe('tools/top_matches', () => {
       jobId: 'j2', title: 'PM, Terminal', company: 'Stripe',
       location: 'Remote', score: 0.84, topStrengths: ['b'], url: 'https://x/2'
     });
+    expect(out.matches[0].postedAt).toBeTruthy(); // user needs to see freshness
     expect(sampling.completeJson).not.toHaveBeenCalled(); // no scoring unless asked
+  });
+
+  it('only scores fresh jobs by default (stale postings waste money and time)', async () => {
+    const sampling = {
+      completeJson: vi.fn().mockResolvedValue({ score: 0.7, top_strengths: [], top_gaps: [] })
+    } as unknown as SamplingClient;
+    await topMatches({ scoreMissing: true, maxToScore: 10 }, { db, sampling });
+    // j3 is 40 days old — skipped by the default 14-day freshness window
+    expect(sampling.completeJson).toHaveBeenCalledTimes(2);
   });
 
   it('scores unscored recent jobs when scoreMissing is true, up to maxToScore', async () => {
@@ -55,7 +65,7 @@ describe('tools/top_matches', () => {
       completeJson: vi.fn().mockResolvedValue({ score: 0.8, top_strengths: [], top_gaps: [] })
     } as unknown as SamplingClient;
 
-    const out = await topMatches({ scoreMissing: true, maxToScore: 5 }, { db, sampling });
+    const out = await topMatches({ scoreMissing: true, maxToScore: 5, sinceDays: 60 }, { db, sampling });
     expect(sampling.completeJson).toHaveBeenCalledTimes(1); // only j3 was unscored
     expect(out.matches.length).toBe(3);
   });
