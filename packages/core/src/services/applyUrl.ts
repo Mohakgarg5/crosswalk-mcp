@@ -8,11 +8,32 @@
 
 // Matches both plain `"applyLink":"https://…"` and the escaped form
 // `\"applyLink\":\"https://…\"` found inside the page's serialized JSON.
-const APPLY_LINK_RE = /\\?"applyLink\\?":\\?"(https?:\/\/[^"\\]+)/;
+// The capture must allow \uXXXX escapes — Muse encodes `&` as `&`, and
+// stopping at the backslash truncates the query string (broken redirects).
+const APPLY_LINK_RE = /\\?"applyLink\\?":\\?"(https?:\/\/(?:[^"\\]|\\u[0-9a-fA-F]{4})+)/;
+
+function decodeJsonEscapes(s: string): string {
+  return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)));
+}
+
+/** Ad-tracking redirectors (Recruitics, Appcast, …) often carry the real
+ * destination in a query param (`rx_url=https%3A%2F%2Fjobs.apple.com%2F…`).
+ * Going straight there skips a hop that frequently 500s without the full
+ * client-side context. */
+function unwrapTracker(url: string): string {
+  try {
+    for (const [, v] of new URL(url).searchParams) {
+      if (/^https?:\/\//.test(v)) return v;
+    }
+  } catch {
+    /* not parseable — return as-is */
+  }
+  return url;
+}
 
 export function extractApplyLink(html: string): string | undefined {
   const m = html.match(APPLY_LINK_RE);
-  return m ? m[1] : undefined;
+  return m ? unwrapTracker(decodeJsonEscapes(m[1])) : undefined;
 }
 
 export type ApplyTarget = {

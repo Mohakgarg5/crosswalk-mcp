@@ -16,6 +16,17 @@ describe('services/applyUrl — external apply-link resolution for aggregator li
     expect(extractApplyLink('<html><body>no link here</body></html>')).toBeUndefined();
   });
 
+  it('decodes \\u0026 escapes so query params survive (the truncated-Recruitics bug)', () => {
+    const html = '\\"applyLink\\":\\"https://tracker.example.com/redirect?a=1\\u0026b=2\\u0026rx_jobId=99\\"';
+    // No inner URL param here — keeps the tracker URL but with ALL params intact.
+    expect(extractApplyLink(html)).toBe('https://tracker.example.com/redirect?a=1&b=2&rx_jobId=99');
+  });
+
+  it('unwraps tracking redirectors to the real destination in a URL param', () => {
+    const html = '\\"applyLink\\":\\"https://jsv3.recruitics.com/redirect?rx_cid=3427\\u0026rx_jobId=200632069\\u0026rx_url=https%3A%2F%2Fjobs.apple.com%2Fen-us%2Fdetails%2F200632069%2Ftechnical-data-product-lead%3Fboard_id%3DJB006\\"';
+    expect(extractApplyLink(html)).toBe('https://jobs.apple.com/en-us/details/200632069/technical-data-product-lead?board_id=JB006');
+  });
+
   it('resolveExternalApplyUrl fetches the landing page and extracts the link', async () => {
     const f = (async () => ({
       ok: true,
