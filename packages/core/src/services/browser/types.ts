@@ -94,6 +94,10 @@ export type BrowserFillResult = {
   skipped: string[];
   /** Whether a submit button was clicked. False when clickSubmit was not requested or no submit button matched. */
   submitClicked?: boolean;
+  /** Why submit-button clicks failed (selector: first error line). Set only
+   * when clicks were attempted and threw — distinguishes "button blocked"
+   * from "no button on the page". */
+  submitClickErrors?: string[];
   /** URL after submit click (post-navigation). Only set when submitClicked is true. */
   postSubmitUrl?: string;
   /** Page title after submit click (post-navigation). Only set when submitClicked is true. */

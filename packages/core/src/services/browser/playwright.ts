@@ -224,8 +224,18 @@ export class LazyPlaywrightBrowser implements Browser {
       let submitClicked: boolean | undefined;
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
+      const submitClickErrors: string[] = [];
       if (opts.clickSubmit) {
-        submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS);
+        // Uploads (résumé DOCX) keep ATS submit buttons disabled while they
+        // process — Greenhouse times a 30s element click out. Wait for an
+        // enabled submit control first.
+        await waitForSubmitEnabled(page, 45_000);
+        submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
+        if (!submitClicked && submitClickErrors.some(e => /Timeout/i.test(e))) {
+          // Last resort: dispatch the click directly on the element — covers
+          // sticky overlays (cookie banners) obscuring the hit point.
+          submitClicked = await forceClickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
+        }
         if (submitClicked) {
           try {
             // Best-effort wait for navigation to settle
@@ -289,7 +299,11 @@ export class LazyPlaywrightBrowser implements Browser {
       }
 
       const screenshotPng = await page.screenshot({ fullPage: true });
-      return { resolvedUrl, title, screenshotPng, filled, skipped, submitClicked, postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved };
+      return {
+        resolvedUrl, title, screenshotPng, filled, skipped, submitClicked,
+        postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved,
+        ...(submitClickErrors.length ? { submitClickErrors } : {})
+      };
     });
   }
 
@@ -370,7 +384,17 @@ const WORKDAY_CHOOSER_SELECTORS: string[] = [
  */
 async function advanceToForm(page: PlaywrightPage): Promise<void> {
   try {
-    const clicked = await clickFirst(page, APPLY_SELECTORS);
+    // Client-rendered boards (Ashby) mount the Apply button well AFTER
+    // domcontentloaded — a single immediate probe misses it and the form
+    // never opens. Poll for the button (or an already-present form) first.
+    let clicked = false;
+    for (let i = 0; i < 16; i++) {
+      clicked = await clickFirst(page, APPLY_SELECTORS);
+      if (clicked) break;
+      const n = await countFormFields(page);
+      if (n >= 3 || n === -1) break; // form on screen, or unknowable (mocks)
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
     if (clicked) {
       // Let the form render — Greenhouse renders client-side, Lever navigates.
       await new Promise(resolve => setTimeout(resolve, 3000));
@@ -387,29 +411,37 @@ async function advanceToForm(page: PlaywrightPage): Promise<void> {
   } catch { /* best effort — never block the calling flow */ }
 }
 
+/** Count visible form fields across frames. Returns -1 when no frame could
+ * report a number (test-mocked pages) — callers treat that as "unknowable,
+ * don't wait on it". */
+async function countFormFields(page: PlaywrightPage): Promise<number> {
+  let total = 0;
+  let anyNumber = false;
+  for (const frame of allFrames(page)) {
+    try {
+      const count = await frame.evaluate(() => {
+        const doc = (globalThis as unknown as { document: any }).document;
+        return doc.querySelectorAll('input:not([type="hidden"]), textarea, select, [role="combobox"]').length;
+      });
+      if (typeof count === 'number') {
+        total += count;
+        anyNumber = true;
+      }
+    } catch { /* skip cross-origin frame */ }
+  }
+  return anyNumber ? total : -1;
+}
+
 async function waitForFormReady(page: PlaywrightPage, timeoutMs: number): Promise<void> {
   const pollMs = 400;
   const maxPolls = Math.ceil(timeoutMs / pollMs);
   let consecutiveBadEvaluates = 0;
   for (let i = 0; i < maxPolls; i++) {
-    let totalFields = 0;
-    let anyEvaluateReturnedNumber = false;
-    for (const frame of allFrames(page)) {
-      try {
-        const count = await frame.evaluate(() => {
-          const doc = (globalThis as unknown as { document: any }).document;
-          return doc.querySelectorAll('input:not([type="hidden"]), textarea, select, [role="combobox"]').length;
-        });
-        if (typeof count === 'number') {
-          totalFields += count;
-          anyEvaluateReturnedNumber = true;
-        }
-      } catch { /* skip cross-origin frame */ }
-    }
-    if (totalFields >= 3) return; // 3+ visible fields → form is ready
+    const total = await countFormFields(page);
+    if (total >= 3) return; // 3+ visible fields → form is ready
     // Test-mocked pages return arrays/undefined from evaluate. Bail after two
     // such polls so the test suite doesn't sit through the full 8s timeout.
-    if (!anyEvaluateReturnedNumber) {
+    if (total === -1) {
       consecutiveBadEvaluates++;
       if (consecutiveBadEvaluates >= 2) return;
     } else {
@@ -419,15 +451,19 @@ async function waitForFormReady(page: PlaywrightPage, timeoutMs: number): Promis
   }
 }
 
-/** Click the first matching, clickable selector. Returns whether one was clicked. */
-async function clickFirst(frame: PlaywrightFrame, selectors: string[]): Promise<boolean> {
+/** Click the first matching, clickable selector. Returns whether one was
+ * clicked. Failures are pushed onto `errs` (when given) — a silently
+ * swallowed click error is indistinguishable from "no button", which has
+ * cost us real submissions. */
+async function clickFirst(frame: PlaywrightFrame, selectors: string[], errs?: string[]): Promise<boolean> {
   for (const selector of selectors) {
     const btn = await frame.$(selector);
     if (!btn || typeof btn.click !== 'function') continue;
     try {
       await btn.click();
       return true;
-    } catch {
+    } catch (e) {
+      errs?.push(`${selector}: ${(e as Error).message.split('\n')[0]}`);
       continue;
     }
   }
@@ -445,9 +481,54 @@ function allFrames(page: PlaywrightPage): PlaywrightFrame[] {
 }
 
 /** Like clickFirst but tries the main frame first, then every iframe. */
-async function clickFirstAcrossFrames(page: PlaywrightPage, selectors: string[]): Promise<boolean> {
+async function clickFirstAcrossFrames(page: PlaywrightPage, selectors: string[], errs?: string[]): Promise<boolean> {
   for (const frame of allFrames(page)) {
-    if (await clickFirst(frame, selectors)) return true;
+    if (await clickFirst(frame, selectors, errs)) return true;
+  }
+  return false;
+}
+
+/** Wait until any submit-selector element reports enabled (uploads finished).
+ * Returns immediately when no submit element exists at all — only a present-
+ * but-disabled button is worth waiting on. Best effort: resolves quietly on
+ * timeout and the click still gets attempted. */
+async function waitForSubmitEnabled(page: PlaywrightPage, timeoutMs: number): Promise<void> {
+  const pollMs = 500;
+  const deadline = Math.ceil(timeoutMs / pollMs);
+  for (let i = 0; i < deadline; i++) {
+    let sawDisabled = false;
+    for (const frame of allFrames(page)) {
+      for (const sel of SUBMIT_SELECTORS) {
+        try {
+          const el = await frame.$(sel);
+          if (!el) continue;
+          const enabledFn = (el as { isEnabled?: () => Promise<boolean> }).isEnabled;
+          if (typeof enabledFn !== 'function') return; // mock/unknown handle — don't stall
+          if (await enabledFn.call(el)) return;
+          sawDisabled = true;
+        } catch { /* detached frame — keep polling */ }
+      }
+    }
+    if (!sawDisabled) return; // nothing to wait for
+    await new Promise(resolve => setTimeout(resolve, pollMs));
+  }
+}
+
+/** Force-dispatch a click on the first matching submit control — bypasses
+ * actionability checks (hit-point obscured by sticky banners, etc.). */
+async function forceClickFirstAcrossFrames(page: PlaywrightPage, selectors: string[], errs?: string[]): Promise<boolean> {
+  for (const frame of allFrames(page)) {
+    for (const selector of selectors) {
+      const btn = await frame.$(selector);
+      if (!btn || typeof btn.click !== 'function') continue;
+      try {
+        await (btn as unknown as { click: (o?: { force?: boolean; timeout?: number }) => Promise<void> })
+          .click({ force: true, timeout: 5000 });
+        return true;
+      } catch (e) {
+        errs?.push(`force ${selector}: ${(e as Error).message.split('\n')[0]}`);
+      }
+    }
   }
   return false;
 }
@@ -930,9 +1011,11 @@ const ATS_SELECTORS: Record<string, Partial<Record<StaticKind, string[]>>> = {
     resume_file: ['input[name="resumeFile"]', 'input[name="cv"]']
   },
   ashby: {
-    email: ['input[data-testid*="email" i]'],
-    phone: ['input[data-testid*="phone" i]'],
-    resume_file: ['input[data-testid*="resume" i]']
+    // Current Ashby boards use _systemfield_* ids; older ones data-testid.
+    email: ['input[id="_systemfield_email"]', 'input[data-testid*="email" i]'],
+    full_name: ['input[id="_systemfield_name"]'],
+    phone: ['input[id="_systemfield_phone"]', 'input[data-testid*="phone" i]'],
+    resume_file: ['input[id="_systemfield_resume"]', 'input[data-testid*="resume" i]']
   },
   workday: {
     email: ['input[data-automation-id="email"]'],

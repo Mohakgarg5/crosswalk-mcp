@@ -80,7 +80,7 @@ describe('tools/apply_application', () => {
     );
     const kinds = seenFields.map(f => f.kind).sort();
     expect(kinds).toEqual(
-      ['cover_letter_file', 'cover_letter_text', 'email', 'first_name', 'last_name', 'linkedin', 'phone', 'resume_file']
+      ['cover_letter_file', 'cover_letter_text', 'email', 'first_name', 'full_name', 'last_name', 'linkedin', 'phone', 'resume_file']
     );
     const resumeField = seenFields.find(f => f.kind === 'resume_file');
     expect(resumeField).toBeDefined();

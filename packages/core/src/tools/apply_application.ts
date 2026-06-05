@@ -62,7 +62,7 @@ function safeHost(url: string): string {
 
 /** Infer the ATS from a resolved apply URL so its field selectors apply.
  * Null when the host isn't a recognized ATS. */
-function atsFromHost(host: string): string | null {
+function atsFromHost(host: string): import('../store/company.ts').KnownAts | null {
   if (/(^|\.)myworkdayjobs\.com$/.test(host)) return 'workday';
   if (/(^|\.)greenhouse\.io$/.test(host)) return 'greenhouse';
   if (/(^|\.)lever\.co$/.test(host)) return 'lever';
@@ -94,8 +94,11 @@ export async function applyApplication(
   const lastName = asString(profile.last_name);
   if (lastName) fields.push({ kind: 'last_name', value: lastName });
 
-  const fullName = asString(profile.name) ?? asString(profile.full_name);
-  if (fullName && !firstName && !lastName) {
+  // Always offer a full-name value: single-name forms (Ashby) need it even
+  // when first/last exist. Forms without a full-name field just skip it.
+  const fullName = asString(profile.name) ?? asString(profile.full_name)
+    ?? ([firstName, lastName].filter(Boolean).join(' ') || undefined);
+  if (fullName) {
     fields.push({ kind: 'full_name', value: fullName });
   }
 
@@ -297,6 +300,10 @@ export async function applyApplication(
   const confirmed = CONFIRMATION_RE.test(result.postSubmitTitle ?? '') || CONFIRMATION_RE.test(result.postSubmitUrl ?? '');
   const evidence = navigated || confirmed || Boolean(result.verificationResolved);
   const submitted = Boolean(result.submitClicked) && !verificationPending && evidence;
+  if (input.submit && !result.submitClicked && result.submitClickErrors?.length) {
+    // The button was found but every click attempt threw — log why.
+    addEventForApplication(ctx.db, app.id, 'submit_click_failed', { errors: result.submitClickErrors });
+  }
   if (Boolean(result.submitClicked) && !verificationPending && !evidence) {
     addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
       url: result.resolvedUrl,
