@@ -179,6 +179,32 @@ export class LazyPlaywrightBrowser implements Browser {
           if (Array.isArray(fromFrame)) formFields.push(...fromFrame);
         } catch { /* cross-origin frame or detached — skip */ }
       }
+      // Custom comboboxes (react-select etc.) keep their options in a menu
+      // that only exists while open — without them the model answers blind
+      // ("United States" for an option list that says "US"; prose for a
+      // years-range select). Open each one briefly and harvest its options.
+      for (const f of formFields) {
+        if (f.options?.length || !f.name) continue;
+        if (f.type !== 'text') continue;
+        try {
+          const input = await page.$(`input[role="combobox"][id="${escAttr(f.name)}"]`)
+                     ?? await page.$(`input[role="combobox"][name="${escAttr(f.name)}"]`);
+          if (!input || typeof input.click !== 'function') continue;
+          await input.click();
+          await new Promise(r => setTimeout(r, 600));
+          const opts = await page.evaluate(() => {
+            const doc = (globalThis as unknown as { document: any }).document;
+            const menus = (Array.from(doc.querySelectorAll('.select__menu, [role="listbox"]')) as any[])
+              .filter(m => m.getBoundingClientRect().height > 0);
+            return menus.flatMap(m =>
+              (Array.from(m.querySelectorAll('.select__option, [role="option"]')) as any[])
+                .map(o => String(o.textContent ?? '').trim())
+            ).filter((t: string) => t.length > 0);
+          }).catch(() => []);
+          if (Array.isArray(opts) && opts.length > 0) f.options = [...new Set(opts as string[])];
+          if (typeof input.press === 'function') await input.press('Escape').catch(() => {});
+        } catch { /* best-effort harvesting */ }
+      }
       return { screenshotPng, resolvedUrl, title, formFields };
     });
   }

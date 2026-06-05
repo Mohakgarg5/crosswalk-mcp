@@ -215,6 +215,9 @@ export async function applyApplication(
         || formField.type === 'tel'
         || formField.type === 'email';
       if (!isFreeText) continue;
+      // Comboboxes with harvested options are choice fields — the choice
+      // resolver picks from the real option list; prose would miss.
+      if (formField.type === 'text' && (formField.options?.length ?? 0) > 0) continue;
       if (!formField.name || knownNames.has(formField.name)) continue;
       const labelOrName = (formField.label || formField.name).toLowerCase();
       if (/(?<![a-z])cover[\s_-]?letter/.test(labelOrName)) continue;

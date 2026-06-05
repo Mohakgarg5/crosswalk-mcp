@@ -35,9 +35,11 @@ export async function resolveChoiceFields(
 ): Promise<FillField[]> {
   const out: FillField[] = [];
 
-  // <select>
+  // <select> — plus custom comboboxes whose options were harvested at
+  // preview time (type 'text' with a non-empty options list).
   for (const f of formFields) {
-    if (f.type !== 'select' || !f.name || !f.options || f.options.length === 0) continue;
+    const isChoice = f.type === 'select' || (f.type === 'text' && (f.options?.length ?? 0) > 0);
+    if (!isChoice || !f.name || !f.options || f.options.length === 0) continue;
     const question = f.label || f.name;
     const bank = matchAnswer(db, question);
     let chosen = bank ? fuzzyPick(f.options, bank) : null;
