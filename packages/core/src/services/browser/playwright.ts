@@ -283,11 +283,26 @@ export class LazyPlaywrightBrowser implements Browser {
           };
           const outcome = await opts.resolveVerification(ctx);
           if (outcome?.kind === 'code') {
+            let entered = false;
             const loc = await firstLocatorAcrossFrames(page, CODE_FIELD_SELECTORS);
             if (loc?.fill) {
               await loc.fill(outcome.code);
+              entered = true;
+            } else {
+              // Segmented one-char boxes (Greenhouse): focus the first box and
+              // keyboard-type — the widget auto-advances per character.
+              const segmented = await firstLocatorAcrossFrames(page, ['input[maxlength="1"]']);
+              const kb = (page as { keyboard?: { type: (t: string, o?: { delay?: number }) => Promise<void> } }).keyboard;
+              if (segmented && typeof segmented.click === 'function' && kb) {
+                await segmented.click();
+                await kb.type(outcome.code, { delay: 60 });
+                entered = true;
+              }
+            }
+            if (entered) {
+              await waitForSubmitEnabled(page, 15_000);
               submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS) || submitClicked;
-              await new Promise(resolve => setTimeout(resolve, 2000));
+              await new Promise(resolve => setTimeout(resolve, 4000));
               verificationResolved = true;
             }
           } else if (outcome?.kind === 'link') {
@@ -605,6 +620,11 @@ async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'l
         });
         if (isCode) return 'code';
         const bodyText = (doc.body?.innerText ?? '').toLowerCase();
+        // Greenhouse's gate is 8 anonymous single-char boxes — no attributes
+        // to match. The body copy is the reliable signal.
+        const segmented = inputs.filter(el => el.getAttribute('maxlength') === '1').length >= 4;
+        const looksLikeCodeGate = /(verification|security) code (was )?(sent|emailed)|enter the [\w-]{0,24}\s?(character )?code/.test(bodyText);
+        if (looksLikeCodeGate && (segmented || bodyText.includes('security code'))) return 'code';
         // Don't treat a post-submit success page ("Thanks for applying, check
         // your email for next steps") as a verification gate — that would
         // mislabel a completed submission as pending.
