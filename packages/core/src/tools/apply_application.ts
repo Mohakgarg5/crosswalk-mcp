@@ -60,6 +60,21 @@ function safeHost(url: string): string {
   try { return new URL(url).host; } catch { return ''; }
 }
 
+/** Infer the ATS from a resolved apply URL so its field selectors apply.
+ * Null when the host isn't a recognized ATS. */
+function atsFromHost(host: string): string | null {
+  if (/(^|\.)myworkdayjobs\.com$/.test(host)) return 'workday';
+  if (/(^|\.)greenhouse\.io$/.test(host)) return 'greenhouse';
+  if (/(^|\.)lever\.co$/.test(host)) return 'lever';
+  if (/(^|\.)ashbyhq\.com$/.test(host)) return 'ashby';
+  if (/(^|\.)workable\.com$/.test(host)) return 'workable';
+  if (/(^|\.)smartrecruiters\.com$/.test(host)) return 'smartrecruiters';
+  if (/(^|\.)bamboohr\.com$/.test(host)) return 'bamboohr';
+  if (/(^|\.)recruitee\.com$/.test(host)) return 'recruitee';
+  if (/(^|\.)icims\.com$/.test(host)) return 'icims';
+  return null;
+}
+
 export async function applyApplication(
   input: z.infer<typeof applyApplicationInput>,
   ctx: { db: Db; browser: Browser; sampling: SamplingClient; fetchImpl?: typeof fetch }
@@ -144,7 +159,9 @@ export async function applyApplication(
     }
     addEventForApplication(ctx.db, app.id, 'apply_url_resolved', { from: app.deepLink, to: target.url });
     applyUrl = target.url;
-    detectedAts = null; // the ATS behind the redirect is unknown
+    // Use the resolved host's ATS so its field selectors apply (Workday's
+    // data-automation-id inputs, Greenhouse names, …).
+    detectedAts = atsFromHost(safeHost(target.url));
   }
 
   let preview: Awaited<ReturnType<Browser['preview']>> | null = null;

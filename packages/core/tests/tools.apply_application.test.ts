@@ -470,9 +470,11 @@ describe('tools/apply_application', () => {
       deepLink: 'https://www.themuse.com/jobs/acme/pm'
     });
     const seenUrls: string[] = [];
+    let seenAts: string | undefined;
     const browser = makeDefaultBrowser({
-      fillForm: vi.fn(async (url: string) => {
+      fillForm: vi.fn(async (url: string, _fields: FillField[], opts?: { ats?: string }) => {
         seenUrls.push(url);
+        seenAts = opts?.ats;
         return {
           resolvedUrl: url, title: 'Apply', screenshotPng: Buffer.from([]),
           filled: [], skipped: []
@@ -487,6 +489,7 @@ describe('tools/apply_application', () => {
     await applyApplication({ applicationId: 'app2' }, { db, browser, sampling, fetchImpl });
 
     expect(seenUrls).toEqual(['https://boards.greenhouse.io/acme/jobs/9']);
+    expect(seenAts).toBe('greenhouse'); // ATS inferred from the resolved host
     const events = listEventsForApplication(db, 'app2');
     expect(events.some(e => e.kind === 'apply_url_resolved')).toBe(true);
   });
