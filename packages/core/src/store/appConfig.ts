@@ -26,7 +26,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   // safety margin). Auto-fill on each page; the loop stops when no Next
   // button is found, so single-page forms still finish in one pass.
   applyMaxSteps: 8,
-  verificationTimeoutMs: 90_000
+  verificationTimeoutMs: 240_000
 };
 
 export function getConfig(db: Db): AppConfig {

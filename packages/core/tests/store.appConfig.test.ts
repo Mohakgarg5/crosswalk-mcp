@@ -20,7 +20,7 @@ describe('app_config store', () => {
 
 describe('appConfig verificationTimeoutMs', () => {
   it('defaults to 90 seconds', () => {
-    expect(DEFAULT_APP_CONFIG.verificationTimeoutMs).toBe(90_000);
+    expect(DEFAULT_APP_CONFIG.verificationTimeoutMs).toBe(240_000);
   });
 
   it('persists an override', () => {
