@@ -167,6 +167,18 @@ export async function applyApplication(
     detectedAts = atsFromHost(safeHost(target.url));
   }
 
+  // Company-hosted Greenhouse pages (stripe.com/jobs, careers.airbnb.com)
+  // bury the form in an iframe behind trackers; the identical form loads
+  // standalone at the embed URL — apply there, like a hosted board.
+  if (detectedAts === 'greenhouse' && !/(^|\.)greenhouse\.io$/.test(safeHost(applyUrl))) {
+    const m = /^greenhouse:([^:]+):(\d+)$/.exec(app.jobId);
+    if (m) {
+      const embedUrl = `https://job-boards.greenhouse.io/embed/job_app?for=${m[1]}&token=${m[2]}`;
+      addEventForApplication(ctx.db, app.id, 'apply_url_resolved', { from: applyUrl, to: embedUrl });
+      applyUrl = embedUrl;
+    }
+  }
+
   let preview: Awaited<ReturnType<Browser['preview']>> | null = null;
   try {
     preview = await ctx.browser.preview(applyUrl);
