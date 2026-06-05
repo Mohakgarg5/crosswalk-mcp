@@ -2,6 +2,9 @@ export type FormField = {
   name: string;
   type: string;
   label?: string;
+  /** For radio/checkbox options: the group's question text (fieldset legend
+   * or the label preceding the options container). */
+  groupLabel?: string;
   required: boolean;
   value?: string;
   /** For <select>: the option labels. For radio/checkbox: this element's value. */

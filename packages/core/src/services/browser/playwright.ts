@@ -1207,10 +1207,33 @@ const extractFormFieldsScript = (): FormField[] => {
         .map(o => String(o.textContent ?? '').trim())
         .filter((t: string) => t.length > 0);
     }
+    // For grouped choices the per-option label ("United States") says nothing
+    // about the QUESTION ("countries you anticipate working in") — find the
+    // group's question text so the answer bank/model can reason about it.
+    let groupLabel: string | undefined;
+    if (type === 'radio' || type === 'checkbox') {
+      const legend = e.closest('fieldset')?.querySelector('legend');
+      if (legend) groupLabel = String(legend.textContent ?? '').trim();
+      if (!groupLabel) {
+        // Walk up a few containers; the question is usually the text of a
+        // label-ish element immediately preceding the options container.
+        let node = e.parentElement;
+        for (let depth = 0; depth < 5 && node && !groupLabel; depth++) {
+          const prev = node.previousElementSibling;
+          if (prev && /label|legend/i.test(prev.tagName + ' ' + (prev.className || ''))) {
+            const t = String(prev.textContent ?? '').trim();
+            if (t && t.length <= 220) groupLabel = t;
+          }
+          node = node.parentElement;
+        }
+      }
+      if (groupLabel && groupLabel === derivedLabel) groupLabel = undefined;
+    }
     fields.push({
       name,
       type,
       label: derivedLabel ?? ariaLabel ?? undefined,
+      groupLabel,
       required: Boolean(e.required),
       value: typeof e.value === 'string' && e.value.length > 0 ? e.value : undefined,
       options
