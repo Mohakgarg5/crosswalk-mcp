@@ -132,4 +132,53 @@ describe('searchRoles — role-based discovery across companies', () => {
     const r = await searchRoles(db, { query: 'underwater basket weaver' }, fakeFetch());
     expect(r.jobs.length).toBe(0);
   });
+
+  it('drops stale postings by default and sorts newest first', async () => {
+    const db = openDb(':memory:');
+    const now = Date.now();
+    const aged = {
+      total: 3, page_count: 1,
+      results: [
+        {
+          id: 401, name: 'Senior Product Manager, Old', publication_date: new Date(now - 60 * 86400_000).toISOString(),
+          refs: { landing_page: 'https://www.themuse.com/jobs/a/old' },
+          locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'OldCo', short_name: 'oldco' }
+        },
+        {
+          id: 402, name: 'Senior Product Manager, Newest', publication_date: new Date(now - 1 * 86400_000).toISOString(),
+          refs: { landing_page: 'https://www.themuse.com/jobs/b/new' },
+          locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'NewCo', short_name: 'newco' }
+        },
+        {
+          id: 403, name: 'Senior Product Manager, Recent', publication_date: new Date(now - 10 * 86400_000).toISOString(),
+          refs: { landing_page: 'https://www.themuse.com/jobs/c/recent' },
+          locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+          company: { name: 'RecentCo', short_name: 'recentco' }
+        }
+      ]
+    };
+    const f = (async () => ({ ok: true, json: async () => aged })) as unknown as typeof fetch;
+    const r = await searchRoles(db, { query: 'senior product manager' }, f);
+    // 60-day-old posting dropped (default 21-day window); newest first.
+    expect(r.jobs.map(j => j.company)).toEqual(['NewCo', 'RecentCo']);
+  });
+
+  it('honors an explicit sinceDays override', async () => {
+    const db = openDb(':memory:');
+    const now = Date.now();
+    const aged = {
+      total: 1, page_count: 1,
+      results: [{
+        id: 405, name: 'Senior Product Manager, Old', publication_date: new Date(now - 60 * 86400_000).toISOString(),
+        refs: { landing_page: 'https://www.themuse.com/jobs/a/old' },
+        locations: [{ name: 'Remote' }], categories: [{ name: 'Product Management' }],
+        company: { name: 'OldCo', short_name: 'oldco' }
+      }]
+    };
+    const f = (async () => ({ ok: true, json: async () => aged })) as unknown as typeof fetch;
+    const r = await searchRoles(db, { query: 'senior product manager', sinceDays: 90 }, f);
+    expect(r.jobs.length).toBe(1);
+  });
 });

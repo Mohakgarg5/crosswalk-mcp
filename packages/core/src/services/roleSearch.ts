@@ -21,6 +21,9 @@ export type RoleSearchOptions = {
   location?: string;
   /** Pages to pull (each ~20 jobs). More pages = more to apply to. */
   pages?: number;
+  /** Drop postings older than this many days (default 21). The Muse keeps
+   * serving long-dead listings; applying to them wastes everyone's time. */
+  sinceDays?: number;
 };
 
 export type RoleSearchJob = {
@@ -140,8 +143,16 @@ export async function searchRoles(
     return tokens.every(tok => t.includes(tok));
   };
   const narrowed = opts.category || !q ? valid : valid.filter(tokenMatch);
-  const jobs = [...narrowed]
-    .sort((a, b) => Number(phraseMatch(b)) - Number(phraseMatch(a)))
+  // Freshness: stale postings are mostly closed roles wearing a live URL.
+  const cutoff = Date.now() - (opts.sinceDays ?? 21) * 86400_000;
+  const fresh = narrowed.filter(r => {
+    if (!r.publication_date) return true; // undated — keep, can't judge
+    const t = new Date(r.publication_date).getTime();
+    return Number.isNaN(t) || t >= cutoff;
+  });
+  const postedMs = (r: MuseJob) => new Date(r.publication_date ?? 0).getTime() || 0;
+  const jobs = [...fresh]
+    .sort((a, b) => (Number(phraseMatch(b)) - Number(phraseMatch(a))) || (postedMs(b) - postedMs(a)))
     .map(normalize);
 
   // Persist as regular jobs so draft/auto-apply/pipeline work on them.

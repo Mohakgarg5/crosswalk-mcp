@@ -247,7 +247,7 @@ export async function autoApplyJobs(jobIds: string[], submit?: boolean) {
 
 // --- Role-based discovery + registry growth -----------------------------------
 
-export async function searchRolesWeb(opts: { query?: string; category?: string; location?: string; pages?: number }) {
+export async function searchRolesWeb(opts: { query?: string; category?: string; location?: string; pages?: number; sinceDays?: number }) {
   const { searchRoles } = await rt();
   return searchRoles(await db(), opts);
 }
