@@ -380,6 +380,10 @@ export class LazyPlaywrightBrowser implements Browser {
 }
 
 const SUBMIT_SELECTORS: string[] = [
+  // Text-first: Ashby renders its Yes/No OPTION buttons as type=submit, so
+  // the generic [type=submit] selector can hit "Yes" instead of the real
+  // submit. The visible "Submit application" label is unambiguous.
+  'button:has-text("Submit application")',
   'button[type="submit"]',
   'input[type="submit"]',
   'button[name="submit"]',
@@ -387,9 +391,6 @@ const SUBMIT_SELECTORS: string[] = [
   'button[name*="submit" i]',
   'button[data-automation-id*="submit" i]',
   'button[data-automation-id="bottom-navigation-next-button"]',
-  // Text fallbacks — some boards (Ashby re-renders) momentarily detach the
-  // typed button; the visible label is the stable thing.
-  'button:has-text("Submit application")',
   'button:has-text("Submit")'
 ];
 
@@ -948,6 +949,26 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
       const clicked = await page.evaluate(
         ({ name, value }: { name: string; value: string }) => {
           const doc = (globalThis as unknown as { document: any }).document;
+          // Synthetic button-option groups (Ashby Yes/No widgets): the name
+          // embeds the question; click the button whose text matches the
+          // chosen value under the same question.
+          if (name.startsWith('__btnopt__')) {
+            const q = name.slice('__btnopt__'.length);
+            const btns = Array.from(doc.querySelectorAll('button[class*="_option_"]')) as any[];
+            for (const b of btns) {
+              const txt = String(b.innerText ?? '').trim();
+              if (txt.toLowerCase() !== value.toLowerCase().trim()) continue;
+              let bq = '';
+              let n = b.parentElement;
+              for (let i = 0; i < 6 && n && !bq; i++) {
+                const t = String(n.textContent ?? '').trim();
+                if (t.includes('?') && t.length < 300) bq = t.split('?')[0].trim().slice(-120) + '?';
+                n = n.parentElement;
+              }
+              if (bq.slice(0, 100) === q) { b.click(); return true; }
+            }
+            return false;
+          }
           // Ashby prefixes group names with a per-page-load instance id, so
           // the name captured at preview time won't equal the one at fill
           // time. The `__systemfield_…` (or generally `__…`) suffix is stable.
@@ -1272,6 +1293,31 @@ const extractFormFieldsScript = (): FormField[] => {
       required: Boolean(e.required),
       value: typeof e.value === 'string' && e.value.length > 0 ? e.value : undefined,
       options
+    });
+  }
+  // Ashby's Yes/No widgets are plain <button class="_option_…"> pairs — no
+  // input element at all. Surface them as a radio group keyed on the
+  // question text so the choice resolver and the button-click fill path
+  // can find them again.
+  const optBtns = Array.from(doc.querySelectorAll('button[class*="_option_"]')) as any[];
+  for (const b of optBtns) {
+    const txt = String(b.innerText ?? '').trim();
+    if (!txt || txt.length > 40) continue;
+    let q = '';
+    let n = b.parentElement;
+    for (let i = 0; i < 6 && n && !q; i++) {
+      const t = String(n.textContent ?? '').trim();
+      if (t.includes('?') && t.length < 300) q = t.split('?')[0].trim().slice(-120) + '?';
+      n = n.parentElement;
+    }
+    if (!q) continue;
+    fields.push({
+      name: `__btnopt__${q.slice(0, 100)}`,
+      type: 'radio',
+      label: txt,
+      groupLabel: q,
+      required: false,
+      value: txt
     });
   }
   return fields;
