@@ -250,8 +250,12 @@ export class LazyPlaywrightBrowser implements Browser {
       let submitClicked: boolean | undefined;
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
+      let confirmationSeen = false;
       const submitClickErrors: string[] = [];
       if (opts.clickSubmit) {
+        // Let async form-state syncs settle (Ashby PATCHes every field via
+        // ApiSetFormValue; submitting mid-flight loses the last values).
+        await new Promise(resolve => setTimeout(resolve, 2500));
         // Uploads (résumé DOCX) keep ATS submit buttons disabled while they
         // process — Greenhouse times a 30s element click out. Wait for an
         // enabled submit control first.
@@ -284,6 +288,18 @@ export class LazyPlaywrightBrowser implements Browser {
               if (nowUrl !== preUrl) break;
               const title = await page.title().catch(() => '');
               if (/thank|received|submitted|confirmation/i.test(title ?? '')) break;
+              // Ashby renders an in-page success panel — same URL, same
+              // title. The body text is the only signal.
+              if (patient) {
+                try {
+                  const ok = await page.evaluate(() => {
+                    const doc = (globalThis as unknown as { document: any }).document;
+                    return /your application has been submitted|application (was )?submitted successfully|thank you for applying/i
+                      .test(String(doc.body?.innerText ?? '').slice(0, 4000));
+                  });
+                  if (ok === true) { confirmationSeen = true; break; }
+                } catch { /* transient */ }
+              }
             }
             postSubmitUrl = page.url();
             postSubmitTitle = await page.title();
@@ -362,6 +378,7 @@ export class LazyPlaywrightBrowser implements Browser {
       return {
         resolvedUrl, title, screenshotPng, filled, skipped, submitClicked,
         postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved,
+        ...(confirmationSeen ? { confirmationSeen } : {}),
         ...(submitClickErrors.length ? { submitClickErrors } : {})
       };
     });

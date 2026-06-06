@@ -105,6 +105,9 @@ export type BrowserFillResult = {
   postSubmitUrl?: string;
   /** Page title after submit click (post-navigation). Only set when submitClicked is true. */
   postSubmitTitle?: string;
+  /** True when an in-page success panel was observed after the submit click
+   * (Ashby keeps URL and title unchanged — body text is the only signal). */
+  confirmationSeen?: boolean;
   /** How many wizard pages were advanced past (Next/Continue clicks) before submit. */
   stepsAdvanced?: number;
   /** True if a verification gate (code field or magic-link screen) was detected. */

@@ -317,7 +317,7 @@ export async function applyApplication(
   const navigated = Boolean(result.postSubmitUrl) && result.postSubmitUrl !== result.resolvedUrl;
   const CONFIRMATION_RE = /thank|confirm|received|success|submitted|application complete/i;
   const confirmed = CONFIRMATION_RE.test(result.postSubmitTitle ?? '') || CONFIRMATION_RE.test(result.postSubmitUrl ?? '');
-  const evidence = navigated || confirmed || Boolean(result.verificationResolved);
+  const evidence = navigated || confirmed || Boolean(result.verificationResolved) || Boolean(result.confirmationSeen);
   const submitted = Boolean(result.submitClicked) && !verificationPending && evidence;
   if (input.submit && !result.submitClicked && result.submitClickErrors?.length) {
     // The button was found but every click attempt threw — log why.
