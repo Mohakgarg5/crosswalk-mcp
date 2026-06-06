@@ -24,6 +24,31 @@ describe('answer bank', () => {
     expect(matchAnswer(db, 'What is your favorite color?')).toBeNull();
   });
 
+  it('replaces an existing answer with the same label, case-insensitively (upsert)', () => {
+    const db = openDb(':memory:');
+    addAnswer(db, { label: 'Gender', answer: 'Male' });
+    addAnswer(db, { label: 'gender', answer: 'Decline to self-identify' });
+    const matches = listAnswers(db).filter(a => a.label.toLowerCase() === 'gender');
+    expect(matches).toHaveLength(1);
+    expect(matches[0].answer).toBe('Decline to self-identify');
+  });
+
+  it('keeps answers with different labels independent', () => {
+    const db = openDb(':memory:');
+    addAnswer(db, { label: 'gender', answer: 'Male' });
+    addAnswer(db, { label: 'veteran', answer: 'I am not a protected veteran' });
+    expect(listAnswers(db)).toHaveLength(2);
+  });
+
+  it('loadDefaults still skips labels the user already set', () => {
+    const db = openDb(':memory:');
+    addAnswer(db, { label: 'gender', answer: 'Male' });
+    loadDefaults(db);
+    const gender = listAnswers(db).filter(a => a.label.toLowerCase() === 'gender');
+    expect(gender).toHaveLength(1);
+    expect(gender[0].answer).toBe('Male');
+  });
+
   it('loadDefaults seeds EEO/work-auth answers idempotently', () => {
     const db = openDb(':memory:');
     expect(loadDefaults(db)).toBeGreaterThan(0);

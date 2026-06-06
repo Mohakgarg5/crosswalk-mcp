@@ -15,9 +15,13 @@ type Row = { id: string; label: string; answer: string; created_at: string };
 export function addAnswer(db: Db, input: { label: string; answer: string }): AnswerEntry {
   const id = randomUUID();
   const createdAt = new Date().toISOString();
+  const label = input.label.trim();
+  // Upsert: re-running onboarding/setup must update an answer, not stack
+  // duplicates (the bank once held "legally authorized → Yes" three times).
+  db.prepare(`DELETE FROM answer_bank WHERE lower(label) = lower(?)`).run(label);
   db.prepare(`INSERT INTO answer_bank (id, label, answer, created_at) VALUES (?, ?, ?, ?)`)
-    .run(id, input.label.trim(), input.answer, createdAt);
-  return { id, label: input.label.trim(), answer: input.answer, createdAt };
+    .run(id, label, input.answer, createdAt);
+  return { id, label, answer: input.answer, createdAt };
 }
 
 export function listAnswers(db: Db): AnswerEntry[] {
