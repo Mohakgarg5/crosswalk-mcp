@@ -18,6 +18,7 @@ Local-first · your data never leaves your machine · bring your own AI.
 - [Add your AI key](#add-your-ai-key)
 - [Connect your email inbox (Gmail app password)](#connect-your-email-inbox-gmail-app-password)
 - [How to use the app](#how-to-use-the-app)
+- [Tell it about yourself once (the questionnaire)](#tell-it-about-yourself-once-the-questionnaire)
 - [What it can and can't auto-apply to](#what-it-can-and-cant-auto-apply-to)
 - [Use it inside Claude or other AI tools](#use-it-inside-claude-or-other-ai-tools)
 - [Run it automatically (hands-off)](#run-it-automatically-hands-off)
@@ -136,6 +137,21 @@ Use the left-hand menu, roughly in this order:
 5. **Apply** — click **draft →** on a job to review it first, or **Auto-apply** at the top of the results to handle them all.
 6. **Settings → Email inbox** _(optional)_ — paste an **app password** for your email so the agent can read verification codes/links and finish those applications on its own. Step-by-step: [Connect your email inbox](#connect-your-email-inbox-gmail-app-password). Leave it blank to skip — you'll just complete those few by hand.
 7. **Pipeline / Alerts / Inbox** — track every application, see new-match alerts, and route recruiter emails to the right application.
+
+---
+
+## Tell it about yourself once (the questionnaire)
+
+The first time you open the app you get a short **setup wizard** — re-run it anytime at `localhost:3000/onboarding`. Besides your name and résumé, it asks the questions real applications repeat forever:
+
+- **Work eligibility** — visa status, work authorization, sponsorship.
+- **Education** — school, degree, discipline, years. (The school pickers on Greenhouse-style forms fill from this.)
+- **Work preferences** — remote/hybrid/onsite, willingness to relocate, earliest start date, "how did you hear about us".
+- **Voluntary self-identification (EEO)** — gender, ethnicity, veteran and disability status. Every question has a *"Prefer not to say"* option, and that is exactly what goes on forms if you pick it.
+
+Your answers land in a local **answer bank** (plus your profile) in `~/.crosswalk`. When an application asks one of these questions — in any phrasing close enough to match — Crosswalk uses **your** saved answer instead of guessing. Anything the bank doesn't cover falls back to the AI, which only uses true facts from your résumé and profile.
+
+See, add, and edit every saved answer under **Settings → Answer bank**. Saving an answer with the same question label **replaces** the old one, so re-running the wizard updates your answers rather than duplicating them. Every step is skippable.
 
 ---
 
