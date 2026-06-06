@@ -11,3 +11,4 @@ coverage/
 .idea/
 tmp/
 .crosswalk-dev/
+.playwright-mcp/
