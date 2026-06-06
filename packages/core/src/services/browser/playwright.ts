@@ -264,9 +264,11 @@ export class LazyPlaywrightBrowser implements Browser {
         // enabled submit control first.
         await waitForSubmitEnabled(page, 45_000);
         submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
-        if (!submitClicked && submitClickErrors.length === 0) {
+        if (!submitClicked && submitClickErrors.length === 0
+            && typeof (page as { waitForLoadState?: unknown }).waitForLoadState === 'function') {
           // No button found at all — boards that re-render after uploads
           // (Ashby) detach it briefly. Give it one more patient attempt.
+          // (Real pages only; mocks without the button just report false.)
           await new Promise(resolve => setTimeout(resolve, 5000));
           await waitForSubmitEnabled(page, 20_000);
           submitClicked = await clickFirstAcrossFrames(page, SUBMIT_SELECTORS, submitClickErrors);
