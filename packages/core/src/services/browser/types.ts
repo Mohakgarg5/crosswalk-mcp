@@ -108,6 +108,8 @@ export type BrowserFillResult = {
   /** True when an in-page success panel was observed after the submit click
    * (Ashby keeps URL and title unchanged — body text is the only signal). */
   confirmationSeen?: boolean;
+  /** Raw ATS submit-endpoint responses observed (status + url + body head). */
+  submitResponses?: string[];
   /** How many wizard pages were advanced past (Next/Continue clicks) before submit. */
   stepsAdvanced?: number;
   /** True if a verification gate (code field or magic-link screen) was detected. */

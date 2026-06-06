@@ -214,6 +214,23 @@ export class LazyPlaywrightBrowser implements Browser {
       // Captured up-front so the verification poller only considers emails that
       // arrived at/after this apply attempt began.
       const startedAt = new Date().toISOString();
+      // Ground truth for submissions: record the ATS's own submit responses.
+      // "Click happened" is circumstantial; the POST result is the verdict.
+      const submitResponses: string[] = [];
+      const pageOn = (page as { on?: (ev: string, cb: (res: unknown) => void) => void }).on;
+      if (typeof pageOn === 'function') {
+        pageOn.call(page, 'response', (res: unknown) => {
+          void (async () => {
+            try {
+              const r = res as { url: () => string; status: () => number; text: () => Promise<string> };
+              if (/SubmitSingleApplicationFormAction|job_application|\/applications?\b.*submit|submit.*application/i.test(r.url())) {
+                const body = await r.text().catch(() => '');
+                submitResponses.push(`${r.status()} ${r.url().slice(0, 90)} :: ${body.slice(0, 220)}`);
+              }
+            } catch { /* response stream gone */ }
+          })();
+        });
+      }
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS });
       // Many public ATS URLs (Greenhouse job-boards, Lever, Ashby) land on a job
       // description page that hides the application form behind an "Apply" button.
@@ -384,6 +401,7 @@ export class LazyPlaywrightBrowser implements Browser {
         resolvedUrl, title, screenshotPng, filled, skipped, submitClicked,
         postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved,
         ...(confirmationSeen ? { confirmationSeen } : {}),
+        ...(submitResponses.length ? { submitResponses } : {}),
         ...(submitClickErrors.length ? { submitClickErrors } : {})
       };
     });
