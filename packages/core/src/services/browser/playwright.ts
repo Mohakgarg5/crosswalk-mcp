@@ -255,7 +255,10 @@ export class LazyPlaywrightBrowser implements Browser {
       if (opts.clickSubmit) {
         // Let async form-state syncs settle (Ashby PATCHes every field via
         // ApiSetFormValue; submitting mid-flight loses the last values).
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        // Real pages only — mocks lack waitForLoadState.
+        if (typeof (page as { waitForLoadState?: unknown }).waitForLoadState === 'function') {
+          await new Promise(resolve => setTimeout(resolve, 2500));
+        }
         // Uploads (résumé DOCX) keep ATS submit buttons disabled while they
         // process — Greenhouse times a 30s element click out. Wait for an
         // enabled submit control first.
