@@ -879,6 +879,12 @@ async function tryFillFieldAcrossFrames(page: PlaywrightPage, field: FillField, 
 /** Fill a single field on the given frame. Returns whether it matched a selector. */
 async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string | undefined): Promise<boolean> {
   if (field.kind === 'text_by_name') {
+    // Synthetic label-keyed comboboxes (anonymous Ashby autocompletes):
+    // route straight to the label-based react-select machinery.
+    if (field.name.startsWith('__combobox__')) {
+      const label = field.name.slice('__combobox__'.length);
+      return tryReactSelect(page, label, field.value, field.label ?? label);
+    }
     if (!isSafeFieldName(field.name)) return false;
     // First check whether `<input id="X">` is actually a react-select combobox.
     // For those, calling .fill() programmatically succeeds at the DOM level but
@@ -971,8 +977,10 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
           }
           // Ashby prefixes group names with a per-page-load instance id, so
           // the name captured at preview time won't equal the one at fill
-          // time. The `__systemfield_…` (or generally `__…`) suffix is stable.
-          const suffix = name.includes('__') ? name.slice(name.indexOf('__')) : null;
+          // time. The part from the FIRST underscore on is stable — covers
+          // both `uuid__systemfield_x` and Cohere-style `uuid_question-uuid`.
+          const us = name.indexOf('_');
+          const suffix = us >= 0 ? name.slice(us) : null;
           // Checkboxes included: Lever single-select groups are checkboxes.
           const radios = (Array.from(doc.querySelectorAll('input[type="radio"], input[type="checkbox"]')) as any[])
             .filter((x: any) => x.name === name || (suffix && typeof x.name === 'string' && x.name.endsWith(suffix)));
@@ -1254,7 +1262,34 @@ const extractFormFieldsScript = (): FormField[] => {
     }
     const hasAnyIdentifier = Boolean(e.name) || Boolean(e.id) || Boolean(ariaLabel)
                           || Boolean(ariaLabelledBy) || Boolean(derivedLabel);
-    if (!hasAnyIdentifier) continue;
+    if (!hasAnyIdentifier) {
+      // Anonymous comboboxes (Ashby's Location autocomplete: no name, no id,
+      // no label association) — derive the question from the label-ish text
+      // preceding the widget and emit a synthetic label-keyed field, else a
+      // required field stays invisible and the form can never submit.
+      if (e.getAttribute('role') === 'combobox') {
+        let q = '';
+        let node = e.parentElement;
+        for (let depth = 0; depth < 5 && node && !q; depth++) {
+          const prev = node.previousElementSibling;
+          if (prev && /label|legend/i.test(prev.tagName + ' ' + (prev.className || ''))) {
+            const t = String(prev.textContent ?? '').trim();
+            if (t && t.length <= 120) q = t;
+          }
+          node = node.parentElement;
+        }
+        if (q) {
+          fields.push({
+            name: `__combobox__${q.replace(/\*+$/, '').trim()}`,
+            type: 'text',
+            label: q.replace(/\*+$/, '').trim(),
+            required: q.includes('*'),
+            value: undefined
+          });
+        }
+      }
+      continue;
+    }
     const name = e.name || e.id || '(unnamed)';
     const type = tag === 'input' ? (e.type || 'text') : tag;
     let options: string[] | undefined;
