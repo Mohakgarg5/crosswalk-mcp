@@ -62,7 +62,18 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 const STATUSES = ['US Citizen', 'Permanent Resident', 'H-1B', 'F-1 (Student)', 'OPT', 'CPT', 'J-1', 'L-1', 'O-1', 'TN', 'E-3', 'Other'] as const;
 type Status = typeof STATUSES[number];
 type YN = 'yes' | 'no';
-const TOTAL = 6;
+// The standard ATS degree list (Greenhouse et al.) — answers picked here fill
+// those dropdowns verbatim.
+const DEGREES = ["Bachelor's Degree", "Master's Degree", 'Master of Business Administration (M.B.A.)', 'Doctor of Philosophy (Ph.D.)', "Associate's Degree", "Engineer's Degree", 'Doctor of Medicine (M.D.)', 'Juris Doctor (J.D.)', 'High School', 'Other'] as const;
+type Degree = typeof DEGREES[number];
+const GENDERS = ['Male', 'Female', 'Non-binary', 'Prefer not to say'] as const;
+const HISPANIC = ['Yes', 'No', 'Prefer not to say'] as const;
+const RACES = ['American Indian or Alaska Native', 'Asian', 'Black or African American', 'Hispanic or Latino', 'Native Hawaiian or Other Pacific Islander', 'Two or More Races', 'White', 'Prefer not to say'] as const;
+const VETERAN = ['I am not a protected veteran', 'I identify as one or more of the classifications of a protected veteran', "I don't wish to answer"] as const;
+const DISABILITY = ['No, I do not have a disability', 'Yes, I have a disability (or previously had one)', "I don't wish to answer"] as const;
+const WORK_STYLES = ['Remote', 'Hybrid', 'Onsite'] as const;
+type WorkStyle = typeof WORK_STYLES[number];
+const TOTAL = 9;
 
 export default function Onboarding() {
   const router = useRouter();
@@ -81,6 +92,23 @@ export default function Onboarding() {
   const [status, setStatus] = useState<Status | null>(null);
   const [authorized, setAuthorized] = useState<YN | null>(null);
   const [sponsorship, setSponsorship] = useState<YN | null>(null);
+  // education
+  const [school, setSchool] = useState('');
+  const [degree, setDegree] = useState<Degree | null>(null);
+  const [discipline, setDiscipline] = useState('');
+  const [eduStart, setEduStart] = useState('');
+  const [eduEnd, setEduEnd] = useState('');
+  // work preferences
+  const [workStyle, setWorkStyle] = useState<WorkStyle | null>(null);
+  const [relocate, setRelocate] = useState<YN | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [heard, setHeard] = useState('LinkedIn');
+  // EEO self-identification
+  const [gender, setGender] = useState<string | null>(null);
+  const [hispanic, setHispanic] = useState<string | null>(null);
+  const [race, setRace] = useState<string | null>(null);
+  const [veteran, setVeteran] = useState<string | null>(null);
+  const [disability, setDisability] = useState<string | null>(null);
   const [resume, setResume] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [defaultsLoaded, setDefaultsLoaded] = useState<number | null>(null);
@@ -114,10 +142,40 @@ export default function Onboarding() {
         if (authorized) await postJSON('/api/answers', { label: 'Are you legally authorized to work in the US?', answer: authorized === 'yes' ? 'Yes' : 'No' });
         if (sponsorship) await postJSON('/api/answers', { label: 'Will you now or in the future require sponsorship?', answer: sponsorship === 'yes' ? 'Yes' : 'No' });
       } else if (step === 3) {
-        if (resume.trim()) await runTool('add_resume', { label: 'My résumé', rawText: resume.trim() });
+        if (school.trim()) {
+          await postJSON('/api/profile', { education: [{ school: school.trim(), degree, discipline: discipline.trim() || undefined, start_year: eduStart || undefined, end_year: eduEnd || undefined }] });
+          await postJSON('/api/answers', { label: 'school', answer: school.trim() });
+          await postJSON('/api/answers', { label: 'university', answer: school.trim() });
+        }
+        if (degree) await postJSON('/api/answers', { label: 'degree', answer: degree });
+        if (discipline.trim()) await postJSON('/api/answers', { label: 'discipline', answer: discipline.trim() });
       } else if (step === 4) {
-        if (apiKey.trim()) await saveSettings({ apiKey: apiKey.trim() });
+        await postJSON('/api/profile', {
+          ...(workStyle ? { work_style_preference: workStyle } : {}),
+          ...(relocate ? { willing_to_relocate: relocate === 'yes' } : {}),
+          ...(startDate.trim() ? { earliest_start_date: startDate.trim() } : {})
+        });
+        if (workStyle === 'Remote') await postJSON('/api/answers', { label: 'preferred office location', answer: 'Remote' });
+        if (relocate) await postJSON('/api/answers', { label: 'relocate', answer: relocate === 'yes' ? 'Yes' : 'No' });
+        if (startDate.trim()) await postJSON('/api/answers', { label: 'start date', answer: startDate.trim() });
+        if (heard.trim()) await postJSON('/api/answers', { label: 'how did you hear', answer: heard.trim() });
       } else if (step === 5) {
+        // "Prefer not to say" maps to the same decline strings the
+        // load-defaults path uses, so both stay consistent on forms.
+        const DECLINE = 'Decline to self-identify';
+        const save = (label: string, v: string | null, decline: string) =>
+          v ? postJSON('/api/answers', { label, answer: v.startsWith('Prefer not') || v.startsWith("I don't wish") ? decline : v }) : Promise.resolve();
+        await save('gender', gender, DECLINE);
+        await save('hispanic', hispanic, DECLINE);
+        await save('race', race, DECLINE);
+        await save('ethnicity', race, DECLINE);
+        await save('veteran', veteran, "I don't wish to answer");
+        await save('disability', disability, "I don't wish to answer");
+      } else if (step === 6) {
+        if (resume.trim()) await runTool('add_resume', { label: 'My résumé', rawText: resume.trim() });
+      } else if (step === 7) {
+        if (apiKey.trim()) await saveSettings({ apiKey: apiKey.trim() });
+      } else if (step === 8) {
         await saveSettings({ submitPolicy, weeklyCap: Math.max(0, parseInt(weeklyCap || '0', 10)) });
         router.push('/');
         return;
@@ -167,6 +225,71 @@ export default function Onboarding() {
             <Row label="Will you now, or in the future, require sponsorship?">
               <Segmented options={[{ key: 'yes', label: 'Yes' }, { key: 'no', label: 'No' }]} value={sponsorship} onChange={setSponsorship} />
             </Row>
+          </div>
+        </div>
+      )
+    },
+    {
+      eyebrow: 'EDUCATION', title: 'Your most recent education.',
+      blurb: 'School pickers are on nearly every form — answering once fills them everywhere.', canSkip: true,
+      body: (
+        <div className="space-y-5">
+          <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">School</label><Input value={school} onChange={e => setSchool(e.target.value)} placeholder="Northwestern University" /></div>
+          <div>
+            <label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Degree</label>
+            <OptionGrid options={[...DEGREES]} value={degree} onChange={setDegree} />
+          </div>
+          <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Discipline / major</label><Input value={discipline} onChange={e => setDiscipline(e.target.value)} placeholder="Engineering" /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Start year</label><Input value={eduStart} onChange={e => setEduStart(e.target.value.replace(/[^0-9]/g, ''))} placeholder="2025" /></div>
+            <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">End year (or expected)</label><Input value={eduEnd} onChange={e => setEduEnd(e.target.value.replace(/[^0-9]/g, ''))} placeholder="2026" /></div>
+          </div>
+        </div>
+      )
+    },
+    {
+      eyebrow: 'WORK PREFERENCES', title: 'How do you want to work?',
+      blurb: 'Used for office-location, relocation, and start-date questions.', canSkip: true,
+      body: (
+        <div className="space-y-6">
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Preferred work style</div>
+            <OptionGrid options={[...WORK_STYLES]} value={workStyle} onChange={setWorkStyle} />
+          </div>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4">
+            <Row label="Willing to relocate for the right role?">
+              <Segmented options={[{ key: 'yes', label: 'Yes' }, { key: 'no', label: 'No' }]} value={relocate} onChange={setRelocate} />
+            </Row>
+          </div>
+          <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Earliest start date</label><Input value={startDate} onChange={e => setStartDate(e.target.value)} placeholder="2 weeks after offer" /></div>
+          <div><label className="mb-1.5 block text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">How did you hear about jobs? <span className="normal-case">(forms love this one)</span></label><Input value={heard} onChange={e => setHeard(e.target.value)} placeholder="LinkedIn" /></div>
+        </div>
+      )
+    },
+    {
+      eyebrow: 'SELF-IDENTIFICATION', title: 'Voluntary self-identification.',
+      blurb: 'US applications ask these. Every answer is optional — "Prefer not to say" is always respected, and everything stays on your machine.', canSkip: true,
+      body: (
+        <div className="space-y-6">
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Gender</div>
+            <OptionGrid options={[...GENDERS]} value={gender} onChange={setGender} />
+          </div>
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Hispanic or Latino?</div>
+            <OptionGrid options={[...HISPANIC]} value={hispanic} onChange={setHispanic} />
+          </div>
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Race / ethnicity</div>
+            <OptionGrid options={[...RACES]} value={race} onChange={setRace} />
+          </div>
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Veteran status</div>
+            <OptionGrid options={[...VETERAN]} value={veteran} onChange={setVeteran} />
+          </div>
+          <div>
+            <div className="mb-2 text-[12px] font-medium uppercase tracking-wide text-[var(--faint)]">Disability status</div>
+            <OptionGrid options={[...DISABILITY]} value={disability} onChange={setDisability} />
           </div>
         </div>
       )
