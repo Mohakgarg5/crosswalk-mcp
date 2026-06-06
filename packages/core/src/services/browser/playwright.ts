@@ -311,15 +311,22 @@ export class LazyPlaywrightBrowser implements Browser {
               const title = await page.title().catch(() => '');
               if (/thank|received|submitted|confirmation/i.test(title ?? '')) break;
               // Ashby renders an in-page success panel — same URL, same
-              // title. The body text is the only signal.
+              // title. The body text is the only signal. Likewise its
+              // rejection banner ("flagged as possible spam").
               if (patient) {
                 try {
-                  const ok = await page.evaluate(() => {
+                  const verdict = await page.evaluate(() => {
                     const doc = (globalThis as unknown as { document: any }).document;
-                    return /your application has been submitted|application (was )?submitted successfully|thank you for applying/i
-                      .test(String(doc.body?.innerText ?? '').slice(0, 4000));
+                    const text = String(doc.body?.innerText ?? '').slice(0, 4000);
+                    if (/your application has been submitted|application (was )?submitted successfully|thank you for applying/i.test(text)) return 'ok';
+                    if (/flagged as possible spam|couldn'?t submit your application/i.test(text)) return 'rejected';
+                    return '';
                   });
-                  if (ok === true) { confirmationSeen = true; break; }
+                  if (verdict === 'ok') { confirmationSeen = true; break; }
+                  if (verdict === 'rejected') {
+                    submitClickErrors.push('ATS rejected the submission as possible spam (rate-limited) — retry after a cool-down');
+                    break;
+                  }
                 } catch { /* transient */ }
               }
             }
