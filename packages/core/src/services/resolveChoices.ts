@@ -13,10 +13,18 @@ const ALIAS_GROUPS: string[][] = [
 function fuzzyPick(options: string[], answer: string): string | null {
   const a = answer.toLowerCase();
   const grp = ALIAS_GROUPS.find(g => g.includes(a));
-  return options.find(o => o.toLowerCase() === a)
-    ?? (grp ? options.find(o => grp.includes(o.toLowerCase())) ?? null : null)
-    ?? options.find(o => o.toLowerCase().includes(a) || a.includes(o.toLowerCase()))
-    ?? null;
+  const exact = options.find(o => o.toLowerCase() === a);
+  if (exact) return exact;
+  if (grp) {
+    const aliased = options.find(o => grp.includes(o.toLowerCase()));
+    if (aliased) return aliased;
+  }
+  const contained = options.filter(o => o.toLowerCase().includes(a) || a.includes(o.toLowerCase()));
+  // A generic answer ("Yes") that matches several options ("Yes - US Citizen",
+  // "Yes - Green Card holder", "Yes - Visa holder") is ambiguous — taking the
+  // first hit attested US citizenship for a CPT visa holder. Let the model
+  // decide with the applicant's context instead.
+  return contained.length === 1 ? contained[0] : null;
 }
 
 const AFFIRMATIVE = /^(yes|true|agree|i agree|i certify|accept|confirm|on)\b/i;
@@ -43,7 +51,12 @@ export async function resolveChoiceFields(
     const question = f.label || f.name;
     const bank = matchAnswer(db, question);
     let chosen = bank ? fuzzyPick(f.options, bank) : null;
-    if (!chosen) chosen = await chooseFormOption({ sampling, label: question, options: f.options, context });
+    // 50+ harvested options means a paginated typeahead (school pickers) —
+    // the list is one page of many, so accept an unlisted verbatim answer
+    // and let the fill path type it into the live widget.
+    const paginated = f.options.length >= 50;
+    if (!chosen && bank && paginated) chosen = bank;
+    if (!chosen) chosen = await chooseFormOption({ sampling, label: question, options: f.options, context, allowFreeText: paginated });
     if (chosen) out.push({ kind: 'select_by_name', name: f.name, value: chosen });
   }
 

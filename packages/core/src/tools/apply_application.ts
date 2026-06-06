@@ -112,12 +112,21 @@ export async function applyApplication(
   const website = asString(profile.website) ?? asString(links.website) ?? asString(links.portfolio);
   if (website) fields.push({ kind: 'website', value: website });
 
-  const resumeDocxPath = await writeResumeDocxToTemp(app.tailoredResumeMd, app.id);
+  const job = getJob(ctx.db, app.jobId);
+  const company = job ? getCompany(ctx.db, job.companyId) : null;
+
+  // Name the uploads Applicant_Company.docx — recruiters see this filename in
+  // the ATS, so no internal IDs or tool branding.
+  const docxNames = {
+    ...(fullName ? { applicantName: fullName } : {}),
+    ...(company?.name ? { companyName: company.name } : {})
+  };
+  const resumeDocxPath = await writeResumeDocxToTemp(app.tailoredResumeMd, app.id, docxNames);
   fields.push({ kind: 'resume_file', path: resumeDocxPath });
 
   let coverLetterDocxPath: string | undefined;
   if (app.coverLetterMd && app.coverLetterMd.length > 0) {
-    coverLetterDocxPath = await writeCoverLetterDocxToTemp(app.coverLetterMd, app.id);
+    coverLetterDocxPath = await writeCoverLetterDocxToTemp(app.coverLetterMd, app.id, docxNames);
     fields.push({ kind: 'cover_letter_file', path: coverLetterDocxPath });
     fields.push({ kind: 'cover_letter_text', value: app.coverLetterMd });
   }
@@ -136,8 +145,6 @@ export async function applyApplication(
     if (f.kind === 'text_by_name') knownNames.add(f.name);
   }
 
-  const job = getJob(ctx.db, app.jobId);
-  const company = job ? getCompany(ctx.db, job.companyId) : null;
   let detectedAts = company ? company.ats : null;
 
   // Aggregator listings (The Muse) carry no application form — resolve the
@@ -190,15 +197,22 @@ export async function applyApplication(
     const jobContext = job
       ? `Applying to: ${job.title}${company ? ` at ${company.name}` : ''}`
       : 'a job application';
-    // Bundle the tailored résumé (real work history) + cover letter so the
-    // sampler has the candidate's actual employers/titles/dates, not just
-    // motivational prose. The model was confusing target company with current
-    // employer when only the cover letter was given.
-    const resumeText = app.tailoredResumeMd ? `--- Applicant's résumé (true facts) ---\n${app.tailoredResumeMd.slice(0, 3000)}` : '';
+    // Bundle the profile (work authorization, location, links live HERE, not
+    // in the résumé) + tailored résumé (real work history) + cover letter so
+    // the sampler has the candidate's actual facts, not just motivational
+    // prose. The model was confusing target company with current employer
+    // when only the cover letter was given, and skipping factual dropdowns
+    // (work auth) it could have answered from the profile.
+    const profileText = Object.keys(profile).length > 0
+      ? `--- Applicant's profile (true facts) ---\n${JSON.stringify(profile)}`
+      : '';
+    // 6000 chars, not 3000: education sits at the BOTTOM of the résumé and
+    // was being cut off, so school/degree dropdowns had nothing to go on.
+    const resumeText = app.tailoredResumeMd ? `--- Applicant's résumé (true facts) ---\n${app.tailoredResumeMd.slice(0, 6000)}` : '';
     const coverText = (app.coverLetterMd && app.coverLetterMd.length > 0)
       ? `--- Applicant's cover letter ---\n${app.coverLetterMd.slice(0, 1200)}`
       : '';
-    const applicantContext = [resumeText, coverText].filter(Boolean).join('\n\n') || 'No résumé or cover letter on file.';
+    const applicantContext = [profileText, resumeText, coverText].filter(Boolean).join('\n\n') || 'No résumé or cover letter on file.';
 
     // Skip fields the standard-selector pass already handles via well-known
     // kinds — re-filling them with a sampled value would be wasted work and

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { writeResumeDocxToTemp, writeCoverLetterDocxToTemp } from '../src/services/browser/resumeFile.ts';
 
 describe('services/browser/resumeFile', () => {
@@ -25,5 +26,50 @@ describe('services/browser/resumeFile', () => {
     expect(bytes[0]).toBe(0x50);
     expect(bytes[1]).toBe(0x4b);
     await fs.unlink(path);
+  });
+
+  it('names the resume Applicant_Company.docx when names are known — recruiters see this filename', async () => {
+    const p = await writeResumeDocxToTemp('# Resume', 'app-1', {
+      applicantName: 'Mohak Garg',
+      companyName: 'Perplexity'
+    });
+    expect(path.basename(p)).toBe('Mohak_Garg_Perplexity.docx');
+    // No internal IDs or tool branding may leak into the visible filename.
+    expect(path.basename(p)).not.toMatch(/crosswalk|app-1/i);
+    await fs.unlink(p);
+  });
+
+  it('sanitizes punctuation and spaces in names', async () => {
+    const p = await writeResumeDocxToTemp('# Resume', 'app-2', {
+      applicantName: 'Mohak  Garg',
+      companyName: 'Perplexity, Inc.'
+    });
+    expect(path.basename(p)).toBe('Mohak_Garg_Perplexity_Inc.docx');
+    await fs.unlink(p);
+  });
+
+  it('returns distinct paths for two writes with identical names (no overwrite)', async () => {
+    const a = await writeResumeDocxToTemp('# A', 'app-3', { applicantName: 'Jane Doe', companyName: 'Acme' });
+    const b = await writeResumeDocxToTemp('# B', 'app-3', { applicantName: 'Jane Doe', companyName: 'Acme' });
+    expect(a).not.toBe(b);
+    expect(path.basename(a)).toBe('Jane_Doe_Acme.docx');
+    expect(path.basename(b)).toBe('Jane_Doe_Acme.docx');
+    await fs.unlink(a);
+    await fs.unlink(b);
+  });
+
+  it('names the cover letter Applicant_Company_Cover_Letter.docx when names are known', async () => {
+    const p = await writeCoverLetterDocxToTemp('Dear team', 'app-4', {
+      applicantName: 'Mohak Garg',
+      companyName: 'Perplexity'
+    });
+    expect(path.basename(p)).toBe('Mohak_Garg_Perplexity_Cover_Letter.docx');
+    await fs.unlink(p);
+  });
+
+  it('falls back to applicant-only naming when the company is unknown', async () => {
+    const p = await writeResumeDocxToTemp('# Resume', 'app-5', { applicantName: 'Mohak Garg' });
+    expect(path.basename(p)).toBe('Mohak_Garg_Resume.docx');
+    await fs.unlink(p);
   });
 });

@@ -44,4 +44,47 @@ describe('resolveChoiceFields', () => {
     const out = await resolveChoiceFields(db, sampling(), fields, 'ctx');
     expect(out.find(f => f.kind === 'checkbox_by_name')).toBeUndefined();
   });
+
+  it('defers ambiguous bank answers to the model — generic "Yes" must not pick "Yes - US Citizen"', async () => {
+    const db = openDb(':memory:');
+    addAnswer(db, { label: 'legally authorized', answer: 'Yes' });
+    const fields: FormField[] = [{
+      name: 'work_auth', type: 'select', label: 'Are you legally authorized to work in the United States?', required: true,
+      options: ['Yes - US Citizen', 'Yes - Green Card holder', 'Yes - Visa holder', 'No - Not authorized']
+    }];
+    // The model (with profile context: CPT visa) picks the right Yes variant.
+    const out = await resolveChoiceFields(db, sampling('Yes - Visa holder'), fields, 'Work authorization: CPT (F-1 visa).');
+    expect(out).toContainEqual({ kind: 'select_by_name', name: 'work_auth', value: 'Yes - Visa holder' });
+  });
+
+  it('still resolves unambiguous bank answers without the model', async () => {
+    const db = openDb(':memory:');
+    addAnswer(db, { label: 'sponsorship', answer: 'No' });
+    const fields: FormField[] = [{
+      name: 'sponsor', type: 'select', label: 'Will you require sponsorship?', required: true,
+      options: ['Yes', 'No']
+    }];
+    const out = await resolveChoiceFields(db, sampling('SKIP'), fields, 'ctx');
+    expect(out).toContainEqual({ kind: 'select_by_name', name: 'sponsor', value: 'No' });
+  });
+
+  it('accepts an unlisted model answer for paginated typeaheads (50+ harvested options)', async () => {
+    const db = openDb(':memory:');
+    // Greenhouse school combobox: harvest captures only the first page.
+    const options = Array.from({ length: 100 }, (_, i) => `University ${i}`);
+    const fields: FormField[] = [
+      { name: 'school--0', type: 'text', label: 'School', required: true, options }
+    ];
+    const out = await resolveChoiceFields(db, sampling('Northwestern University'), fields, 'MS at Northwestern University');
+    expect(out).toContainEqual({ kind: 'select_by_name', name: 'school--0', value: 'Northwestern University' });
+  });
+
+  it('still drops unlisted answers for short (complete) option lists', async () => {
+    const db = openDb(':memory:');
+    const fields: FormField[] = [
+      { name: 'experience', type: 'select', label: 'Years of experience', required: true, options: ['0-2', '3-5', '6+'] }
+    ];
+    const out = await resolveChoiceFields(db, sampling('Purple'), fields, 'ctx');
+    expect(out.find(f => f.kind === 'select_by_name')).toBeUndefined();
+  });
 });

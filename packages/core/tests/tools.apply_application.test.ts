@@ -148,7 +148,8 @@ describe('tools/apply_application', () => {
     expect(kinds).toContain('resume_file');
 
     const cf = passed.find(f => f.kind === 'cover_letter_file');
-    expect(cf && cf.kind === 'cover_letter_file' && cf.path.endsWith('.docx') && cf.path.includes('cover-letter')).toBe(true);
+    // Visible filename is Applicant_Company_Cover_Letter.docx — recruiters see it.
+    expect(cf && cf.kind === 'cover_letter_file' && cf.path.endsWith('Jane_Smith_Stripe_Cover_Letter.docx')).toBe(true);
 
     const ct = passed.find(f => f.kind === 'cover_letter_text');
     expect(ct && ct.kind === 'cover_letter_text' && ct.value.length > 0).toBe(true);
@@ -267,6 +268,11 @@ describe('tools/apply_application', () => {
     // why_company should be sampled and pushed as text_by_name
     const why = passed.find(f => f.kind === 'text_by_name' && f.name === 'why_company');
     expect(why && why.kind === 'text_by_name' && why.value).toBe('Because I love your product depth.');
+
+    // The sampler must see the PROFILE facts (work authorization lives there,
+    // not in the résumé) — factual dropdowns were skipped without them.
+    const sampledPrompt = (completeFn.mock.calls[0][0] as { prompt: string }).prompt;
+    expect(sampledPrompt).toContain('jane@example.com');
 
     // random_q got SKIP — should NOT appear
     expect(passed.find(f => f.kind === 'text_by_name' && f.name === 'random_q')).toBeUndefined();

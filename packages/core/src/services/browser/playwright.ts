@@ -1,4 +1,5 @@
 import { execSync } from 'node:child_process';
+import { appendFileSync } from 'node:fs';
 import type { Browser, BrowserPreview, FormField, FillField, BrowserFillResult, ResolveVerification, VerificationContext } from './types.ts';
 import { BrowserNotInstalledError } from './types.ts';
 // Pure URL-safety util (no email/IMAP logic) — used to re-validate a magic
@@ -729,7 +730,16 @@ async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'l
  * Returns true ONLY when an option was actually clicked. Type+Enter remains as
  * a last-resort fallback for widgets that don't render a discoverable menu.
  */
-async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: string, label?: string): Promise<boolean> {
+// Temporary fill-debug channel: set CROSSWALK_DEBUG_FILL=1 to trace combobox
+// interactions to /tmp/crosswalk-fill-debug.log.
+function fillDebug(event: string, data: Record<string, unknown>): void {
+  if (!process.env.CROSSWALK_DEBUG_FILL) return;
+  try {
+    appendFileSync('/tmp/crosswalk-fill-debug.log', JSON.stringify({ t: new Date().toISOString(), event, ...data }) + '\n');
+  } catch { /* best effort */ }
+}
+
+export async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: string, label?: string): Promise<boolean> {
   const isUsableName = isSafeFieldName(fieldName);
   const escaped = isUsableName ? escAttr(fieldName) : '';
   const inputSelectors = isUsableName ? [
@@ -811,7 +821,7 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
     // `[role="listbox"]` (MUI/Headless UI).
     const wanted = value.toLowerCase().trim();
     const wantedFirstSegment = wanted.split(/[,\(]/)[0].trim();
-    const matchInfo = await frame.evaluate(() => {
+    const enumerateMenuOptions = () => frame.evaluate(() => {
       const doc = (globalThis as unknown as { document: any }).document;
       const containers = Array.from(doc.querySelectorAll(
         '.select__menu, [role="listbox"]'
@@ -831,6 +841,24 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
         text: String(o.textContent ?? '').trim()
       })).filter(o => o.text.length > 0);
     }).catch(() => [] as Array<{ index: number; text: string }>);
+    const clickOptionByText = async (text: string): Promise<boolean> => {
+      const escapedText = text.replace(/"/g, '\\"');
+      for (const sel of [
+        `.select__menu .select__option:has-text("${escapedText}")`,
+        `[role="listbox"] [role="option"]:has-text("${escapedText}")`,
+        `.select__option:has-text("${escapedText}")`,
+        `[role="option"]:has-text("${escapedText}")`
+      ]) {
+        const opt = await frame.$(sel);
+        if (opt && typeof opt.click === 'function') {
+          try { await opt.click(); await new Promise(r => setTimeout(r, 200)); return true; }
+          catch { /* try next selector */ }
+        }
+      }
+      return false;
+    };
+    const matchInfo = await enumerateMenuOptions();
+    fillDebug('rsel:menu-at-open', { fieldName, value, optCount: matchInfo.length, sample: matchInfo.slice(0, 3).map(o => o.text) });
 
     if (matchInfo.length > 0) {
       // Stricter scoring. Exact > startsWith > contains-first-segment with
@@ -874,43 +902,77 @@ async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, value: 
       scored.sort((a, b) => b.score - a.score);
       const best = scored[0];
       if (best && best.score >= 55) {
-        const escapedText = best.text.replace(/"/g, '\\"');
-        const candidates = [
-          `.select__menu .select__option:has-text("${escapedText}")`,
-          `[role="listbox"] [role="option"]:has-text("${escapedText}")`,
-          `.select__option:has-text("${escapedText}")`,
-          `[role="option"]:has-text("${escapedText}")`
-        ];
-        for (const sel of candidates) {
-          const opt = await frame.$(sel);
-          if (opt && typeof opt.click === 'function') {
-            try { await opt.click(); await new Promise(r => setTimeout(r, 200)); return true; }
-            catch { /* try next selector */ }
-          }
-        }
+        if (await clickOptionByText(best.text)) return true;
       }
     }
     // Fallback: type + select — works when the widget filters as you type
-    // (react-select, downshift, location autocompletes). Async suggestion
-    // lookups (Google Places) take >1s; pressing Enter too early commits
-    // nothing, and a blind Escape afterwards CLEARS whatever did commit.
+    // (react-select, downshift, location autocompletes) or queries a remote
+    // list (Greenhouse school typeaheads).
+    if (typeof input.fill === 'function') {
+      // Clear any residue from a previous attempt — retyping into a non-empty
+      // react-select filter produces "NorthwesternNorthwestern" and no results.
+      try { await input.fill(''); } catch { /* readonly trigger inputs */ }
+    }
     if (typeof input.type === 'function') {
       await input.type(value, { delay: 30 });
     } else if (typeof input.fill === 'function') {
       await input.fill(value);
     }
-    await new Promise(r => setTimeout(r, 1500)); // let async suggestions load
-    if (typeof input.press === 'function') {
+    // Remote suggestion lookups take seconds. Poll the menu instead of a
+    // fixed sleep and CLICK the loaded suggestion — pressing Enter on a
+    // still-loading menu commits nothing while reporting success (that's how
+    // "filled" school fields came back empty). Only a CONFIDENT text match
+    // may be clicked: another widget's still-open menu can be visible while
+    // this one is loading, and clicking its first option fills garbage.
+    let clickedSuggestion = false;
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline) {
+      const opts = await enumerateMenuOptions();
+      const target = opts.find(o => o.text.toLowerCase() === wanted)
+        ?? opts.find(o => o.text.toLowerCase().includes(wanted) || wanted.includes(o.text.toLowerCase()));
+      fillDebug('rsel:poll', { fieldName, optCount: opts.length, sample: opts.slice(0, 3).map(o => o.text), target: target?.text ?? null });
+      if (target) {
+        clickedSuggestion = await clickOptionByText(target.text);
+        fillDebug('rsel:click', { fieldName, target: target.text, clickedSuggestion });
+        if (clickedSuggestion) break;
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if (!clickedSuggestion && typeof input.press === 'function') {
       try { await input.press('ArrowDown'); } catch { /* no menu — Enter may still commit */ }
       await new Promise(r => setTimeout(r, 200));
       await input.press('Enter');
+      await new Promise(r => setTimeout(r, 400));
     }
-    await new Promise(r => setTimeout(r, 400));
     // No Escape here: on a committed react-select it clears the selection,
     // and option-menu pollution is already handled by the visible-container
     // filter in the enumeration above.
+    // Verify the widget actually committed a value. A committed react-select
+    // renders it in .select__single-value; reporting success on an empty
+    // widget turns a fixable skip into a silent hole in the application.
+    if (typeof (input as unknown as { evaluate?: unknown }).evaluate === 'function') {
+      try {
+        const committed = await (input as unknown as { evaluate: (fn: (el: any) => boolean) => Promise<boolean> }).evaluate((el: any) => {
+          let n = el;
+          // 3 levels: input-container → value-container → control. Going
+          // higher reaches SIBLING widgets' single-values (education rows).
+          for (let i = 0; i < 3 && n; i++) {
+            const sv = n.querySelector?.('.select__single-value, [class*="singleValue"]');
+            if (sv && String(sv.textContent ?? '').trim().length > 0) return true;
+            n = n.parentElement;
+          }
+          // react-select keeps the typed text in the input even when nothing
+          // committed — only the single-value node proves a real selection.
+          const isReactSelect = Boolean(el.closest?.('[class*="select__"], [class*="select_"]'));
+          if (isReactSelect) return false;
+          return Boolean(el.value && String(el.value).trim().length > 0);
+        });
+        fillDebug('rsel:commit-verdict', { fieldName, committed: Boolean(committed) });
+        return Boolean(committed);
+      } catch (e) { fillDebug('rsel:commit-verify-threw', { fieldName, err: String(e) }); }
+    }
     return true;
-  } catch { return false; }
+  } catch (e) { fillDebug('rsel:threw', { fieldName, err: String(e) }); return false; }
 }
 
 /** Try filling a field on the main page first, then each nested frame (Stripe
@@ -973,11 +1035,55 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
       try { await el.selectOption({ label: field.value }); return true; } catch { /* fall through to value */ }
       try { await el.selectOption(field.value); return true; } catch { continue; }
     }
-    // Fallback to react-select (label-aware).
+    // Fallback to react-select (label-aware). One retry with a fresh element
+    // lookup: Greenhouse re-renders the education section once the uploaded
+    // résumé parses, which detaches the combobox mid-interaction.
+    if (await tryReactSelect(page, field.name, field.value, field.label)) return true;
+    await new Promise(r => setTimeout(r, 1000));
     return tryReactSelect(page, field.name, field.value, field.label);
   }
 
   if (field.kind === 'radio_by_name') {
+    // Synthetic button-option groups (Ashby Yes/No widgets): the name embeds
+    // the question. The in-page evaluate only LOCATES the button and stamps a
+    // marker — the click must be a real Playwright click, because Ashby's
+    // react-aria buttons listen for trusted pointer events and ignore the
+    // synthetic DOM click() an in-page handler would dispatch.
+    if (field.name.startsWith('__btnopt__')) {
+      const q = field.name.slice('__btnopt__'.length);
+      try {
+        const marker = await page.evaluate(
+          ({ q, value }: { q: string; value: string }) => {
+            const doc = (globalThis as unknown as { document: any }).document;
+            // Tolerate whitespace/asterisk drift between preview and fill.
+            const norm = (s: string) => s.toLowerCase().replace(/\*/g, '').replace(/\s+/g, ' ').trim();
+            const btns = Array.from(doc.querySelectorAll('button[class*="_option_"]')) as any[];
+            for (const b of btns) {
+              const txt = String(b.innerText ?? '').trim();
+              if (txt.toLowerCase() !== value.toLowerCase().trim()) continue;
+              let bq = '';
+              let n = b.parentElement;
+              for (let i = 0; i < 6 && n && !bq; i++) {
+                const t = String(n.textContent ?? '').trim();
+                if (t.includes('?') && t.length < 300) bq = t.split('?')[0].trim().slice(-120) + '?';
+                n = n.parentElement;
+              }
+              if (norm(bq.slice(0, 100)) !== norm(q)) continue;
+              const m = `__cw_btnopt_${Math.floor(Math.random() * 1e9)}`;
+              b.setAttribute('data-cw-marker', m);
+              return m;
+            }
+            return null;
+          },
+          { q, value: field.value }
+        );
+        if (marker && typeof marker === 'string') {
+          const btn = await page.$(`[data-cw-marker="${marker}"]`);
+          if (btn && typeof btn.click === 'function') { await btn.click(); return true; }
+        }
+      } catch { /* mocked page or cross-origin — report unfilled */ }
+      return false;
+    }
     for (const selector of [
       `input[type="radio"][name="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`,
       `input[type="radio"][id="${escAttr(field.name)}"][value="${escAttr(field.value)}"]`,
@@ -1002,26 +1108,6 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
       const clicked = await page.evaluate(
         ({ name, value }: { name: string; value: string }) => {
           const doc = (globalThis as unknown as { document: any }).document;
-          // Synthetic button-option groups (Ashby Yes/No widgets): the name
-          // embeds the question; click the button whose text matches the
-          // chosen value under the same question.
-          if (name.startsWith('__btnopt__')) {
-            const q = name.slice('__btnopt__'.length);
-            const btns = Array.from(doc.querySelectorAll('button[class*="_option_"]')) as any[];
-            for (const b of btns) {
-              const txt = String(b.innerText ?? '').trim();
-              if (txt.toLowerCase() !== value.toLowerCase().trim()) continue;
-              let bq = '';
-              let n = b.parentElement;
-              for (let i = 0; i < 6 && n && !bq; i++) {
-                const t = String(n.textContent ?? '').trim();
-                if (t.includes('?') && t.length < 300) bq = t.split('?')[0].trim().slice(-120) + '?';
-                n = n.parentElement;
-              }
-              if (bq.slice(0, 100) === q) { b.click(); return true; }
-            }
-            return false;
-          }
           // Ashby prefixes group names with a per-page-load instance id, so
           // the name captured at preview time won't equal the one at fill
           // time. The part from the FIRST underscore on is stable — covers

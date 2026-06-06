@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mdToDocxBuffer, parseInline } from '../src/exporters/docx.ts';
+import { mdToDocxBuffer, mdToParagraphs, parseInline } from '../src/exporters/docx.ts';
 
 // Walk a TextRun's internal tree and report what it actually contains —
 // used to verify inline markdown becomes real DOCX bold/italic, not literal **.
@@ -76,5 +76,15 @@ describe('exporters/docx', () => {
     expect(parseInline('Half **broken markdown').map(inspectRun)).toEqual([
       { text: 'Half **broken markdown', bold: false, italics: false }
     ]);
+  });
+
+  it('justifies body paragraphs and bullets so lines fill the page width', () => {
+    const md = '# Mohak Garg\n\nProduct manager with six years of experience shipping API platforms.\n\n- Led a team of four engineers';
+    const [heading, body, bullet] = mdToParagraphs(md);
+    // 'both' is OOXML for justified (w:jc w:val="both")
+    expect(JSON.stringify(body)).toContain('"both"');
+    expect(JSON.stringify(bullet)).toContain('"both"');
+    // Headings stay left-aligned — justifying a short heading looks broken.
+    expect(JSON.stringify(heading)).not.toContain('"both"');
   });
 });

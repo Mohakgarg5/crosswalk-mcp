@@ -1,4 +1,4 @@
-import { Document, Packer, Paragraph, HeadingLevel, TextRun } from 'docx';
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType } from 'docx';
 
 type Block =
   | { kind: 'heading'; level: 1 | 2 | 3; text: string }
@@ -102,15 +102,22 @@ function blockToParagraph(b: Block): Paragraph {
   if (b.kind === 'bullet') {
     return new Paragraph({
       bullet: { level: 0 },
+      alignment: AlignmentType.JUSTIFIED,
       children: parseInline(b.text)
     });
   }
-  return new Paragraph({ children: parseInline(b.text) });
+  // Justify body text so each full line spans the page width — left-ragged
+  // resume lines were the complaint. Headings stay left-aligned.
+  return new Paragraph({ alignment: AlignmentType.JUSTIFIED, children: parseInline(b.text) });
+}
+
+/** Markdown → docx Paragraphs. Exported so tests can inspect alignment/styling. */
+export function mdToParagraphs(md: string): Paragraph[] {
+  const blocks = parseBlocks(md);
+  return blocks.length > 0 ? blocks.map(blockToParagraph) : [new Paragraph({})];
 }
 
 export async function mdToDocxBuffer(md: string): Promise<Buffer> {
-  const blocks = parseBlocks(md);
-  const paragraphs = blocks.length > 0 ? blocks.map(blockToParagraph) : [new Paragraph({})];
-  const doc = new Document({ sections: [{ children: paragraphs }] });
+  const doc = new Document({ sections: [{ children: mdToParagraphs(md) }] });
   return Packer.toBuffer(doc);
 }
