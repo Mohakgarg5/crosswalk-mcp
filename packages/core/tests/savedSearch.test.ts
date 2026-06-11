@@ -66,4 +66,38 @@ describe('saved searches + new-match notifications', () => {
     deleteSavedSearch(db, s.id);
     expect(listSavedSearches(db).length).toBe(0);
   });
+
+  it('persists per-watch overrides (resumeId, minFit, weeklyCap, autoSubmit) and round-trips them', () => {
+    const db = openDb(':memory:');
+    const s = createSavedSearch(db, {
+      name: 'PM track',
+      filters: { titleContains: 'PM' },
+      source: 'web',
+      autoApply: true,
+      resumeId: 'r-1',
+      minFit: 0.7,
+      weeklyCap: 5,
+      autoSubmit: true
+    });
+    expect(s.resumeId).toBe('r-1');
+    expect(s.minFit).toBe(0.7);
+    expect(s.weeklyCap).toBe(5);
+    expect(s.autoSubmit).toBe(true);
+
+    const reloaded = listSavedSearches(db).find(x => x.id === s.id)!;
+    expect(reloaded.resumeId).toBe('r-1');
+    expect(reloaded.minFit).toBe(0.7);
+    expect(reloaded.weeklyCap).toBe(5);
+    expect(reloaded.autoSubmit).toBe(true);
+  });
+
+  it('leaves overrides undefined for a watch created without them (back-compat)', () => {
+    const db = openDb(':memory:');
+    const s = createSavedSearch(db, { name: 'plain', filters: {} });
+    const reloaded = listSavedSearches(db).find(x => x.id === s.id)!;
+    expect(reloaded.resumeId).toBeUndefined();
+    expect(reloaded.minFit).toBeUndefined();
+    expect(reloaded.weeklyCap).toBeUndefined();
+    expect(reloaded.autoSubmit).toBeUndefined();
+  });
 });
