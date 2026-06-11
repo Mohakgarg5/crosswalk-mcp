@@ -57,6 +57,12 @@ export async function resolveChoiceFields(
     const paginated = f.options.length >= 50;
     if (!chosen && bank && paginated) chosen = bank;
     if (!chosen) chosen = await chooseFormOption({ sampling, label: question, options: f.options, context, allowFreeText: paginated });
+    // Required dropdown still empty (the model SKIPped a custom question like
+    // "AI Policy for Application")? It blocks submit, so force a choice from the
+    // options the form itself offers — never leave a required field blank.
+    if (!chosen && f.required && !paginated) {
+      chosen = await chooseFormOption({ sampling, label: question, options: f.options, context, mustChoose: true });
+    }
     if (chosen) out.push({ kind: 'select_by_name', name: f.name, value: chosen });
   }
 
