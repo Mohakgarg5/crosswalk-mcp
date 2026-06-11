@@ -281,6 +281,23 @@ export class LazyPlaywrightBrowser implements Browser {
         }
       }
 
+      // Before submitting, re-apply the standard identity fields. ATS embeds
+      // (Greenhouse job_app) frequently reload once mid-fill, silently wiping
+      // values typed early — that's how a filled "First Name" came back
+      // required at submit time. Re-filling on the now-settled page makes them
+      // stick. Restricted to plain idempotent text fills (re-running a
+      // committed react-select could clear it).
+      if (opts.clickSubmit) {
+        await settlePage(page);
+        const REFILL_KINDS = new Set(['email', 'first_name', 'last_name', 'full_name', 'phone', 'linkedin', 'website']);
+        for (const field of fields) {
+          if (!REFILL_KINDS.has(field.kind)) continue;
+          try {
+            if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(labelOf(field));
+          } catch { /* transient nav — the pre-submit validation scan still catches gaps */ }
+        }
+      }
+
       const filled = fields.map(labelOf).filter(l => filledLabels.has(l));
       const skipped = fields.map(labelOf).filter(l => !filledLabels.has(l));
 
