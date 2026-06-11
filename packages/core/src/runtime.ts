@@ -44,6 +44,8 @@ export type { Notification, NeedsActionReason } from './store/notification.ts';
 export { refreshSavedSearch, refreshAllSavedSearches } from './services/savedSearchEngine.ts';
 export { scoreAndGate } from './services/fitGate.ts';
 export type { FitGateResult } from './services/fitGate.ts';
+export { buildLaunchAgentPlist, launchAgentPlistPath, LAUNCH_AGENT_LABEL } from './service/launchAgent.ts';
+export type { LaunchAgentSpec } from './service/launchAgent.ts';
 
 // Recruiter email routing
 export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/email.ts';

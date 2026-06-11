@@ -12,6 +12,8 @@
     "build:web": "npm run build -w @crosswalk/web",
     "dev:web": "npm run dev -w @crosswalk/web",
     "gui": "npm run build:core && npm run dev -w @crosswalk/web",
-    "watch": "node scripts/watch.mjs"
+    "watch": "node scripts/watch.mjs",
+    "service:install": "npm run build:core && node scripts/install-service.mjs",
+    "service:uninstall": "node scripts/install-service.mjs uninstall"
   }
 }
