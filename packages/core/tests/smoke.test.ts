@@ -18,4 +18,10 @@ describe('smoke', () => {
     expect(typeof rt.updateSavedSearchConfig).toBe('function');
     expect(typeof rt.scoreAndGate).toBe('function');
   });
+
+  it('runtime exports enqueueNeedsAction + listNeedsActions', async () => {
+    const rt = await import('../src/runtime.ts');
+    expect(typeof rt.enqueueNeedsAction).toBe('function');
+    expect(typeof rt.listNeedsActions).toBe('function');
+  });
 });

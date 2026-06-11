@@ -207,6 +207,10 @@ export async function listNotifs(unreadOnly = false) {
   const d = await db();
   return { items: listNotifications(d, { unreadOnly }), unread: unreadCount(d) };
 }
+export async function listNeedsAction() {
+  const { listNeedsActions } = await rt();
+  return listNeedsActions(await db());
+}
 export async function markNotifsRead() {
   const { markAllRead } = await rt();
   return markAllRead(await db());

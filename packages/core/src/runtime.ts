@@ -39,8 +39,8 @@ export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch
 export type { SavedSearch, SavedSearchFilters, SearchSource } from './store/savedSearch.ts';
 export { runWatch } from './services/watchEngine.ts';
 export type { WatchRunResult, WatchSearchOutcome } from './services/watchEngine.ts';
-export { listNotifications, unreadCount, markAllRead } from './store/notification.ts';
-export type { Notification } from './store/notification.ts';
+export { listNotifications, unreadCount, markAllRead, createNotification, enqueueNeedsAction, listNeedsActions } from './store/notification.ts';
+export type { Notification, NeedsActionReason } from './store/notification.ts';
 export { refreshSavedSearch, refreshAllSavedSearches } from './services/savedSearchEngine.ts';
 export { scoreAndGate } from './services/fitGate.ts';
 export type { FitGateResult } from './services/fitGate.ts';
