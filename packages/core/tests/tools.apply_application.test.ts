@@ -392,7 +392,7 @@ describe('tools/apply_application', () => {
     expect(res.verificationResolved).toBe(false);
 
     const notifs = listNotifications(db);
-    const pending = notifs.filter(n => n.kind === 'verification_pending');
+    const pending = notifs.filter(n => n.kind === 'needs_action' && n.reason === 'verification_timeout');
     expect(pending.length).toBe(1);
     expect(pending[0].refId).toBe('app1');
 
@@ -448,7 +448,7 @@ describe('tools/apply_application', () => {
     expect(events.some(e => e.kind === 'browser_submitted')).toBe(false);
     expect(events.some(e => e.kind === 'submit_unconfirmed')).toBe(true);
     const notifs = listNotifications(db);
-    expect(notifs.some(n => n.kind === 'submit_unconfirmed')).toBe(true);
+    expect(notifs.some(n => n.kind === 'needs_action' && n.reason === 'submit_unconfirmed')).toBe(true);
   });
 
   it('marks submitted when the page did not navigate but shows a confirmation title', async () => {
@@ -516,5 +516,37 @@ describe('tools/apply_application', () => {
       applyApplication({ applicationId: 'app2' }, { db, browser, sampling, fetchImpl })
     ).rejects.toThrow(/apply on the company site/i);
     expect(browser.fillForm).not.toHaveBeenCalled();
+  });
+
+  it('enqueues a needs_action (account_wall) when nothing fills', async () => {
+    const browser = makeDefaultBrowser(); // fillForm returns filled: []
+    const sampling = makeNoopSampling();
+    const { listNeedsActions } = await import('../src/store/notification.ts');
+
+    await applyApplication({ applicationId: 'app1', submit: false }, { db, browser, sampling });
+
+    const q = listNeedsActions(db);
+    expect(q.some(n => n.reason === 'account_wall')).toBe(true);
+    expect(q.find(n => n.reason === 'account_wall')?.refId).toBe('app1');
+  });
+
+  it('enqueues a needs_action (no_form) when a Muse listing has no resolvable form', async () => {
+    upsertCompany(db, { id: 'themuse:acme', name: 'Acme', ats: 'themuse', atsOrgSlug: 'acme' });
+    upsertJobs(db, [{ id: 'themuse:99', companyId: 'themuse:acme', title: 'PM', url: 'https://www.themuse.com/jobs/acme/pm', raw: {} }]);
+    createApplication(db, {
+      id: 'app3', jobId: 'themuse:99', resumeId: 'r1',
+      tailoredResumeMd: '# Jane', coverLetterMd: '', answerPack: {},
+      deepLink: 'https://www.themuse.com/jobs/acme/pm'
+    });
+    const browser = makeDefaultBrowser();
+    const fetchImpl = (async () => ({ ok: true, text: async () => 'no link in here' })) as unknown as typeof fetch;
+    const sampling = makeNoopSampling();
+    const { listNeedsActions } = await import('../src/store/notification.ts');
+
+    await expect(
+      applyApplication({ applicationId: 'app3' }, { db, browser, sampling, fetchImpl })
+    ).rejects.toThrow(/apply on the company site/i);
+
+    expect(listNeedsActions(db).some(n => n.reason === 'no_form')).toBe(true);
   });
 });
