@@ -15,7 +15,10 @@ import type { SamplingClient } from '../src/sampling/client.ts';
 const tick = () => new Promise(r => setTimeout(r, 1100)); // advance wall-clock past ms granularity
 
 function fakeSampling(): SamplingClient {
-  return { complete: async () => 'GENERATED', completeJson: async () => ({}) } as unknown as SamplingClient;
+  return {
+    complete: async () => 'GENERATED',
+    completeJson: async () => ({ score: 0.85, top_strengths: [], top_gaps: [] })
+  } as unknown as SamplingClient;
 }
 function fakeBrowser(): Browser {
   const png = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -50,6 +53,36 @@ describe('runWatch — continuous role-matched auto-apply', () => {
     const second = await runWatch(deps);
     expect(second.totalNew).toBe(1);
     expect(listApplications(db).length).toBe(1);
+  });
+
+  it('only auto-applies jobs that score >= the watch minFit', async () => {
+    const db = openDb(':memory:');
+    seed(db); // seeds resume r-1 + a PM job g-1
+    // Sampling that scores any job with "Senior" in the title low, others high.
+    const sampling = {
+      complete: async () => 'GENERATED',
+      completeJson: async (req: { prompt: string }) =>
+        req.prompt.includes('Senior')
+          ? { score: 0.2, top_strengths: [], top_gaps: [] }
+          : { score: 0.85, top_strengths: [], top_gaps: [] }
+    } as unknown as SamplingClient;
+    const deps = { db, sampling, browser: fakeBrowser() };
+
+    createSavedSearch(db, {
+      name: 'PM', filters: { titleContains: 'PM' }, source: 'companies',
+      autoApply: true, resumeId: 'r-1', minFit: 0.6
+    });
+    await runWatch(deps); // baseline
+    await tick();
+    // Two new matches: one high-fit, one low-fit ("Senior").
+    upsertJobs(db, [
+      { id: 'g-hi', companyId: 'stripe', title: 'PM, Growth', url: 'https://x/hi', descriptionMd: 'd', raw: {} },
+      { id: 'g-lo', companyId: 'stripe', title: 'Senior PM', url: 'https://x/lo', descriptionMd: 'd', raw: {} }
+    ]);
+    const r = await runWatch(deps);
+    expect(r.totalNew).toBe(2);            // both detected as new
+    expect(listApplications(db).length).toBe(1); // only the high-fit one applied
+    expect(listApplications(db)[0].jobId).toBe('g-hi');
   });
 
   it('only notifies (no apply) when auto-apply is off', async () => {
