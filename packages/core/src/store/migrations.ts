@@ -224,6 +224,15 @@ export const migrations: Migration[] = [
       ALTER TABLE saved_search ADD COLUMN auto_submit INTEGER;
     `
   }
+  ,
+  {
+    id: 11,
+    name: 'notification_needs_action',
+    sql: `
+      ALTER TABLE notification ADD COLUMN reason TEXT;
+      ALTER TABLE notification ADD COLUMN link TEXT;
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

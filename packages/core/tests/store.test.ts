@@ -29,7 +29,7 @@ describe('store/db', () => {
   it('applied all migrations', () => {
     const db = openDb(':memory:');
     const ids = (db.prepare(`SELECT id FROM migrations ORDER BY id`).all() as Array<{ id: number }>).map(r => r.id);
-    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   });
 
   it('defaults defaultMinFit to 0.6 and lets it be overridden', async () => {
