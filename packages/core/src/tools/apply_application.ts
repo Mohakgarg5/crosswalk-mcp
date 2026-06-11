@@ -50,6 +50,8 @@ export type ApplyApplicationResult = {
   verificationRequired?: boolean;
   /** True if that verification was resolved automatically. */
   verificationResolved?: boolean;
+  /** Required fields the ATS flagged after a rejected submit (need an answer). */
+  validationErrors?: string[];
 };
 
 function asString(v: unknown): string | undefined {
@@ -344,17 +346,34 @@ export async function applyApplication(
     addEventForApplication(ctx.db, app.id, 'submit_click_failed', { errors: result.submitClickErrors });
   }
   if (Boolean(result.submitClicked) && !verificationPending && !evidence) {
-    addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
-      url: result.resolvedUrl,
-      postSubmitUrl: result.postSubmitUrl ?? null,
-      postSubmitTitle: result.postSubmitTitle ?? null
-    });
-    enqueueNeedsAction(ctx.db, {
-      applicationId: app.id, reason: 'submit_unconfirmed',
-      title: 'Submission not confirmed',
-      body: 'A submit button was clicked but nothing confirmed the application went through — check it yourself.',
-      link: applyUrl
-    });
+    // The ATS told us exactly why the submit didn't land (a required field is
+    // empty/invalid) — surface that, not a vague "unconfirmed". Far more
+    // actionable: the user knows the one field to fill.
+    if (result.validationErrors && result.validationErrors.length > 0) {
+      addEventForApplication(ctx.db, app.id, 'required_field_missing', {
+        url: result.resolvedUrl,
+        fields: result.validationErrors
+      });
+      const list = result.validationErrors.join(', ');
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'required_field_missing',
+        title: 'One field needs your answer',
+        body: `The application is filled, but ${list} ${result.validationErrors.length === 1 ? 'is a required field that needs' : 'are required fields that need'} an answer before it can submit. Finish it here.`,
+        link: applyUrl
+      });
+    } else {
+      addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
+        url: result.resolvedUrl,
+        postSubmitUrl: result.postSubmitUrl ?? null,
+        postSubmitTitle: result.postSubmitTitle ?? null
+      });
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'submit_unconfirmed',
+        title: 'Submission not confirmed',
+        body: 'A submit button was clicked but nothing confirmed the application went through — check it yourself.',
+        link: applyUrl
+      });
+    }
   }
   if (submitted) {
     addEventForApplication(ctx.db, app.id, 'browser_submitted', {
@@ -395,6 +414,7 @@ export async function applyApplication(
     detectedAts,
     postSubmitUrl: result.postSubmitUrl,
     verificationRequired: result.verificationRequired,
-    verificationResolved: result.verificationResolved
+    verificationResolved: result.verificationResolved,
+    validationErrors: result.validationErrors
   };
 }

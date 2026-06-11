@@ -451,6 +451,33 @@ describe('tools/apply_application', () => {
     expect(notifs.some(n => n.kind === 'needs_action' && n.reason === 'submit_unconfirmed')).toBe(true);
   });
 
+  it('flags the exact required field (not a vague "unconfirmed") when the ATS rejects submit', async () => {
+    const browser = makeDefaultBrowser({
+      fillForm: vi.fn(async (url: string) => ({
+        resolvedUrl: url, title: 'Job Application for PM at Acme',
+        screenshotPng: Buffer.from([]),
+        filled: ['email', 'resume_file'], skipped: [],
+        submitClicked: true,
+        postSubmitUrl: url,                            // same page — submit blocked
+        postSubmitTitle: 'Job Application for PM at Acme',
+        validationErrors: ['AI Policy for Application']
+      }))
+    });
+    const sampling = makeNoopSampling();
+    const { listNeedsActions } = await import('../src/store/notification.ts');
+    const res = await applyApplication({ applicationId: 'app1', submit: true }, { db, browser, sampling });
+
+    expect(res.submitted).toBe(false);
+    const q = listNeedsActions(db);
+    const item = q.find(n => n.reason === 'required_field_missing');
+    expect(item).toBeTruthy();
+    expect(item?.body).toContain('AI Policy for Application');
+    // The actionable reason wins — no vague submit_unconfirmed for the same app.
+    expect(q.some(n => n.reason === 'submit_unconfirmed')).toBe(false);
+    const events = listEventsForApplication(db, 'app1');
+    expect(events.some(e => e.kind === 'required_field_missing')).toBe(true);
+  });
+
   it('marks submitted when the page did not navigate but shows a confirmation title', async () => {
     const browser = makeDefaultBrowser({
       fillForm: vi.fn(async (url: string) => ({

@@ -116,4 +116,8 @@ export type BrowserFillResult = {
   verificationRequired?: boolean;
   /** True if the gate was detected AND the callback resolved it (code entered / link opened). */
   verificationResolved?: boolean;
+  /** Labels of required fields the ATS flagged as empty/invalid AFTER a submit
+   * attempt (e.g. Greenhouse "This field is required"). Non-empty means the
+   * submit was rejected client-side and exactly these fields need an answer. */
+  validationErrors?: string[];
 };

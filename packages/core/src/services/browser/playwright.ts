@@ -269,6 +269,7 @@ export class LazyPlaywrightBrowser implements Browser {
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
       let confirmationSeen = false;
+      let validationErrors: string[] = [];
       const submitClickErrors: string[] = [];
       if (opts.clickSubmit) {
         // Let async form-state syncs settle (Ashby PATCHes every field via
@@ -333,6 +334,14 @@ export class LazyPlaywrightBrowser implements Browser {
             }
             postSubmitUrl = page.url();
             postSubmitTitle = await page.title();
+            // If the submit didn't land (still on the form), ask the ATS which
+            // required fields it's complaining about. Greenhouse/Ashby render
+            // an inline "This field is required" next to the offending field;
+            // reading the field's label tells the user the ONE thing to fix.
+            const stillOnForm = postSubmitUrl === preUrl && !confirmationSeen;
+            if (patient && stillOnForm) {
+              validationErrors = await collectValidationErrors(page);
+            }
           } catch {
             // Page might be in transient state; leave URL/title undefined
           }
@@ -409,6 +418,7 @@ export class LazyPlaywrightBrowser implements Browser {
         resolvedUrl, title, screenshotPng, filled, skipped, submitClicked,
         postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved,
         ...(confirmationSeen ? { confirmationSeen } : {}),
+        ...(validationErrors.length ? { validationErrors } : {}),
         ...(submitResponses.length ? { submitResponses } : {}),
         ...(submitClickErrors.length ? { submitClickErrors } : {})
       };
@@ -716,6 +726,71 @@ async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'l
     if (kind) return kind;
   }
   return null;
+}
+
+/**
+ * After a submit that didn't navigate, read the ATS's own inline validation
+ * errors and return the LABEL of each offending field. Greenhouse/Ashby/Lever
+ * all render a small "This field is required" (or similar) node next to the
+ * field; the nearest label/legend/aria-label names it. Best-effort and fully
+ * defensive — any failure yields an empty list, never throws.
+ */
+async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> {
+  const seen = new Set<string>();
+  for (const frame of allFrames(page)) {
+    try {
+      const labels = await frame.evaluate(() => {
+        // VALIDATION_PROBE
+        const doc = (globalThis as unknown as { document: any }).document;
+        const ERR = /this field is required|is required|please (?:complete|fill|select|answer)|required field|please make a selection/i;
+        const out: string[] = [];
+        const seenLocal = new Set<string>();
+
+        const labelFor = (el: any): string => {
+          // 1) aria-labelledby / aria-label on the field or its container
+          const aria = el.getAttribute?.('aria-label');
+          if (aria && aria.trim()) return aria.trim();
+          // 2) climb to a field container and grab its label/legend
+          let node = el;
+          for (let i = 0; i < 6 && node; i++) {
+            const lbl = node.querySelector?.('label, legend');
+            if (lbl && lbl.innerText && lbl.innerText.trim()) {
+              return lbl.innerText.replace(/\s*\*\s*$/, '').replace(/\s+/g, ' ').trim();
+            }
+            node = node.parentElement;
+          }
+          return '';
+        };
+
+        // Strategy A: nodes whose own text IS a "required" message.
+        const all = Array.from(doc.querySelectorAll('div,span,p,label,small,strong')) as any[];
+        for (const node of all) {
+          const txt = String(node.innerText ?? node.textContent ?? '').trim();
+          if (!txt || txt.length > 80 || !ERR.test(txt)) continue;
+          // Walk up to the field block, then name it.
+          let block = node;
+          for (let i = 0; i < 5 && block?.parentElement; i++) block = block.parentElement;
+          const name = labelFor(block) || labelFor(node.parentElement);
+          const key = (name || txt).toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name || txt); }
+        }
+
+        // Strategy B: aria-invalid fields (Ashby marks these).
+        const invalids = Array.from(doc.querySelectorAll('[aria-invalid="true"]')) as any[];
+        for (const el of invalids) {
+          const name = labelFor(el);
+          if (!name) continue;
+          const key = name.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
+        }
+        return out.slice(0, 10);
+      }) as string[];
+      for (const l of labels) { if (l && !seen.has(l)) seen.add(l); }
+    } catch {
+      continue; // cross-origin frame or evaluate failure — skip
+    }
+  }
+  return Array.from(seen);
 }
 
 /**

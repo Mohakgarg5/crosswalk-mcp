@@ -54,12 +54,13 @@ export function markAllRead(db: Db): number {
 }
 
 export type NeedsActionReason =
-  | 'account_wall'        // nothing filled — Workday-style sign-in wall
-  | 'no_form'             // aggregator listing with no resolvable apply form
-  | 'submit_unconfirmed'  // submit clicked, no confirmation evidence
-  | 'verification_timeout'// emailed code/link not read in time
-  | 'listing_expired'     // listing gone/removed
-  | 'browser_unavailable';// browser step threw (not installed, crash, login wall)
+  | 'account_wall'         // nothing filled — Workday-style sign-in wall
+  | 'no_form'              // aggregator listing with no resolvable apply form
+  | 'submit_unconfirmed'   // submit clicked, no confirmation evidence
+  | 'verification_timeout' // emailed code/link not read in time
+  | 'listing_expired'      // listing gone/removed
+  | 'browser_unavailable'  // browser step threw (not installed, crash, login wall)
+  | 'required_field_missing';// ATS rejected submit — a required field needs an answer
 
 /**
  * Add an application to the "Needs You" queue: it couldn't finish autonomously
