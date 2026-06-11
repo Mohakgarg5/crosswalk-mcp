@@ -35,13 +35,15 @@ export { getApplication, listEventsForApplication } from './store/application.ts
 export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
 
 // Discovery alerts (saved searches + notifications)
-export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch, setSavedSearchAutoApply } from './store/savedSearch.ts';
+export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch, setSavedSearchAutoApply, updateSavedSearchConfig } from './store/savedSearch.ts';
 export type { SavedSearch, SavedSearchFilters, SearchSource } from './store/savedSearch.ts';
 export { runWatch } from './services/watchEngine.ts';
 export type { WatchRunResult, WatchSearchOutcome } from './services/watchEngine.ts';
 export { listNotifications, unreadCount, markAllRead } from './store/notification.ts';
 export type { Notification } from './store/notification.ts';
 export { refreshSavedSearch, refreshAllSavedSearches } from './services/savedSearchEngine.ts';
+export { scoreAndGate } from './services/fitGate.ts';
+export type { FitGateResult } from './services/fitGate.ts';
 
 // Recruiter email routing
 export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/email.ts';
