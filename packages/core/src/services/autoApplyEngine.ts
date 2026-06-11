@@ -12,6 +12,10 @@ export type AutoApplyOptions = {
   /** When true, click submit after filling. When false, fill + leave for review. */
   submit: boolean;
   allowDuplicate?: boolean;
+  /** Résumé to tailor from for every job in this batch. Omit → auto-pick per job. */
+  resumeId?: string;
+  /** Per-watch weekly cap override passed to the guardrail. Omit → global cap. */
+  capOverride?: number;
 };
 
 export type AutoApplyOutcome = {
@@ -48,7 +52,10 @@ export async function autoApply(opts: AutoApplyOptions, deps: AutoApplyDeps): Pr
   for (const jobId of opts.jobIds) {
     let applicationId: string | undefined;
     try {
-      const draft = await buildApplication({ jobId, allowDuplicate: opts.allowDuplicate }, deps);
+      const draft = await buildApplication(
+        { jobId, resumeId: opts.resumeId, capOverride: opts.capOverride, allowDuplicate: opts.allowDuplicate },
+        deps
+      );
       applicationId = draft.applicationId;
     } catch (e) {
       results.push({ jobId, status: 'skipped', message: (e as Error).message });
