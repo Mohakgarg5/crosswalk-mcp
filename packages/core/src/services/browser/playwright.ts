@@ -238,18 +238,40 @@ export class LazyPlaywrightBrowser implements Browser {
       // Try to advance past it before looking for form fields. No-op if the form
       // is already on the page or the button isn't found.
       await advanceToForm(page);
+      // Let any post-load redirect/reload finish before we touch fields — the
+      // ATS embed tearing down a frame mid-fill is what turned fillable forms
+      // into "drafted, needs human".
+      await settlePage(page);
       const maxSteps = Math.max(1, opts.maxSteps ?? 1);
       const labelOf = (f: FillField) => ('name' in f ? `${f.kind}:${f.name}` : f.kind);
       const filledLabels = new Set<string>();
       let stepsAdvanced = 0;
 
+      // Fill one field, surviving a navigation that strikes mid-fill: settle and
+      // retry once. A single field lost to a reload must never abort the whole
+      // application — that's the difference between autonomous and "needs you".
+      const fillOne = async (field: FillField): Promise<void> => {
+        const label = labelOf(field);
+        if (filledLabels.has(label)) return;
+        try {
+          if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+        } catch (e) {
+          if (isNavigationError(e)) {
+            await settlePage(page);
+            try {
+              if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+            } catch { /* field lost to a second navigation — skip it, keep going */ }
+          }
+          // Non-navigation per-field errors are swallowed too: one odd field
+          // can't be allowed to tank an otherwise-complete application.
+        }
+      };
+
       // Multi-step wizards: fill the current page, advance via Next/Continue,
       // repeat. A field skipped on one page may be filled on a later one.
       for (let step = 1; step <= maxSteps; step++) {
         for (const field of fields) {
-          const label = labelOf(field);
-          if (filledLabels.has(label)) continue;
-          if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+          await fillOne(field);
         }
         if (step < maxSteps) {
           const advanced = await clickFirstAcrossFrames(page, NEXT_SELECTORS);
@@ -601,6 +623,34 @@ function allFrames(page: PlaywrightPage): PlaywrightFrame[] {
     const frames = page.frames();
     return Array.isArray(frames) && frames.length > 0 ? frames : [page];
   } catch { return [page]; }
+}
+
+/** True for the family of Playwright errors raised when the page/frame we were
+ *  operating on navigated, reloaded, or detached out from under us. These are
+ *  transient and recoverable — we re-settle and retry rather than abandon the
+ *  whole application (the #1 cause of "filled form became a draft"). */
+export function isNavigationError(e: unknown): boolean {
+  const m = (e as { message?: string })?.message ?? '';
+  return /execution context was destroyed|because of a navigation|frame (was )?detached|target closed|cannot find context|navigating and changing the content/i.test(m);
+}
+
+/** Wait for post-load redirects/reloads to quiesce before interacting, so we
+ *  don't start filling into a frame that's about to be torn down. Many ATS
+ *  embeds (Greenhouse job_app) reload once after first paint. Real pages only —
+ *  test mocks lack waitForLoadState, where this is a no-op. */
+async function settlePage(page: PlaywrightPage, quietMs = 1200, maxWaitMs = 12_000): Promise<void> {
+  const wfl = (page as { waitForLoadState?: (s?: string, o?: { timeout?: number }) => Promise<void> }).waitForLoadState;
+  if (typeof wfl !== 'function') return; // mock/unknown page — nothing to settle
+  try { await wfl.call(page, 'load', { timeout: maxWaitMs }); } catch { /* navigation in-flight */ }
+  const start = Date.now();
+  let lastUrl = typeof page.url === 'function' ? page.url() : '';
+  let stableSince = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 250));
+    const u = typeof page.url === 'function' ? page.url() : lastUrl;
+    if (u !== lastUrl) { lastUrl = u; stableSince = Date.now(); continue; }
+    if (Date.now() - stableSince >= quietMs) return;
+  }
 }
 
 /** Like clickFirst but tries the main frame first, then every iframe. */
@@ -1055,7 +1105,14 @@ export async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, 
  * iframe — selectors on the parent page see nothing). */
 async function tryFillFieldAcrossFrames(page: PlaywrightPage, field: FillField, ats: string | undefined): Promise<boolean> {
   for (const frame of allFrames(page)) {
-    if (await tryFillField(frame, field, ats)) return true;
+    try {
+      if (await tryFillField(frame, field, ats)) return true;
+    } catch (e) {
+      // A mid-fill navigation invalidates this frame — bubble it so the caller
+      // can settle and retry. Any other per-frame error (detached iframe,
+      // selector quirk) shouldn't stop us checking the remaining frames.
+      if (isNavigationError(e)) throw e;
+    }
   }
   return false;
 }

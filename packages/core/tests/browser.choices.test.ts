@@ -57,6 +57,33 @@ describe('fillForm — select / radio / checkbox', () => {
     expect(res.skipped).toContain('select_by_name:nope');
   });
 
+  it('survives a mid-fill navigation: one field that throws "Execution context destroyed" does not abort the rest', async () => {
+    const navErr = new Error('frame.$: Execution context was destroyed, most likely because of a navigation');
+    const goodEl = { selectOption: vi.fn().mockResolvedValue(['v']) };
+    const page = {
+      goto: vi.fn(), title: vi.fn().mockResolvedValue('Apply'),
+      url: vi.fn().mockReturnValue('https://x/'),
+      screenshot: vi.fn().mockResolvedValue(Buffer.from([1])),
+      evaluate: vi.fn().mockResolvedValue([]),
+      $: vi.fn(async (sel: string) => {
+        if (sel.includes('boom')) throw navErr;           // navigation strikes this field
+        if (sel.includes('select[name="ok"]')) return goodEl;
+        return null;
+      }),
+      close: vi.fn()
+    };
+    const b = browserFor(page);
+    const fields: FillField[] = [
+      { kind: 'select_by_name', name: 'boom', value: 'x' },
+      { kind: 'select_by_name', name: 'ok', value: 'Yes' }
+    ];
+    // Must NOT reject — previously this threw out of fillForm and dropped the
+    // whole application to "drafted".
+    const res = await b.fillForm('https://x', fields);
+    expect(res.filled).toContain('select_by_name:ok');   // the rest still fills
+    expect(res.skipped).toContain('select_by_name:boom'); // the lost field is just skipped
+  });
+
   it('clicks Ashby Yes/No option buttons with a real handle click, not an in-page click()', async () => {
     // The in-page evaluate only LOCATES the button and stamps a marker —
     // react-aria buttons ignore synthetic DOM click(). The real click must
