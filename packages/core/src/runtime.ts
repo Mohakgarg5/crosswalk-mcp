@@ -33,6 +33,7 @@ export { addAnswer, listAnswers, deleteAnswer, matchAnswer, loadDefaults } from 
 export type { AnswerEntry } from './store/answerBank.ts';
 export { getApplication, listEventsForApplication } from './store/application.ts';
 export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
+export { applyApplication } from './tools/apply_application.ts';
 
 // Discovery alerts (saved searches + notifications)
 export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch, setSavedSearchAutoApply, updateSavedSearchConfig } from './store/savedSearch.ts';
