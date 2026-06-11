@@ -3,7 +3,8 @@ import type { SamplingClient } from '../sampling/client.ts';
 import type { Browser } from './browser/types.ts';
 import { buildApplication } from './buildApplication.ts';
 import { applyApplication } from '../tools/apply_application.ts';
-import { createNotification } from '../store/notification.ts';
+import { createNotification, enqueueNeedsAction } from '../store/notification.ts';
+import { getJob } from '../store/job.ts';
 
 export type AutoApplyDeps = { db: Db; sampling: SamplingClient; browser: Browser };
 
@@ -72,6 +73,16 @@ export async function autoApply(opts: AutoApplyOptions, deps: AutoApplyDeps): Pr
           (applied.skipped.length ? ` · skipped: ${applied.skipped.join(', ')}` : '')
       });
     } catch (e) {
+      const job = getJob(deps.db, jobId);
+      if (applicationId) {
+        enqueueNeedsAction(deps.db, {
+          applicationId,
+          reason: 'browser_unavailable',
+          title: 'Application needs you',
+          body: `Drafted, but auto-fill couldn't finish: ${(e as Error).message}`,
+          link: job?.url ?? ''
+        });
+      }
       results.push({ jobId, applicationId, status: 'drafted', message: `drafted; auto-fill unavailable: ${(e as Error).message}` });
     }
   }
