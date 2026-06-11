@@ -7,7 +7,7 @@ import { runTool, getSettings } from '@/lib/api';
 
 type AutoApplySummary = { total: number; submitted: number; applied: number; drafted: number; skipped: number; results: { jobId: string; status: string; applicationId?: string; message?: string }[] };
 
-type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; source?: string; autoApply?: boolean; lastCheckedAt?: string };
+type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; source?: string; autoApply?: boolean; resumeId?: string; minFit?: number; weeklyCap?: number; autoSubmit?: boolean; lastCheckedAt?: string };
 
 type Job = {
   id: string; company: string; title: string; location?: string;
@@ -37,6 +37,11 @@ export default function JobsPage() {
   const [watchBusy, setWatchBusy] = useState(false);
   const [watchMsg, setWatchMsg] = useState('');
   const [autoRun, setAutoRun] = useState(false);
+  const [resumes, setResumes] = useState<{ id: string; label: string }[]>([]);
+  const [watchResumeId, setWatchResumeId] = useState<string>('');
+  const [watchMinFit, setWatchMinFit] = useState<number>(0.6);
+  const [watchCap, setWatchCap] = useState<string>('');        // '' = use global
+  const [watchAutoSubmit, setWatchAutoSubmit] = useState<boolean>(false);
 
   async function runWatchNow() {
     setWatchBusy(true); setWatchMsg('');
@@ -93,6 +98,11 @@ export default function JobsPage() {
     if (r.ok) setSearches(r.searches ?? []);
   }
   useEffect(() => { loadSearches(); }, []);
+  useEffect(() => {
+    runTool<{ resumes: { id: string; label: string }[] }>('list_resumes', {})
+      .then(r => setResumes(r.resumes ?? []))
+      .catch(() => {});
+  }, []);
 
   function currentFilters() {
     return {
@@ -107,7 +117,13 @@ export default function JobsPage() {
     const name = (title || location || 'All roles') + (mode === 'web' ? ' · web' : '') + (saveAutoApply ? ' · auto' : '');
     await fetch('/api/searches', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ name, filters: currentFilters(), source: mode, autoApply: saveAutoApply })
+      body: JSON.stringify({
+        name, filters: currentFilters(), source: mode, autoApply: saveAutoApply,
+        resumeId: watchResumeId || undefined,
+        minFit: watchMinFit,
+        weeklyCap: watchCap === '' ? undefined : Number(watchCap),
+        autoSubmit: watchAutoSubmit
+      })
     });
     setSaveAutoApply(false);
     await loadSearches();
@@ -199,6 +215,33 @@ export default function JobsPage() {
             <input type="checkbox" checked={saveAutoApply} onChange={e => setSaveAutoApply(e.target.checked)} /> auto-apply new matches
           </label>
         </div>
+        <div className="mt-3 flex items-center gap-3 flex-wrap text-sm">
+          <span className="text-xs text-[var(--muted)]">Watch settings →</span>
+          <select
+            value={watchResumeId}
+            onChange={e => setWatchResumeId(e.target.value)}
+            className="rounded-lg border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1 outline-none"
+            title="Résumé this watch tailors from"
+          >
+            <option value="">Auto-pick résumé</option>
+            {resumes.map(r => <option key={r.id} value={r.id}>{r.label}</option>)}
+          </select>
+          <label className="flex items-center gap-1 text-[var(--muted)]" title="Minimum fit to auto-apply">
+            min-fit {watchMinFit.toFixed(2)}
+            <input type="range" min={0} max={1} step={0.05}
+              value={watchMinFit} onChange={e => setWatchMinFit(Number(e.target.value))} />
+          </label>
+          <input
+            type="number" min={0} placeholder="cap (blank=global)"
+            value={watchCap} onChange={e => setWatchCap(e.target.value)}
+            className="w-36 rounded-lg border border-[var(--border)] bg-[var(--panel-2)] px-2 py-1 outline-none"
+            title="Per-watch weekly cap (0 = unlimited, blank = use global)"
+          />
+          <label className="flex items-center gap-1 text-[var(--muted)]" title="Submit automatically for this watch">
+            <input type="checkbox" checked={watchAutoSubmit} onChange={e => setWatchAutoSubmit(e.target.checked)} />
+            auto-submit
+          </label>
+        </div>
         <ErrorNote>{err}</ErrorNote>
       </Card>
 
@@ -225,6 +268,12 @@ export default function JobsPage() {
                       {s.name}
                       <Pill tone={s.source === 'web' ? 'accent' : 'muted'}>{s.source === 'web' ? 'open web' : 'ATS'}</Pill>
                       {s.autoApply && <Pill tone="ok">auto-apply</Pill>}
+                    </div>
+                    <div className="text-xs text-[var(--muted)]">
+                      {s.resumeId ? 'résumé set' : 'auto-pick résumé'}
+                      {typeof s.minFit === 'number' ? ` · min-fit ${s.minFit.toFixed(2)}` : ' · min-fit (global)'}
+                      {typeof s.weeklyCap === 'number' ? ` · cap ${s.weeklyCap}` : ''}
+                      {s.autoSubmit ? ' · auto-submit' : ''}
                     </div>
                     <div className="text-xs text-[var(--muted)]">{s.lastCheckedAt ? `last checked ${new Date(s.lastCheckedAt).toLocaleString()}` : 'never checked'}</div>
                   </div>
