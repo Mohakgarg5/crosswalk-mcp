@@ -15,6 +15,7 @@ export type BuildApplicationInput = {
   resumeId?: string;
   allowDuplicate?: boolean;
   confirmLowFit?: boolean;
+  capOverride?: number;
 };
 
 export type BuildApplicationResult = {
@@ -41,7 +42,8 @@ export async function buildApplication(
     jobId: input.jobId,
     resumeId: input.resumeId ?? '',
     allowDuplicate: input.allowDuplicate,
-    confirmLowFit: input.confirmLowFit
+    confirmLowFit: input.confirmLowFit,
+    capOverride: input.capOverride
   });
   if (!guardrail.allowed) throw new Error(guardrail.reason);
   const guardrailWarnings = guardrail.warnings;

@@ -109,4 +109,26 @@ describe('services/guardrail', () => {
     const out = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1' });
     expect(out.allowed).toBe(true);
   });
+
+  it('capOverride takes precedence over the global weekly cap', async () => {
+    // Create 3 recent submitted applications (global cap default is 10).
+    upsertJobs(db, Array.from({ length: 3 }, (_, i) => ({
+      id: `c${i}`, companyId: 'stripe', title: `C${i}`, url: 'https://x', raw: {}
+    })));
+    for (let i = 0; i < 3; i++) {
+      createApplication(db, {
+        id: `ca${i}`, jobId: `c${i}`, resumeId: 'r1',
+        tailoredResumeMd: 'x', coverLetterMd: 'x', answerPack: {}, deepLink: 'https://x'
+      });
+    }
+    const { updateApplicationStatus } = await import('../src/store/application.ts');
+    for (let i = 0; i < 3; i++) updateApplicationStatus(db, `ca${i}`, 'submitted');
+
+    // Override the cap down to 3 → next draft is blocked.
+    const blocked = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1', capOverride: 3 });
+    expect(blocked.allowed).toBe(false);
+    // Override the cap up to 100 → allowed.
+    const ok = checkGuardrail(db, { jobId: 'g:stripe:1', resumeId: 'r1', capOverride: 100 });
+    expect(ok.allowed).toBe(true);
+  });
 });
