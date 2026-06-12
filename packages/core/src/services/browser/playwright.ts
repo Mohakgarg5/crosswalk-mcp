@@ -809,10 +809,14 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
       const labels = await frame.evaluate(() => {
         // VALIDATION_PROBE
         const doc = (globalThis as unknown as { document: any }).document;
-        const ERR = /this field is required|is required|please (?:complete|fill|select|answer)|required field|please make a selection/i;
+        const ERR = /this field is required|is required|please (?:complete|fill|select|answer)|please make a selection/i;
+        // The form's generic legend ("* indicates a required field") and section
+        // headers are not per-field errors — never treat them as one.
+        const NOISE = /indicates a required field|apply for this job/i;
         const out: string[] = [];
         const seenLocal = new Set<string>();
         const clean = (s: string) => s.replace(/\s*\*\s*$/, '').replace(/[*:]/g, '').replace(/\s+/g, ' ').trim();
+        const usable = (name: string) => !!name && name.length <= 60 && !name.includes('\n') && !NOISE.test(name);
 
         // All labels/legends, captured once, to attribute an error to its field.
         const allLabels = Array.from(doc.querySelectorAll('label, legend')) as any[];
@@ -851,10 +855,11 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
         const all = Array.from(doc.querySelectorAll('div,span,p,label,small,strong')) as any[];
         for (const node of all) {
           const txt = String(node.innerText ?? node.textContent ?? '').trim();
-          if (!txt || txt.length > 80 || !ERR.test(txt)) continue;
+          if (!txt || txt.length > 80 || !ERR.test(txt) || NOISE.test(txt)) continue;
           const name = nameForError(node);
-          const key = (name || txt).toLowerCase();
-          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name || txt); }
+          if (!usable(name)) continue; // couldn't pin it to a real field — skip
+          const key = name.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
         }
 
         // Strategy B: aria-invalid fields (Ashby marks these).
@@ -862,7 +867,7 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
         for (const el of invalids) {
           const aria = el.getAttribute?.('aria-label');
           const name = (aria && aria.trim()) ? clean(aria) : nameForError(el);
-          if (!name) continue;
+          if (!usable(name)) continue;
           const key = name.toLowerCase();
           if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
         }
