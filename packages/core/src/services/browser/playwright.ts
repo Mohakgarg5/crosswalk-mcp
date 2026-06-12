@@ -594,6 +594,64 @@ async function advanceToForm(page: PlaywrightPage): Promise<void> {
 /** Count visible form fields across frames. Returns -1 when no frame could
  * report a number (test-mocked pages) — callers treat that as "unknowable,
  * don't wait on it". */
+/** Label patterns for the standard identity fields — used to fill custom
+ *  portals (Uber, company-built forms) whose input NAMES don't match the ATS
+ *  selectors but whose visible LABELS are clear. */
+const LABEL_PATTERNS: Partial<Record<StaticKind, RegExp>> = {
+  email: /e-?mail/i,
+  first_name: /first\s*name|given name|legal first/i,
+  last_name: /last\s*name|surname|family name|legal last/i,
+  full_name: /^name$|full name|legal name|your name|preferred name/i,
+  phone: /phone|mobile|tel(ephone)?|contact number/i,
+  linkedin: /linkedin/i,
+  website: /website|portfolio|personal (site|website)|github/i
+};
+
+/** Fill the first EMPTY text input whose associated label/placeholder/aria-label
+ *  matches `re`, regardless of the input's name/id. Locates in-page, then fills
+ *  via the Playwright handle so React controlled inputs get real change events.
+ *  Portal-agnostic — this is what lets us fill forms that aren't a known ATS. */
+async function fillByLabel(page: PlaywrightFrame, reSource: string, flags: string, value: string): Promise<boolean> {
+  let marked = false;
+  try {
+    marked = await page.evaluate(({ reSource, flags }: { reSource: string; flags: string }) => {
+      const doc = (globalThis as unknown as { document: any }).document;
+      const win = globalThis as unknown as { CSS?: { escape(s: string): string } };
+      const re = new RegExp(reSource, flags);
+      const norm = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').replace(/[*:]/g, '').trim();
+      const inputs = Array.from(doc.querySelectorAll(
+        'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=submit]):not([type=button]):not([type=password]), textarea'
+      )) as any[];
+      const labelText = (el: any): string => {
+        if (el.id) {
+          try { const l = doc.querySelector('label[for="' + (win.CSS ? win.CSS.escape(el.id) : el.id) + '"]'); if (l) return norm(l.textContent); } catch { /* bad id */ }
+        }
+        const wrap = el.closest ? el.closest('label') : null;
+        if (wrap) return norm(wrap.textContent);
+        const al = el.getAttribute('aria-label'); if (al) return norm(al);
+        const lb = el.getAttribute('aria-labelledby'); if (lb) { const n = doc.getElementById(lb); if (n) return norm(n.textContent); }
+        if (el.placeholder) return norm(el.placeholder);
+        return '';
+      };
+      for (const el of inputs) {
+        if (el.value && String(el.value).trim()) continue; // don't clobber a filled field
+        const lt = labelText(el);
+        if (lt && re.test(lt)) { el.setAttribute('data-cw-fill', '1'); return true; }
+      }
+      return false;
+    }, { reSource, flags });
+  } catch { return false; }
+  if (!marked) return false;
+  try {
+    const el = await page.$('[data-cw-fill="1"]');
+    if (el && typeof el.fill === 'function') { await el.fill(value); return true; }
+    return false;
+  } catch { return false; }
+  finally {
+    try { await page.evaluate(() => { const e = (globalThis as unknown as { document: any }).document.querySelector('[data-cw-fill="1"]'); if (e) e.removeAttribute('data-cw-fill'); }); } catch { /* ignore */ }
+  }
+}
+
 /** True when the page is showing a sign-in / account wall. A password field is
  *  the reliable tell — application forms don't have one — backed by sign-in
  *  body copy. */
@@ -1263,6 +1321,8 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
     }
     // Last-resort react-select fallback (fuzzy id/name + label match).
     if (await tryReactSelect(page, field.name, field.value, field.label)) return true;
+    // Plain custom input identified only by its visible label (Uber et al.).
+    if (field.label && await fillByLabel(page, field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i', field.value)) return true;
     return false;
   }
 
@@ -1402,6 +1462,13 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
       continue;
     }
     return true;
+  }
+  // Label fallback for custom portals (Uber, bespoke company forms): the ATS
+  // selectors above didn't match, but the field's visible label might.
+  const labelRe = LABEL_PATTERNS[field.kind];
+  if (labelRe) {
+    const value = (field as { value?: string }).value;
+    if (value && await fillByLabel(page, labelRe.source, labelRe.flags, value)) return true;
   }
   return false;
 }
