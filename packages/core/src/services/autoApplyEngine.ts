@@ -3,7 +3,8 @@ import type { SamplingClient } from '../sampling/client.ts';
 import type { Browser } from './browser/types.ts';
 import { buildApplication } from './buildApplication.ts';
 import { applyApplication } from '../tools/apply_application.ts';
-import { createNotification } from '../store/notification.ts';
+import { createNotification, enqueueNeedsAction } from '../store/notification.ts';
+import { getJob } from '../store/job.ts';
 
 export type AutoApplyDeps = { db: Db; sampling: SamplingClient; browser: Browser };
 
@@ -12,6 +13,10 @@ export type AutoApplyOptions = {
   /** When true, click submit after filling. When false, fill + leave for review. */
   submit: boolean;
   allowDuplicate?: boolean;
+  /** Résumé to tailor from for every job in this batch. Omit → auto-pick per job. */
+  resumeId?: string;
+  /** Per-watch weekly cap override passed to the guardrail. Omit → global cap. */
+  capOverride?: number;
 };
 
 export type AutoApplyOutcome = {
@@ -48,7 +53,10 @@ export async function autoApply(opts: AutoApplyOptions, deps: AutoApplyDeps): Pr
   for (const jobId of opts.jobIds) {
     let applicationId: string | undefined;
     try {
-      const draft = await buildApplication({ jobId, allowDuplicate: opts.allowDuplicate }, deps);
+      const draft = await buildApplication(
+        { jobId, resumeId: opts.resumeId, capOverride: opts.capOverride, allowDuplicate: opts.allowDuplicate },
+        deps
+      );
       applicationId = draft.applicationId;
     } catch (e) {
       results.push({ jobId, status: 'skipped', message: (e as Error).message });
@@ -65,6 +73,16 @@ export async function autoApply(opts: AutoApplyOptions, deps: AutoApplyDeps): Pr
           (applied.skipped.length ? ` · skipped: ${applied.skipped.join(', ')}` : '')
       });
     } catch (e) {
+      const job = getJob(deps.db, jobId);
+      if (applicationId) {
+        enqueueNeedsAction(deps.db, {
+          applicationId,
+          reason: 'browser_unavailable',
+          title: 'Application needs you',
+          body: `Drafted, but auto-fill couldn't finish: ${(e as Error).message}`,
+          link: job?.url ?? ''
+        });
+      }
       results.push({ jobId, applicationId, status: 'drafted', message: `drafted; auto-fill unavailable: ${(e as Error).message}` });
     }
   }

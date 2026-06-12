@@ -16,6 +16,9 @@ export type AppConfig = {
    *  pausing-and-flagging the application. Only used when an email inbox is
    *  configured. */
   verificationTimeoutMs: number;
+  /** Default minimum fit score (0..1) a job must reach to be auto-applied,
+   *  when a watch doesn't set its own. */
+  defaultMinFit: number;
 };
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -26,7 +29,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   // safety margin). Auto-fill on each page; the loop stops when no Next
   // button is found, so single-page forms still finish in one pass.
   applyMaxSteps: 8,
-  verificationTimeoutMs: 240_000
+  verificationTimeoutMs: 240_000,
+  defaultMinFit: 0.6
 };
 
 export function getConfig(db: Db): AppConfig {

@@ -5,6 +5,7 @@ import { listSavedSearches } from '../store/savedSearch.ts';
 import { refreshSavedSearch } from './savedSearchEngine.ts';
 import { searchRoles } from './roleSearch.ts';
 import { autoApply, type AutoApplySummary } from './autoApplyEngine.ts';
+import { scoreAndGate } from './fitGate.ts';
 import { getConfig } from '../store/appConfig.ts';
 
 export type WatchDeps = { db: Db; sampling: SamplingClient; browser: Browser };
@@ -59,8 +60,16 @@ export async function runWatch(deps: WatchDeps, opts: WatchOptions = {}): Promis
 
     let autoApplied: AutoApplySummary | undefined;
     if (s.autoApply && jobIds.length > 0) {
-      autoApplied = await autoApply({ jobIds, submit }, deps);
-      totalSubmitted += autoApplied.submitted;
+      const minFit = s.minFit ?? getConfig(db).defaultMinFit;
+      const gate = await scoreAndGate({ db, sampling: deps.sampling }, jobIds, { resumeId: s.resumeId, minFit });
+      if (gate.kept.length > 0) {
+        const submitThisWatch = s.autoSubmit ?? submit;
+        autoApplied = await autoApply(
+          { jobIds: gate.kept, submit: submitThisWatch, resumeId: s.resumeId, capOverride: s.weeklyCap },
+          deps
+        );
+        totalSubmitted += autoApplied.submitted;
+      }
     }
 
     searches.push({ searchId: s.id, name: s.name, source: s.source, newMatches, autoApplied });

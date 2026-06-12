@@ -213,6 +213,26 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_answer_bank_label ON answer_bank(label);
     `
   }
+  ,
+  {
+    id: 10,
+    name: 'saved_search_per_watch_overrides',
+    sql: `
+      ALTER TABLE saved_search ADD COLUMN resume_id TEXT;
+      ALTER TABLE saved_search ADD COLUMN min_fit REAL;
+      ALTER TABLE saved_search ADD COLUMN weekly_cap INTEGER;
+      ALTER TABLE saved_search ADD COLUMN auto_submit INTEGER;
+    `
+  }
+  ,
+  {
+    id: 11,
+    name: 'notification_needs_action',
+    sql: `
+      ALTER TABLE notification ADD COLUMN reason TEXT;
+      ALTER TABLE notification ADD COLUMN link TEXT;
+    `
+  }
 ];
 
 export function applyMigrations(db: Database.Database): void {

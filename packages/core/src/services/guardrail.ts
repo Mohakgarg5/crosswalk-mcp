@@ -11,6 +11,8 @@ export type GuardrailInput = {
   resumeId: string;
   allowDuplicate?: boolean;
   confirmLowFit?: boolean;  // reserved for M4 live-fit gate
+  /** Overrides the global weekly cap for this check (per-watch cap). <=0 = unlimited. */
+  capOverride?: number;
 };
 
 export type GuardrailResult =
@@ -22,7 +24,7 @@ export function checkGuardrail(db: Db, input: GuardrailInput): GuardrailResult {
 
   // 1. Weekly cap (configurable via app_config). A cap <= 0 means UNLIMITED
   //    (no weekly limit) — for high-volume, hands-off auto-applying.
-  const cap = getConfig(db).weeklyCap;
+  const cap = input.capOverride ?? getConfig(db).weeklyCap;
   if (cap > 0) {
     const cutoff = new Date(Date.now() - WEEKLY_WINDOW_MS).toISOString();
     const count = (db.prepare(

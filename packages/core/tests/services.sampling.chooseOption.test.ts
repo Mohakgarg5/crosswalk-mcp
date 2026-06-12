@@ -20,6 +20,23 @@ describe('services/sampling/chooseOption', () => {
     expect(call.system).toMatch(/willingness|onsite|relocat/i);
   });
 
+  it('mustChoose forbids SKIP in the prompt + system so required dropdowns are never left blank', async () => {
+    const completeFn = vi.fn().mockResolvedValue('I agree to the AI policy');
+    const sampling = { complete: completeFn } as unknown as SamplingClient;
+    const out = await chooseFormOption({
+      sampling,
+      label: 'AI Policy for Application',
+      options: ['Select...', 'I agree to the AI policy', 'I do not agree'],
+      context: 'Mohak Garg, PM',
+      mustChoose: true
+    });
+    expect(out).toBe('I agree to the AI policy');
+    const call = completeFn.mock.calls[0][0] as { system: string; prompt: string };
+    expect(call.system).toMatch(/REQUIRED/);
+    expect(call.system).toMatch(/Do NOT reply "SKIP"|must choose/i);
+    expect(call.prompt).toMatch(/REQUIRED/);
+  });
+
   it('returns the model\'s verbatim value for paginated typeaheads when allowFreeText is set', async () => {
     // Greenhouse school dropdowns harvest only the first page (~100 options);
     // "Northwestern University" isn't in it. The fill path types the value

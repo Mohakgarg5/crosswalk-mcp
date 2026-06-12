@@ -141,13 +141,30 @@ function sanitizeFilters(f: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-export async function createSearch(name: string, filters: Record<string, unknown>, source?: 'web' | 'companies', autoApply?: boolean) {
+export async function createSearch(
+  name: string,
+  filters: Record<string, unknown>,
+  source?: 'web' | 'companies',
+  autoApply?: boolean,
+  overrides?: { resumeId?: string; minFit?: number; weeklyCap?: number; autoSubmit?: boolean }
+) {
   const { createSavedSearch } = await rt();
-  return createSavedSearch(await db(), { name, filters: sanitizeFilters(filters), source, autoApply });
+  return createSavedSearch(await db(), {
+    name, filters: sanitizeFilters(filters), source, autoApply,
+    resumeId: overrides?.resumeId, minFit: overrides?.minFit,
+    weeklyCap: overrides?.weeklyCap, autoSubmit: overrides?.autoSubmit
+  });
 }
 export async function setSearchAutoApply(id: string, autoApply: boolean) {
   const { setSavedSearchAutoApply } = await rt();
   setSavedSearchAutoApply(await db(), id, autoApply);
+}
+export async function updateSearchConfig(
+  id: string,
+  patch: { resumeId?: string | null; minFit?: number | null; weeklyCap?: number | null; autoSubmit?: boolean | null; autoApply?: boolean }
+) {
+  const { updateSavedSearchConfig } = await rt();
+  updateSavedSearchConfig(await db(), id, patch);
 }
 // --- Answer bank --------------------------------------------------------------
 
@@ -189,6 +206,10 @@ export async function listNotifs(unreadOnly = false) {
   const { listNotifications, unreadCount } = await rt();
   const d = await db();
   return { items: listNotifications(d, { unreadOnly }), unread: unreadCount(d) };
+}
+export async function listNeedsAction() {
+  const { listNeedsActions } = await rt();
+  return listNeedsActions(await db());
 }
 export async function markNotifsRead() {
   const { markAllRead } = await rt();

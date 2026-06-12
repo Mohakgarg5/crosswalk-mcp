@@ -31,17 +31,22 @@ export { getProfile, upsertProfile } from './store/profile.ts';
 export type { Profile } from './store/profile.ts';
 export { addAnswer, listAnswers, deleteAnswer, matchAnswer, loadDefaults } from './store/answerBank.ts';
 export type { AnswerEntry } from './store/answerBank.ts';
-export { getApplication, listEventsForApplication } from './store/application.ts';
+export { getApplication, listEventsForApplication, updateApplicationStatus, addEventForApplication } from './store/application.ts';
 export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
+export { applyApplication } from './tools/apply_application.ts';
 
 // Discovery alerts (saved searches + notifications)
-export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch, setSavedSearchAutoApply } from './store/savedSearch.ts';
+export { createSavedSearch, listSavedSearches, getSavedSearch, deleteSavedSearch, setSavedSearchAutoApply, updateSavedSearchConfig } from './store/savedSearch.ts';
 export type { SavedSearch, SavedSearchFilters, SearchSource } from './store/savedSearch.ts';
 export { runWatch } from './services/watchEngine.ts';
 export type { WatchRunResult, WatchSearchOutcome } from './services/watchEngine.ts';
-export { listNotifications, unreadCount, markAllRead } from './store/notification.ts';
-export type { Notification } from './store/notification.ts';
+export { listNotifications, unreadCount, markAllRead, createNotification, enqueueNeedsAction, listNeedsActions } from './store/notification.ts';
+export type { Notification, NeedsActionReason } from './store/notification.ts';
 export { refreshSavedSearch, refreshAllSavedSearches } from './services/savedSearchEngine.ts';
+export { scoreAndGate } from './services/fitGate.ts';
+export type { FitGateResult } from './services/fitGate.ts';
+export { buildLaunchAgentPlist, launchAgentPlistPath, LAUNCH_AGENT_LABEL } from './service/launchAgent.ts';
+export type { LaunchAgentSpec } from './service/launchAgent.ts';
 
 // Recruiter email routing
 export { getEmailAccount, setEmailAccount, listInboundEmails } from './store/email.ts';

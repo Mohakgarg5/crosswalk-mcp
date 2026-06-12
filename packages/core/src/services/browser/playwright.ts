@@ -39,6 +39,7 @@ async function launchPersistentWithLockRecovery(
 
 type PlaywrightContext = {
   newPage(): Promise<PlaywrightPage>;
+  pages?(): PlaywrightPage[];
   close(): Promise<void>;
 };
 
@@ -238,24 +239,69 @@ export class LazyPlaywrightBrowser implements Browser {
       // Try to advance past it before looking for form fields. No-op if the form
       // is already on the page or the button isn't found.
       await advanceToForm(page);
+      // Let any post-load redirect/reload finish before we touch fields — the
+      // ATS embed tearing down a frame mid-fill is what turned fillable forms
+      // into "drafted, needs human".
+      await settlePage(page);
+      // Headed/interactive (the Finish handoff): if there's a sign-in wall,
+      // wait for the user to log in before filling, then continue. The
+      // persistent profile remembers the session next time. Headless auto-apply
+      // can't wait for a human, so it skips this and surfaces an account-wall
+      // alert instead (unchanged).
+      if (this.headed) await waitForLoginThenForm(page, 5 * 60 * 1000);
       const maxSteps = Math.max(1, opts.maxSteps ?? 1);
       const labelOf = (f: FillField) => ('name' in f ? `${f.kind}:${f.name}` : f.kind);
       const filledLabels = new Set<string>();
       let stepsAdvanced = 0;
 
+      // Fill one field, surviving a navigation that strikes mid-fill: settle and
+      // retry once. A single field lost to a reload must never abort the whole
+      // application — that's the difference between autonomous and "needs you".
+      const fillOne = async (field: FillField): Promise<void> => {
+        const label = labelOf(field);
+        if (filledLabels.has(label)) return;
+        try {
+          if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+        } catch (e) {
+          if (isNavigationError(e)) {
+            await settlePage(page);
+            try {
+              if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+            } catch { /* field lost to a second navigation — skip it, keep going */ }
+          }
+          // Non-navigation per-field errors are swallowed too: one odd field
+          // can't be allowed to tank an otherwise-complete application.
+        }
+      };
+
       // Multi-step wizards: fill the current page, advance via Next/Continue,
       // repeat. A field skipped on one page may be filled on a later one.
       for (let step = 1; step <= maxSteps; step++) {
         for (const field of fields) {
-          const label = labelOf(field);
-          if (filledLabels.has(label)) continue;
-          if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(label);
+          await fillOne(field);
         }
         if (step < maxSteps) {
           const advanced = await clickFirstAcrossFrames(page, NEXT_SELECTORS);
           if (!advanced) break; // no Next button → this is the last page
           stepsAdvanced++;
           await new Promise(resolve => setTimeout(resolve, 1500)); // let the next page render
+        }
+      }
+
+      // Before submitting, re-apply the standard identity fields. ATS embeds
+      // (Greenhouse job_app) frequently reload once mid-fill, silently wiping
+      // values typed early — that's how a filled "First Name" came back
+      // required at submit time. Re-filling on the now-settled page makes them
+      // stick. Restricted to plain idempotent text fills (re-running a
+      // committed react-select could clear it).
+      if (opts.clickSubmit) {
+        await settlePage(page);
+        const REFILL_KINDS = new Set(['email', 'first_name', 'last_name', 'full_name', 'phone', 'linkedin', 'website']);
+        for (const field of fields) {
+          if (!REFILL_KINDS.has(field.kind)) continue;
+          try {
+            if (await tryFillFieldAcrossFrames(page, field, opts.ats)) filledLabels.add(labelOf(field));
+          } catch { /* transient nav — the pre-submit validation scan still catches gaps */ }
         }
       }
 
@@ -269,6 +315,7 @@ export class LazyPlaywrightBrowser implements Browser {
       let postSubmitUrl: string | undefined;
       let postSubmitTitle: string | undefined;
       let confirmationSeen = false;
+      let validationErrors: string[] = [];
       const submitClickErrors: string[] = [];
       if (opts.clickSubmit) {
         // Let async form-state syncs settle (Ashby PATCHes every field via
@@ -333,6 +380,14 @@ export class LazyPlaywrightBrowser implements Browser {
             }
             postSubmitUrl = page.url();
             postSubmitTitle = await page.title();
+            // If the submit didn't land (still on the form), ask the ATS which
+            // required fields it's complaining about. Greenhouse/Ashby render
+            // an inline "This field is required" next to the offending field;
+            // reading the field's label tells the user the ONE thing to fix.
+            const stillOnForm = postSubmitUrl === preUrl && !confirmationSeen;
+            if (patient && stillOnForm) {
+              validationErrors = await collectValidationErrors(page);
+            }
           } catch {
             // Page might be in transient state; leave URL/title undefined
           }
@@ -409,6 +464,7 @@ export class LazyPlaywrightBrowser implements Browser {
         resolvedUrl, title, screenshotPng, filled, skipped, submitClicked,
         postSubmitUrl, postSubmitTitle, stepsAdvanced, verificationRequired, verificationResolved,
         ...(confirmationSeen ? { confirmationSeen } : {}),
+        ...(validationErrors.length ? { validationErrors } : {}),
         ...(submitResponses.length ? { submitResponses } : {}),
         ...(submitClickErrors.length ? { submitClickErrors } : {})
       };
@@ -424,6 +480,17 @@ export class LazyPlaywrightBrowser implements Browser {
       await this.launchedBrowser.close();
       this.launchedBrowser = null;
     }
+  }
+
+  /** The currently-open pages in the persistent context. Used by the headed
+   *  "finish" handoff to watch for the user's manual submit. Empty unless a
+   *  persistent (profile) context is live. */
+  openPages(): PlaywrightPage[] {
+    const ctx = this.persistentContext;
+    if (ctx && typeof ctx.pages === 'function') {
+      try { return ctx.pages() ?? []; } catch { return []; }
+    }
+    return [];
   }
 }
 
@@ -527,6 +594,101 @@ async function advanceToForm(page: PlaywrightPage): Promise<void> {
 /** Count visible form fields across frames. Returns -1 when no frame could
  * report a number (test-mocked pages) — callers treat that as "unknowable,
  * don't wait on it". */
+/** Label patterns for the standard identity fields — used to fill custom
+ *  portals (Uber, company-built forms) whose input NAMES don't match the ATS
+ *  selectors but whose visible LABELS are clear. */
+const LABEL_PATTERNS: Partial<Record<StaticKind, RegExp>> = {
+  email: /e-?mail/i,
+  first_name: /first\s*name|given name|legal first/i,
+  last_name: /last\s*name|surname|family name|legal last/i,
+  full_name: /^name$|full name|legal name|your name|preferred name/i,
+  phone: /phone|mobile|tel(ephone)?|contact number/i,
+  linkedin: /linkedin/i,
+  website: /website|portfolio|personal (site|website)|github/i
+};
+
+/** Fill the first EMPTY text input whose associated label/placeholder/aria-label
+ *  matches `re`, regardless of the input's name/id. Locates in-page, then fills
+ *  via the Playwright handle so React controlled inputs get real change events.
+ *  Portal-agnostic — this is what lets us fill forms that aren't a known ATS. */
+async function fillByLabel(page: PlaywrightFrame, reSource: string, flags: string, value: string): Promise<boolean> {
+  let marked = false;
+  try {
+    marked = await page.evaluate(({ reSource, flags }: { reSource: string; flags: string }) => {
+      const doc = (globalThis as unknown as { document: any }).document;
+      const win = globalThis as unknown as { CSS?: { escape(s: string): string } };
+      const re = new RegExp(reSource, flags);
+      const norm = (s: unknown) => String(s ?? '').replace(/\s+/g, ' ').replace(/[*:]/g, '').trim();
+      const inputs = Array.from(doc.querySelectorAll(
+        'input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([type=submit]):not([type=button]):not([type=password]), textarea'
+      )) as any[];
+      const labelText = (el: any): string => {
+        if (el.id) {
+          try { const l = doc.querySelector('label[for="' + (win.CSS ? win.CSS.escape(el.id) : el.id) + '"]'); if (l) return norm(l.textContent); } catch { /* bad id */ }
+        }
+        const wrap = el.closest ? el.closest('label') : null;
+        if (wrap) return norm(wrap.textContent);
+        const al = el.getAttribute('aria-label'); if (al) return norm(al);
+        const lb = el.getAttribute('aria-labelledby'); if (lb) { const n = doc.getElementById(lb); if (n) return norm(n.textContent); }
+        if (el.placeholder) return norm(el.placeholder);
+        return '';
+      };
+      for (const el of inputs) {
+        if (el.value && String(el.value).trim()) continue; // don't clobber a filled field
+        const lt = labelText(el);
+        if (lt && re.test(lt)) { el.setAttribute('data-cw-fill', '1'); return true; }
+      }
+      return false;
+    }, { reSource, flags });
+  } catch { return false; }
+  if (!marked) return false;
+  try {
+    const el = await page.$('[data-cw-fill="1"]');
+    if (el && typeof el.fill === 'function') { await el.fill(value); return true; }
+    return false;
+  } catch { return false; }
+  finally {
+    try { await page.evaluate(() => { const e = (globalThis as unknown as { document: any }).document.querySelector('[data-cw-fill="1"]'); if (e) e.removeAttribute('data-cw-fill'); }); } catch { /* ignore */ }
+  }
+}
+
+/** True when the page is showing a sign-in / account wall. A password field is
+ *  the reliable tell — application forms don't have one — backed by sign-in
+ *  body copy. */
+async function looksLikeLogin(page: PlaywrightPage): Promise<boolean> {
+  for (const frame of allFrames(page)) {
+    try {
+      const hit = await frame.evaluate(() => {
+        const doc = (globalThis as unknown as { document: any }).document;
+        if (doc.querySelector('input[type="password"]')) return true;
+        const t = String(doc.body?.innerText ?? '').toLowerCase().slice(0, 3000);
+        return /(sign in|log in|create an account)\s+(to|and)\s+(apply|continue|your account|get started)/.test(t)
+          || /please (sign in|log in) to continue/.test(t);
+      });
+      if (hit) return true;
+    } catch { /* cross-origin frame */ }
+  }
+  return false;
+}
+
+/** Headed/interactive only: if the apply URL lands on a login wall, wait for the
+ *  user to sign in (the password field disappears / the form appears) before
+ *  filling — otherwise we'd fill nothing and bail while they're still logging
+ *  in. The persistent profile remembers the session for next time. */
+async function waitForLoginThenForm(page: PlaywrightPage, timeoutMs: number): Promise<void> {
+  if (!(await looksLikeLogin(page))) return;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1500));
+    if (!(await looksLikeLogin(page))) {
+      // Logged in — let the post-login page settle and reveal the form.
+      await settlePage(page);
+      await advanceToForm(page);
+      return;
+    }
+  }
+}
+
 async function countFormFields(page: PlaywrightPage): Promise<number> {
   let total = 0;
   let anyNumber = false;
@@ -591,6 +753,34 @@ function allFrames(page: PlaywrightPage): PlaywrightFrame[] {
     const frames = page.frames();
     return Array.isArray(frames) && frames.length > 0 ? frames : [page];
   } catch { return [page]; }
+}
+
+/** True for the family of Playwright errors raised when the page/frame we were
+ *  operating on navigated, reloaded, or detached out from under us. These are
+ *  transient and recoverable — we re-settle and retry rather than abandon the
+ *  whole application (the #1 cause of "filled form became a draft"). */
+export function isNavigationError(e: unknown): boolean {
+  const m = (e as { message?: string })?.message ?? '';
+  return /execution context was destroyed|because of a navigation|frame (was )?detached|target closed|cannot find context|navigating and changing the content/i.test(m);
+}
+
+/** Wait for post-load redirects/reloads to quiesce before interacting, so we
+ *  don't start filling into a frame that's about to be torn down. Many ATS
+ *  embeds (Greenhouse job_app) reload once after first paint. Real pages only —
+ *  test mocks lack waitForLoadState, where this is a no-op. */
+async function settlePage(page: PlaywrightPage, quietMs = 1200, maxWaitMs = 12_000): Promise<void> {
+  const wfl = (page as { waitForLoadState?: (s?: string, o?: { timeout?: number }) => Promise<void> }).waitForLoadState;
+  if (typeof wfl !== 'function') return; // mock/unknown page — nothing to settle
+  try { await wfl.call(page, 'load', { timeout: maxWaitMs }); } catch { /* navigation in-flight */ }
+  const start = Date.now();
+  let lastUrl = typeof page.url === 'function' ? page.url() : '';
+  let stableSince = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 250));
+    const u = typeof page.url === 'function' ? page.url() : lastUrl;
+    if (u !== lastUrl) { lastUrl = u; stableSince = Date.now(); continue; }
+    if (Date.now() - stableSince >= quietMs) return;
+  }
 }
 
 /** Like clickFirst but tries the main frame first, then every iframe. */
@@ -716,6 +906,106 @@ async function detectVerificationGate(page: PlaywrightPage): Promise<'code' | 'l
     if (kind) return kind;
   }
   return null;
+}
+
+/**
+ * After a submit that didn't navigate, read the ATS's own inline validation
+ * errors and return the LABEL of each offending field. Greenhouse/Ashby/Lever
+ * all render a small "This field is required" (or similar) node next to the
+ * field; the nearest label/legend/aria-label names it. Best-effort and fully
+ * defensive — any failure yields an empty list, never throws.
+ */
+async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> {
+  const seen = new Set<string>();
+  for (const frame of allFrames(page)) {
+    try {
+      const labels = await frame.evaluate(() => {
+        // VALIDATION_PROBE
+        const doc = (globalThis as unknown as { document: any }).document;
+        const ERR = /this field is required|is required|please (?:complete|fill|select|answer)|please make a selection/i;
+        // The form's generic legend ("* indicates a required field") and section
+        // headers are not per-field errors — never treat them as one.
+        const NOISE = /indicates a required field|apply for this job/i;
+        const out: string[] = [];
+        const seenLocal = new Set<string>();
+        const clean = (s: string) => s.replace(/\s*\*\s*$/, '').replace(/[*:]/g, '').replace(/\s+/g, ' ').trim();
+        const usable = (name: string) => !!name && name.length <= 60 && !name.includes('\n') && !NOISE.test(name);
+
+        // All labels/legends, captured once, to attribute an error to its field.
+        const allLabels = Array.from(doc.querySelectorAll('label, legend')) as any[];
+
+        // Name the field an error node belongs to. Climbing parents then taking
+        // the first label overshoots into multi-field containers (that's how
+        // every error got mislabeled "First Name"). Instead: (1) the closest
+        // ancestor that contains exactly ONE label is the field's own wrapper;
+        // (2) failing that, the label that most-closely PRECEDES the error in
+        // document order is the field's label.
+        const nameForError = (errNode: any): string => {
+          let node = errNode;
+          for (let i = 0; i < 8 && node; i++) {
+            const lbls = node.querySelectorAll ? Array.from(node.querySelectorAll('label, legend')) as any[] : [];
+            if (lbls.length === 1) {
+              const t = clean(String(lbls[0].innerText ?? lbls[0].textContent ?? ''));
+              if (t) return t;
+            }
+            if (lbls.length > 1) break; // climbed into a multi-field container
+            node = node.parentElement;
+          }
+          // Fallback: the last label that appears before this error in the DOM.
+          let best = '';
+          for (const lbl of allLabels) {
+            // DOCUMENT_POSITION_FOLLOWING (4): errNode comes AFTER lbl.
+            if (typeof lbl.compareDocumentPosition !== 'function') continue;
+            if (lbl.compareDocumentPosition(errNode) & 4) {
+              const t = clean(String(lbl.innerText ?? lbl.textContent ?? ''));
+              if (t) best = t;
+            }
+          }
+          return best;
+        };
+
+        // Strategy A: nodes whose own text IS a "required" message.
+        const all = Array.from(doc.querySelectorAll('div,span,p,label,small,strong')) as any[];
+        for (const node of all) {
+          const txt = String(node.innerText ?? node.textContent ?? '').trim();
+          if (!txt || txt.length > 80 || !ERR.test(txt) || NOISE.test(txt)) continue;
+          const name = nameForError(node);
+          if (!usable(name)) continue; // couldn't pin it to a real field — skip
+          const key = name.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
+        }
+
+        // Strategy B: aria-invalid fields (Ashby marks these).
+        const invalids = Array.from(doc.querySelectorAll('[aria-invalid="true"]')) as any[];
+        for (const el of invalids) {
+          const aria = el.getAttribute?.('aria-label');
+          const name = (aria && aria.trim()) ? clean(aria) : nameForError(el);
+          if (!usable(name)) continue;
+          const key = name.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
+        }
+
+        // Strategy C: accessible error messages (role=alert / aria-live).
+        // Ashby announces a submit-blocking error this way rather than inline
+        // "required" text. Capture the field name it points at, else the message.
+        const alerts = Array.from(doc.querySelectorAll('[role="alert"], [aria-live="assertive"], [aria-live="polite"]')) as any[];
+        for (const el of alerts) {
+          const txt = String(el.innerText ?? el.textContent ?? '').trim();
+          if (!txt || txt.length > 120 || NOISE.test(txt)) continue;
+          const name = nameForError(el);
+          const chosen = usable(name) ? name : (txt.length <= 80 ? txt : '');
+          if (!chosen) continue;
+          const key = chosen.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(chosen); }
+        }
+        return out.slice(0, 10);
+      }) as string[];
+      for (const l of labels) { if (l && !seen.has(l)) seen.add(l); }
+    } catch {
+      continue; // cross-origin frame or evaluate failure — skip
+    }
+  }
+  return Array.from(seen);
 }
 
 /**
@@ -980,7 +1270,14 @@ export async function tryReactSelect(frame: PlaywrightFrame, fieldName: string, 
  * iframe — selectors on the parent page see nothing). */
 async function tryFillFieldAcrossFrames(page: PlaywrightPage, field: FillField, ats: string | undefined): Promise<boolean> {
   for (const frame of allFrames(page)) {
-    if (await tryFillField(frame, field, ats)) return true;
+    try {
+      if (await tryFillField(frame, field, ats)) return true;
+    } catch (e) {
+      // A mid-fill navigation invalidates this frame — bubble it so the caller
+      // can settle and retry. Any other per-frame error (detached iframe,
+      // selector quirk) shouldn't stop us checking the remaining frames.
+      if (isNavigationError(e)) throw e;
+    }
   }
   return false;
 }
@@ -1024,6 +1321,8 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
     }
     // Last-resort react-select fallback (fuzzy id/name + label match).
     if (await tryReactSelect(page, field.name, field.value, field.label)) return true;
+    // Plain custom input identified only by its visible label (Uber et al.).
+    if (field.label && await fillByLabel(page, field.label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i', field.value)) return true;
     return false;
   }
 
@@ -1163,6 +1462,13 @@ async function tryFillField(page: PlaywrightFrame, field: FillField, ats: string
       continue;
     }
     return true;
+  }
+  // Label fallback for custom portals (Uber, bespoke company forms): the ATS
+  // selectors above didn't match, but the field's visible label might.
+  const labelRe = LABEL_PATTERNS[field.kind];
+  if (labelRe) {
+    const value = (field as { value?: string }).value;
+    if (value && await fillByLabel(page, labelRe.source, labelRe.flags, value)) return true;
   }
   return false;
 }

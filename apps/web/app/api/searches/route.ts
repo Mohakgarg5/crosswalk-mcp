@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { listSearches, createSearch, deleteSearch, refreshSearches, setSearchAutoApply } from '@/lib/engine';
+import { listSearches, createSearch, deleteSearch, refreshSearches, setSearchAutoApply, updateSearchConfig } from '@/lib/engine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +13,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as {
       action?: string; id?: string; name?: string;
       filters?: Record<string, unknown>; source?: 'web' | 'companies'; autoApply?: boolean;
+      resumeId?: string; minFit?: number; weeklyCap?: number; autoSubmit?: boolean;
     };
     if (body.action === 'refresh') {
       return NextResponse.json({ ok: true, result: await refreshSearches() });
@@ -22,8 +23,21 @@ export async function POST(req: Request) {
       await setSearchAutoApply(body.id, Boolean(body.autoApply));
       return NextResponse.json({ ok: true });
     }
+    if (body.action === 'set-config') {
+      if (!body.id) return NextResponse.json({ ok: false, error: 'id required' }, { status: 400 });
+      await updateSearchConfig(body.id, {
+        resumeId: body.resumeId ?? null,
+        minFit: body.minFit ?? null,
+        weeklyCap: body.weeklyCap ?? null,
+        autoSubmit: body.autoSubmit ?? null,
+        ...(body.autoApply === undefined ? {} : { autoApply: body.autoApply })
+      });
+      return NextResponse.json({ ok: true });
+    }
     if (!body.name) return NextResponse.json({ ok: false, error: 'name required' }, { status: 400 });
-    const search = await createSearch(body.name, body.filters ?? {}, body.source, body.autoApply);
+    const search = await createSearch(body.name, body.filters ?? {}, body.source, body.autoApply, {
+      resumeId: body.resumeId, minFit: body.minFit, weeklyCap: body.weeklyCap, autoSubmit: body.autoSubmit
+    });
     return NextResponse.json({ ok: true, search });
   } catch (e) {
     return NextResponse.json({ ok: false, error: (e as Error).message }, { status: 400 });

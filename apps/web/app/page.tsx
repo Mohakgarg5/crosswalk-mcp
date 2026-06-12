@@ -64,16 +64,35 @@ export default function Dashboard() {
       })
       .catch(() => setSetUp(false));
     // Cached scores only — free and instant. Fresh scoring is the button below.
-    runTool<{ matches: Match[] }>('top_matches', { limit: 4 })
+    // freshDays: 2 → only jobs posted in the last couple days, never stale ones.
+    runTool<{ matches: Match[] }>('top_matches', { limit: 4, freshDays: 2 })
       .then(r => setMatches(r.matches))
       .catch(() => setMatches([]));
   }, []);
 
+  // "Find new matches" must actually pull NEW jobs off the web first — scoring
+  // alone only re-ranks the cache, so a stale cache yields nothing new (that's
+  // the "I scored twice and saw no new jobs" trap). Fetch for the user's roles,
+  // THEN score the freshly-fetched ones.
   async function scoreMatches() {
     setScoring(true); setMatchErr('');
     try {
-      const r = await runTool<{ matches: Match[] }>('top_matches', { limit: 4, scoreMissing: true, maxToScore: 8 });
+      const queries = chips.length ? chips : ['product manager'];
+      let fetched = 0;
+      for (const q of queries) {
+        const sr = await fetch('/api/search-roles', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query: q, pages: 3 })
+        }).then(x => x.json()).catch(() => null);
+        if (sr?.ok) fetched += sr.meta?.fetched ?? sr.jobs?.length ?? 0;
+      }
+      const r = await runTool<{ matches: Match[]; scored: number }>('top_matches', { limit: 4, scoreMissing: true, maxToScore: 12, freshDays: 2 });
       setMatches(r.matches);
+      if ((r.matches?.length ?? 0) === 0) {
+        setMatchErr(fetched > 0
+          ? `Fetched ${fetched} jobs but none posted in the last 2 days scored high enough yet — try a broader role, or “Browse all jobs”.`
+          : 'No fresh jobs (last 2 days) found for those roles right now. Try a different/broader role above.');
+      }
     } catch (e) { setMatchErr((e as Error).message); }
     finally { setScoring(false); }
   }
@@ -183,7 +202,7 @@ export default function Dashboard() {
             {matches && matches.length > 0 && (
               <button onClick={scoreMatches} disabled={scoring}
                 className="text-[13px] font-medium text-[var(--accent)] hover:underline disabled:opacity-50">
-                {scoring ? 'Scoring…' : '↻ Score new jobs'}
+                {scoring ? 'Finding new jobs…' : '↻ Find new matches'}
               </button>
             )}
             <Link href="/jobs" className="text-[13px] font-medium text-[var(--accent)] hover:underline">Browse all jobs →</Link>
@@ -340,7 +359,7 @@ function EmptyMatches({ hasKey, setUp, scoring, onScore, canScore }: {
               <div className="mt-4 flex items-center justify-center gap-2">
                 {canScore && (
                   <Button size="sm" onClick={onScore} disabled={scoring}>
-                    {scoring ? 'Scoring your jobs…' : 'Score my matches'}
+                    {scoring ? 'Finding new jobs…' : 'Find new matches'}
                   </Button>
                 )}
                 <Link href="/jobs"><Button size="sm" variant="ghost">Search jobs →</Button></Link>

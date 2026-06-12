@@ -12,7 +12,7 @@ import { getConfig } from '../store/appConfig.ts';
 import { matchAnswer } from '../store/answerBank.ts';
 import { resolveChoiceFields } from '../services/resolveChoices.ts';
 import { getEmailAccount } from '../store/email.ts';
-import { createNotification } from '../store/notification.ts';
+import { enqueueNeedsAction } from '../store/notification.ts';
 import { imapConfigFromAccount, liveImapFetcher } from '../services/email/imapReader.ts';
 import { makeResolveVerification } from '../services/email/resolveVerification.ts';
 import type { ResolveVerification } from '../services/browser/types.ts';
@@ -50,6 +50,8 @@ export type ApplyApplicationResult = {
   verificationRequired?: boolean;
   /** True if that verification was resolved automatically. */
   verificationResolved?: boolean;
+  /** Required fields the ATS flagged after a rejected submit (need an answer). */
+  validationErrors?: string[];
 };
 
 function asString(v: unknown): string | undefined {
@@ -155,15 +157,21 @@ export async function applyApplication(
     const target = await resolveApplyTarget(app.deepLink, ctx.fetchImpl);
     if (target.gone) {
       addEventForApplication(ctx.db, app.id, 'listing_expired', { url: app.deepLink });
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'listing_expired',
+        title: 'Listing expired',
+        body: 'This listing is no longer accepting applications through this link.',
+        link: app.deepLink
+      });
       throw new Error('This listing has expired or been removed — the job is no longer accepting applications through this link.');
     }
     if (!target.url) {
       addEventForApplication(ctx.db, app.id, 'apply_url_unresolved', { url: app.deepLink });
-      createNotification(ctx.db, {
-        kind: 'manual_apply_needed',
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'no_form',
         title: 'Apply on the company site',
-        body: `Couldn't find the application form behind this listing. Open it and apply manually: ${app.deepLink}`,
-        refId: app.id
+        body: "Couldn't find the application form behind this listing — open it and apply manually.",
+        link: app.deepLink
       });
       throw new Error(`This listing has no application form — apply on the company site: ${app.deepLink}`);
     }
@@ -313,11 +321,11 @@ export async function applyApplication(
   // account-gated ATS (Workday sign-in wall). Don't leave the user guessing.
   if (result.filled.length === 0) {
     addEventForApplication(ctx.db, app.id, 'nothing_filled', { url: result.resolvedUrl });
-    createNotification(ctx.db, {
-      kind: 'manual_apply_needed',
-      title: 'Form needs you — likely an account sign-in',
-      body: `No fields could be filled on this page (often a Workday-style account wall). Finish it by hand: ${result.resolvedUrl || applyUrl}`,
-      refId: app.id
+    enqueueNeedsAction(ctx.db, {
+      applicationId: app.id, reason: 'account_wall',
+      title: 'Form needs you — likely a sign-in wall',
+      body: 'No fields could be filled (often a Workday-style account wall). Finish it by hand.',
+      link: result.resolvedUrl || applyUrl
     });
   }
 
@@ -338,17 +346,34 @@ export async function applyApplication(
     addEventForApplication(ctx.db, app.id, 'submit_click_failed', { errors: result.submitClickErrors });
   }
   if (Boolean(result.submitClicked) && !verificationPending && !evidence) {
-    addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
-      url: result.resolvedUrl,
-      postSubmitUrl: result.postSubmitUrl ?? null,
-      postSubmitTitle: result.postSubmitTitle ?? null
-    });
-    createNotification(ctx.db, {
-      kind: 'submit_unconfirmed',
-      title: 'Submission not confirmed',
-      body: `A submit button was clicked but nothing confirmed the application went through. Check it yourself: ${applyUrl}`,
-      refId: app.id
-    });
+    // The ATS told us exactly why the submit didn't land (a required field is
+    // empty/invalid) — surface that, not a vague "unconfirmed". Far more
+    // actionable: the user knows the one field to fill.
+    if (result.validationErrors && result.validationErrors.length > 0) {
+      addEventForApplication(ctx.db, app.id, 'required_field_missing', {
+        url: result.resolvedUrl,
+        fields: result.validationErrors
+      });
+      const list = result.validationErrors.join(', ');
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'required_field_missing',
+        title: 'One field needs your answer',
+        body: `The application is filled, but ${list} ${result.validationErrors.length === 1 ? 'is a required field that needs' : 'are required fields that need'} an answer before it can submit. Finish it here.`,
+        link: applyUrl
+      });
+    } else {
+      addEventForApplication(ctx.db, app.id, 'submit_unconfirmed', {
+        url: result.resolvedUrl,
+        postSubmitUrl: result.postSubmitUrl ?? null,
+        postSubmitTitle: result.postSubmitTitle ?? null
+      });
+      enqueueNeedsAction(ctx.db, {
+        applicationId: app.id, reason: 'submit_unconfirmed',
+        title: 'Submission not confirmed',
+        body: 'A submit button was clicked but nothing confirmed the application went through — check it yourself.',
+        link: applyUrl
+      });
+    }
   }
   if (submitted) {
     addEventForApplication(ctx.db, app.id, 'browser_submitted', {
@@ -364,11 +389,11 @@ export async function applyApplication(
 
   if (verificationPending) {
     addEventForApplication(ctx.db, app.id, 'verification_pending', { url: result.resolvedUrl });
-    createNotification(ctx.db, {
-      kind: 'verification_pending',
+    enqueueNeedsAction(ctx.db, {
+      applicationId: app.id, reason: 'verification_timeout',
       title: 'Email verification needed',
       body: `${result.title || 'An application'} asked for an emailed code/link we couldn't read in time. The form is filled — finish it by hand.`,
-      refId: app.id
+      link: result.resolvedUrl || applyUrl
     });
   } else if (result.verificationResolved) {
     addEventForApplication(ctx.db, app.id, 'email_verified', { url: result.resolvedUrl });
@@ -389,6 +414,7 @@ export async function applyApplication(
     detectedAts,
     postSubmitUrl: result.postSubmitUrl,
     verificationRequired: result.verificationRequired,
-    verificationResolved: result.verificationResolved
+    verificationResolved: result.verificationResolved,
+    validationErrors: result.validationErrors
   };
 }

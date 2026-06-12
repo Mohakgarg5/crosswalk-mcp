@@ -87,4 +87,26 @@ describe('autoApply — applies to a batch on the user\'s behalf', () => {
     expect(s.drafted).toBe(1);
     expect(listApplications(db).length).toBe(1); // the draft is still saved
   });
+
+  it('enqueues a needs_action (browser_unavailable) when the browser step throws', async () => {
+    const db = openDb(':memory:');
+    seed(db);
+    const { listNeedsActions } = await import('../src/store/notification.ts');
+    await autoApply({ jobIds: ['g-1'], submit: true }, { db, sampling: fakeSampling(), browser: brokenBrowser() });
+    const q = listNeedsActions(db);
+    expect(q.some(n => n.reason === 'browser_unavailable')).toBe(true);
+  });
+
+  it('uses the supplied resumeId for every job in the batch', async () => {
+    const db = openDb(':memory:');
+    seed(db);
+    addResume(db, { id: 'r-product', label: 'Product', rawText: 'p', parsed: {} });
+    addResume(db, { id: 'r-project', label: 'Project', rawText: 'j', parsed: {} });
+    const deps = { db, sampling: fakeSampling(), browser: fakeBrowser() };
+
+    const summary = await autoApply({ jobIds: ['g-1'], submit: false, resumeId: 'r-project' }, deps);
+    expect(summary.total).toBe(1);
+    const app = listApplications(db)[0];
+    expect(app.resumeId).toBe('r-project');
+  });
 });

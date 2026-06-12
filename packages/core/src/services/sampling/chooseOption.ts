@@ -9,6 +9,9 @@ export type ChooseOptionArgs = {
    * options — when set, an answer that isn't in `options` is returned
    * verbatim so the fill path can type it into the live typeahead. */
   allowFreeText?: boolean;
+  /** The field is REQUIRED — the form won't submit while it's blank. The model
+   * must pick the best-fitting option from the list and may not reply SKIP. */
+  mustChoose?: boolean;
 };
 
 const SYSTEM = `You help a job applicant pick the best option for a multiple-choice application field. Choose the single option that best fits the applicant and copy it EXACTLY as written.
@@ -23,12 +26,20 @@ If the options list looks like one page of a longer list (e.g. universities) and
 
 Otherwise, if no option is clearly appropriate, or it needs personal facts you don't have (salary history, government IDs, specific certifications), reply with exactly "SKIP".`;
 
+// For REQUIRED fields: the form will not submit while this is blank, so SKIP is
+// not an option. The model must pick the single best-fitting choice from the
+// list — these are all pre-approved answers the form itself offers. Prefer the
+// neutral / affirmative / acknowledgement option when no fact decides it.
+const SYSTEM_MUST = `${SYSTEM}
+
+OVERRIDE: This field is REQUIRED — the application cannot be submitted while it is blank. You MUST choose the single best-fitting option from the list. Do NOT reply "SKIP". Every option shown is an answer the form itself offers, so one of them is acceptable. When no applicant fact decides it, pick the neutral, affirmative, or acknowledgement option (e.g. agreeing to a policy, "I understand", "Yes") rather than leaving it blank.`;
+
 /**
  * Ask the model to pick one of the given options for a select/radio question.
  * Returns the exact option string (guaranteed to be one of `options`) or null.
  */
 export async function chooseFormOption(args: ChooseOptionArgs): Promise<string | null> {
-  const { sampling, label, options, context, allowFreeText } = args;
+  const { sampling, label, options, context, allowFreeText, mustChoose } = args;
   if (options.length === 0) return null;
 
   const prompt = [
@@ -38,12 +49,14 @@ export async function chooseFormOption(args: ChooseOptionArgs): Promise<string |
     '',
     `Applicant: ${context}`,
     '',
-    'Reply with ONLY the chosen option text (or the applicant\'s exact value for a partial list), on one line, with no explanation — or exactly "SKIP".'
+    mustChoose
+      ? 'This field is REQUIRED. Reply with ONLY the single best-fitting option text, on one line, with no explanation. Do NOT reply "SKIP".'
+      : 'Reply with ONLY the chosen option text (or the applicant\'s exact value for a partial list), on one line, with no explanation — or exactly "SKIP".'
   ].join('\n');
 
   let raw: string;
   try {
-    raw = await sampling.complete({ prompt, system: SYSTEM, maxTokens: 60, temperature: 0.2 });
+    raw = await sampling.complete({ prompt, system: mustChoose ? SYSTEM_MUST : SYSTEM, maxTokens: 60, temperature: 0.2 });
   } catch {
     return null;
   }
