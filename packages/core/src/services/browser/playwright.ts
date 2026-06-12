@@ -812,21 +812,39 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
         const ERR = /this field is required|is required|please (?:complete|fill|select|answer)|required field|please make a selection/i;
         const out: string[] = [];
         const seenLocal = new Set<string>();
+        const clean = (s: string) => s.replace(/\s*\*\s*$/, '').replace(/[*:]/g, '').replace(/\s+/g, ' ').trim();
 
-        const labelFor = (el: any): string => {
-          // 1) aria-labelledby / aria-label on the field or its container
-          const aria = el.getAttribute?.('aria-label');
-          if (aria && aria.trim()) return aria.trim();
-          // 2) climb to a field container and grab its label/legend
-          let node = el;
-          for (let i = 0; i < 6 && node; i++) {
-            const lbl = node.querySelector?.('label, legend');
-            if (lbl && lbl.innerText && lbl.innerText.trim()) {
-              return lbl.innerText.replace(/\s*\*\s*$/, '').replace(/\s+/g, ' ').trim();
+        // All labels/legends, captured once, to attribute an error to its field.
+        const allLabels = Array.from(doc.querySelectorAll('label, legend')) as any[];
+
+        // Name the field an error node belongs to. Climbing parents then taking
+        // the first label overshoots into multi-field containers (that's how
+        // every error got mislabeled "First Name"). Instead: (1) the closest
+        // ancestor that contains exactly ONE label is the field's own wrapper;
+        // (2) failing that, the label that most-closely PRECEDES the error in
+        // document order is the field's label.
+        const nameForError = (errNode: any): string => {
+          let node = errNode;
+          for (let i = 0; i < 8 && node; i++) {
+            const lbls = node.querySelectorAll ? Array.from(node.querySelectorAll('label, legend')) as any[] : [];
+            if (lbls.length === 1) {
+              const t = clean(String(lbls[0].innerText ?? lbls[0].textContent ?? ''));
+              if (t) return t;
             }
+            if (lbls.length > 1) break; // climbed into a multi-field container
             node = node.parentElement;
           }
-          return '';
+          // Fallback: the last label that appears before this error in the DOM.
+          let best = '';
+          for (const lbl of allLabels) {
+            // DOCUMENT_POSITION_FOLLOWING (4): errNode comes AFTER lbl.
+            if (typeof lbl.compareDocumentPosition !== 'function') continue;
+            if (lbl.compareDocumentPosition(errNode) & 4) {
+              const t = clean(String(lbl.innerText ?? lbl.textContent ?? ''));
+              if (t) best = t;
+            }
+          }
+          return best;
         };
 
         // Strategy A: nodes whose own text IS a "required" message.
@@ -834,10 +852,7 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
         for (const node of all) {
           const txt = String(node.innerText ?? node.textContent ?? '').trim();
           if (!txt || txt.length > 80 || !ERR.test(txt)) continue;
-          // Walk up to the field block, then name it.
-          let block = node;
-          for (let i = 0; i < 5 && block?.parentElement; i++) block = block.parentElement;
-          const name = labelFor(block) || labelFor(node.parentElement);
+          const name = nameForError(node);
           const key = (name || txt).toLowerCase();
           if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name || txt); }
         }
@@ -845,7 +860,8 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
         // Strategy B: aria-invalid fields (Ashby marks these).
         const invalids = Array.from(doc.querySelectorAll('[aria-invalid="true"]')) as any[];
         for (const el of invalids) {
-          const name = labelFor(el);
+          const aria = el.getAttribute?.('aria-label');
+          const name = (aria && aria.trim()) ? clean(aria) : nameForError(el);
           if (!name) continue;
           const key = name.toLowerCase();
           if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
