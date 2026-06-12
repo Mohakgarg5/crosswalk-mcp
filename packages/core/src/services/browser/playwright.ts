@@ -871,6 +871,20 @@ async function collectValidationErrors(page: PlaywrightPage): Promise<string[]> 
           const key = name.toLowerCase();
           if (!seenLocal.has(key)) { seenLocal.add(key); out.push(name); }
         }
+
+        // Strategy C: accessible error messages (role=alert / aria-live).
+        // Ashby announces a submit-blocking error this way rather than inline
+        // "required" text. Capture the field name it points at, else the message.
+        const alerts = Array.from(doc.querySelectorAll('[role="alert"], [aria-live="assertive"], [aria-live="polite"]')) as any[];
+        for (const el of alerts) {
+          const txt = String(el.innerText ?? el.textContent ?? '').trim();
+          if (!txt || txt.length > 120 || NOISE.test(txt)) continue;
+          const name = nameForError(el);
+          const chosen = usable(name) ? name : (txt.length <= 80 ? txt : '');
+          if (!chosen) continue;
+          const key = chosen.toLowerCase();
+          if (!seenLocal.has(key)) { seenLocal.add(key); out.push(chosen); }
+        }
         return out.slice(0, 10);
       }) as string[];
       for (const l of labels) { if (l && !seen.has(l)) seen.add(l); }
