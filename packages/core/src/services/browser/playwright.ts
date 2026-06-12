@@ -243,6 +243,12 @@ export class LazyPlaywrightBrowser implements Browser {
       // ATS embed tearing down a frame mid-fill is what turned fillable forms
       // into "drafted, needs human".
       await settlePage(page);
+      // Headed/interactive (the Finish handoff): if there's a sign-in wall,
+      // wait for the user to log in before filling, then continue. The
+      // persistent profile remembers the session next time. Headless auto-apply
+      // can't wait for a human, so it skips this and surfaces an account-wall
+      // alert instead (unchanged).
+      if (this.headed) await waitForLoginThenForm(page, 5 * 60 * 1000);
       const maxSteps = Math.max(1, opts.maxSteps ?? 1);
       const labelOf = (f: FillField) => ('name' in f ? `${f.kind}:${f.name}` : f.kind);
       const filledLabels = new Set<string>();
@@ -588,6 +594,43 @@ async function advanceToForm(page: PlaywrightPage): Promise<void> {
 /** Count visible form fields across frames. Returns -1 when no frame could
  * report a number (test-mocked pages) — callers treat that as "unknowable,
  * don't wait on it". */
+/** True when the page is showing a sign-in / account wall. A password field is
+ *  the reliable tell — application forms don't have one — backed by sign-in
+ *  body copy. */
+async function looksLikeLogin(page: PlaywrightPage): Promise<boolean> {
+  for (const frame of allFrames(page)) {
+    try {
+      const hit = await frame.evaluate(() => {
+        const doc = (globalThis as unknown as { document: any }).document;
+        if (doc.querySelector('input[type="password"]')) return true;
+        const t = String(doc.body?.innerText ?? '').toLowerCase().slice(0, 3000);
+        return /(sign in|log in|create an account)\s+(to|and)\s+(apply|continue|your account|get started)/.test(t)
+          || /please (sign in|log in) to continue/.test(t);
+      });
+      if (hit) return true;
+    } catch { /* cross-origin frame */ }
+  }
+  return false;
+}
+
+/** Headed/interactive only: if the apply URL lands on a login wall, wait for the
+ *  user to sign in (the password field disappears / the form appears) before
+ *  filling — otherwise we'd fill nothing and bail while they're still logging
+ *  in. The persistent profile remembers the session for next time. */
+async function waitForLoginThenForm(page: PlaywrightPage, timeoutMs: number): Promise<void> {
+  if (!(await looksLikeLogin(page))) return;
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    await new Promise(r => setTimeout(r, 1500));
+    if (!(await looksLikeLogin(page))) {
+      // Logged in — let the post-login page settle and reveal the form.
+      await settlePage(page);
+      await advanceToForm(page);
+      return;
+    }
+  }
+}
+
 async function countFormFields(page: PlaywrightPage): Promise<number> {
   let total = 0;
   let anyNumber = false;
