@@ -12,6 +12,21 @@ export default function AlertsPage() {
   const [items, setItems] = useState<Notification[]>([]);
   const [needs, setNeeds] = useState<Notification[]>([]);
   const [err, setErr] = useState('');
+  const [finishMsg, setFinishMsg] = useState('');
+  const [finishing, setFinishing] = useState('');
+
+  async function finishInBrowser(applicationId?: string) {
+    if (!applicationId) { setFinishMsg('This item has no linked application to finish.'); return; }
+    setFinishing(applicationId); setFinishMsg('');
+    try {
+      const r = await fetch('/api/finish', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ applicationId })
+      }).then(x => x.json());
+      setFinishMsg(r.ok ? (r.message ?? 'Opening a browser window…') : `Error: ${r.error}`);
+    } catch (e) { setFinishMsg(`Error: ${(e as Error).message}`); }
+    finally { setFinishing(''); }
+  }
 
   async function load() {
     try {
@@ -42,7 +57,8 @@ export default function AlertsPage() {
       <ErrorNote>{err}</ErrorNote>
       {needs.length > 0 && (
         <div className="mb-4">
-          <Card title={`Needs you (${needs.length})`} subtitle="Applications that couldn't finish on their own — one quick step from you completes them.">
+          <Card title={`Needs you (${needs.length})`} subtitle="Applications that couldn't finish on their own. Click “Finish in browser” — it re-opens the form already filled, you just do the last step and submit.">
+            {finishMsg && <div className="mb-3 text-sm text-[var(--accent)]">{finishMsg}</div>}
             <ul className="divide-y divide-[var(--border)]">
               {needs.map(n => (
                 <li key={n.id} className="flex items-center justify-between py-3">
@@ -52,7 +68,9 @@ export default function AlertsPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Pill tone="muted">{(n.reason ?? 'action').replace(/_/g, ' ')}</Pill>
-                    {n.link && <a href={n.link} target="_blank" rel="noreferrer" className="text-xs text-[var(--accent)] whitespace-nowrap">Open &amp; finish →</a>}
+                    <Button onClick={() => finishInBrowser(n.refId)} disabled={finishing === n.refId}>
+                      {finishing === n.refId ? 'Opening…' : 'Finish in browser'}
+                    </Button>
                   </div>
                 </li>
               ))}

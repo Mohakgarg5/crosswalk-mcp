@@ -83,6 +83,18 @@ export default function ApplicationDetail() {
     if (r) { setPreview(r); await load(); }
   }
 
+  async function doFinishInBrowser() {
+    if (!app) return;
+    await act('finish', async () => {
+      const r = await fetch('/api/finish', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ applicationId: app.id })
+      }).then(x => x.json());
+      if (!r.ok) throw new Error(r.error);
+      setErr(''); alert(r.message ?? 'Opening the filled application in a browser window — review and submit there.');
+    });
+  }
+
   async function doScoreFit() {
     if (!app) return;
     await act('score-fit', async () => {
@@ -153,8 +165,9 @@ export default function ApplicationDetail() {
             <Button variant="ghost" onClick={doPreview} disabled={!!busy}>{busy === 'preview' ? 'Loading…' : 'Preview form'}</Button>
             <Button variant="ghost" onClick={() => doApply(false)} disabled={!!busy}>{busy === 'apply' ? 'Filling…' : 'Auto-fill (no submit)'}</Button>
             <Button onClick={() => doApply(true)} disabled={!!busy}>Auto-fill & submit</Button>
+            <Button variant="ghost" onClick={doFinishInBrowser} disabled={!!busy}>{busy === 'finish' ? 'Opening…' : 'Finish in browser'}</Button>
           </div>
-          <p className="text-xs text-[var(--muted)] mb-3">Requires the browser runtime: <code>npx crosswalk-mcp install-browser</code>.</p>
+          <p className="text-xs text-[var(--muted)] mb-3"><strong>Finish in browser</strong> opens this application already filled in a real window so you can complete any custom field and submit it yourself — works on every form. Auto-fill requires the browser runtime: <code>npx crosswalk-mcp install-browser</code>.</p>
           {preview && (
             <div>
               <div className="text-xs text-[var(--muted)] mb-2">{preview.title} — {preview.resolvedUrl}
