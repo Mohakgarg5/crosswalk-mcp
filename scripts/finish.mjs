@@ -57,21 +57,59 @@ const sampling = key
 // Headed + persistent profile: a real window you can see and finish in.
 const browser = new LazyPlaywrightBrowser({ headed: true, profileDir });
 
+const ID_KINDS = ['email', 'first_name', 'last_name', 'full_name', 'phone'];
+
+// True when a page currently shows a real application form (identity inputs or
+// several fillable fields) — used to detect when an account wall has cleared.
+async function aFormIsVisible() {
+  let pages;
+  try { pages = browser.openPages(); } catch { pages = []; }
+  for (const page of pages) {
+    try {
+      const has = await page.evaluate(() => {
+        const d = (globalThis).document;
+        if (d.querySelector('input[type=email],input[name*=email i],input[name*=name i],input[type=tel],input[name*=phone i]')) return true;
+        return d.querySelectorAll('input:not([type=hidden]):not([type=file]):not([type=submit]):not([type=button]),textarea').length >= 4;
+      });
+      if (has) return true;
+    } catch { /* busy */ }
+  }
+  return false;
+}
+
 console.log('Opening the application in a visible browser and filling it…');
+let res;
 try {
-  const res = await applyApplication({ applicationId, submit: false }, { db, browser, sampling });
-  console.log(`\nForm is filled and open on your screen: ${res.resolvedUrl}`);
+  res = await applyApplication({ applicationId, submit: false }, { db, browser, sampling });
+  console.log(`\nForm opened: ${res.resolvedUrl}`);
   console.log(`  filled: ${res.filled.join(', ') || 'none'}`);
   if (res.skipped.length) console.log(`  skipped: ${res.skipped.join(', ')}`);
-  if (res.validationErrors?.length) {
-    console.log(`\n⚠️  These required field(s) still need YOUR answer: ${res.validationErrors.join(', ')}`);
-  }
-  console.log('\n👉 Review it, fill anything left, and click Submit yourself.');
-  console.log('   I\'ll watch the window — when you submit, I mark it Submitted automatically.\n');
 } catch (e) {
   console.error(`\nCouldn't fill the form: ${e.message}`);
-  console.error('The window may still be open — finish it by hand, or re-run this command.');
 }
+
+// Account wall (Uber etc.): the form's fields don't exist until you sign in /
+// create an account. If nothing identity-like filled, wait for you to get past
+// the wall, then fill the form that appears.
+const filledIdentity = (res?.filled ?? []).some(k => ID_KINDS.includes(k));
+if (!filledIdentity) {
+  console.log('\nThis page may need you to sign in or create an account first.');
+  console.log('Do that in the window — I\'ll fill the form automatically once it appears…');
+  const waitUntil = Date.now() + 6 * 60 * 1000;
+  while (Date.now() < waitUntil) {
+    await new Promise(r => setTimeout(r, 4000));
+    if (await aFormIsVisible()) {
+      console.log('Form detected — filling it now…');
+      try {
+        const r2 = await applyApplication({ applicationId, submit: false }, { db, browser, sampling });
+        console.log(`  filled: ${r2.filled.join(', ') || 'none'}`);
+      } catch (e) { console.error(`  couldn't fill: ${e.message}`); }
+      break;
+    }
+  }
+}
+console.log('\n👉 Review it, fill anything left, and click Submit yourself.');
+console.log('   I\'ll watch the window — when you submit, I mark it Submitted automatically.\n');
 
 // Watch the open window for YOUR submit and mark the application Submitted when
 // it lands — so a hand-finished application shows up as Submitted, not Draft.
