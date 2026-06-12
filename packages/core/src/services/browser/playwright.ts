@@ -39,6 +39,7 @@ async function launchPersistentWithLockRecovery(
 
 type PlaywrightContext = {
   newPage(): Promise<PlaywrightPage>;
+  pages?(): PlaywrightPage[];
   close(): Promise<void>;
 };
 
@@ -473,6 +474,17 @@ export class LazyPlaywrightBrowser implements Browser {
       await this.launchedBrowser.close();
       this.launchedBrowser = null;
     }
+  }
+
+  /** The currently-open pages in the persistent context. Used by the headed
+   *  "finish" handoff to watch for the user's manual submit. Empty unless a
+   *  persistent (profile) context is live. */
+  openPages(): PlaywrightPage[] {
+    const ctx = this.persistentContext;
+    if (ctx && typeof ctx.pages === 'function') {
+      try { return ctx.pages() ?? []; } catch { return []; }
+    }
+    return [];
   }
 }
 

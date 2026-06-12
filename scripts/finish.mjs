@@ -21,7 +21,8 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   openDb, seedRegistryIfEmpty, SamplingClient, ApiSamplingBackend,
-  LazyPlaywrightBrowser, getConfig, getApplication, applyApplication
+  LazyPlaywrightBrowser, getConfig, getApplication, applyApplication,
+  updateApplicationStatus, addEventForApplication
 } from 'crosswalk-mcp/runtime';
 
 const applicationId = process.argv[2];
@@ -66,11 +67,46 @@ try {
     console.log(`\n⚠️  These required field(s) still need YOUR answer: ${res.validationErrors.join(', ')}`);
   }
   console.log('\n👉 Review it, fill anything left, and click Submit yourself.');
-  console.log('   The window stays open. Press Ctrl-C here when you are done.\n');
+  console.log('   I\'ll watch the window — when you submit, I mark it Submitted automatically.\n');
 } catch (e) {
   console.error(`\nCouldn't fill the form: ${e.message}`);
   console.error('The window may still be open — finish it by hand, or re-run this command.');
 }
 
-// Keep the process (and the visible browser window) alive until the user is done.
-await new Promise(() => {});
+// Watch the open window for YOUR submit and mark the application Submitted when
+// it lands — so a hand-finished application shows up as Submitted, not Draft.
+const CONFIRM_URL = /thank|confirm|success|submitted|application[-_]?complete|post[-_]?apply/i;
+const CONFIRM_TEXT = /your application has been submitted|application (?:was )?submitted|thank you for applying|application received|we(?:'ve| have) received your application|successfully (?:submitted|applied)/i;
+let marked = false;
+const deadline = Date.now() + 45 * 60 * 1000; // watch for up to 45 min
+while (!marked && Date.now() < deadline) {
+  await new Promise(r => setTimeout(r, 3000));
+  let pages;
+  try { pages = browser.openPages(); } catch { pages = []; }
+  for (const page of pages) {
+    try {
+      const url = typeof page.url === 'function' ? page.url() : '';
+      let title = '';
+      try { title = await page.title(); } catch { /* navigating */ }
+      let bodyHit = false;
+      try {
+        bodyHit = await page.evaluate((re) => {
+          const t = String((globalThis).document?.body?.innerText ?? '').slice(0, 5000);
+          return new RegExp(re, 'i').test(t);
+        }, CONFIRM_TEXT.source);
+      } catch { /* context busy */ }
+      if (CONFIRM_URL.test(url) || CONFIRM_URL.test(title) || bodyHit) {
+        updateApplicationStatus(db, applicationId, 'submitted');
+        addEventForApplication(db, applicationId, 'browser_submitted', { via: 'finish_handoff', url });
+        console.log(`\n✅ Detected your submission — marked "${app.id}" as Submitted. You can close the window.`);
+        marked = true;
+        break;
+      }
+    } catch { /* page gone — keep watching the others */ }
+  }
+}
+if (!marked) {
+  console.log('\n(Stopped watching. If you submitted, set the status to Submitted in the app — Pipeline → the application.)');
+}
+// Keep the window open a moment, then leave it to the user.
+await new Promise(r => setTimeout(r, 2000));

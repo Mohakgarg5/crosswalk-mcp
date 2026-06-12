@@ -31,7 +31,7 @@ export { getProfile, upsertProfile } from './store/profile.ts';
 export type { Profile } from './store/profile.ts';
 export { addAnswer, listAnswers, deleteAnswer, matchAnswer, loadDefaults } from './store/answerBank.ts';
 export type { AnswerEntry } from './store/answerBank.ts';
-export { getApplication, listEventsForApplication } from './store/application.ts';
+export { getApplication, listEventsForApplication, updateApplicationStatus, addEventForApplication } from './store/application.ts';
 export type { Application, ApplicationEvent, ApplicationStatus } from './store/application.ts';
 export { applyApplication } from './tools/apply_application.ts';
 
