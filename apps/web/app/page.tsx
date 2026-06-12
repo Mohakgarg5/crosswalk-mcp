@@ -64,7 +64,8 @@ export default function Dashboard() {
       })
       .catch(() => setSetUp(false));
     // Cached scores only — free and instant. Fresh scoring is the button below.
-    runTool<{ matches: Match[] }>('top_matches', { limit: 4 })
+    // freshDays: 2 → only jobs posted in the last couple days, never stale ones.
+    runTool<{ matches: Match[] }>('top_matches', { limit: 4, freshDays: 2 })
       .then(r => setMatches(r.matches))
       .catch(() => setMatches([]));
   }, []);
@@ -85,12 +86,12 @@ export default function Dashboard() {
         }).then(x => x.json()).catch(() => null);
         if (sr?.ok) fetched += sr.meta?.fetched ?? sr.jobs?.length ?? 0;
       }
-      const r = await runTool<{ matches: Match[]; scored: number }>('top_matches', { limit: 4, scoreMissing: true, maxToScore: 12 });
+      const r = await runTool<{ matches: Match[]; scored: number }>('top_matches', { limit: 4, scoreMissing: true, maxToScore: 12, freshDays: 2 });
       setMatches(r.matches);
       if ((r.matches?.length ?? 0) === 0) {
         setMatchErr(fetched > 0
-          ? `Fetched ${fetched} jobs but none scored high enough yet — try a broader role, or “Browse all jobs”.`
-          : 'No new jobs found for those roles right now. Try a different/broader role above.');
+          ? `Fetched ${fetched} jobs but none posted in the last 2 days scored high enough yet — try a broader role, or “Browse all jobs”.`
+          : 'No fresh jobs (last 2 days) found for those roles right now. Try a different/broader role above.');
       }
     } catch (e) { setMatchErr((e as Error).message); }
     finally { setScoring(false); }

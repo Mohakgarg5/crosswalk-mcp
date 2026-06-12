@@ -17,6 +17,10 @@ export const topMatchesInput = z.object({
   /** Only score jobs posted within this many days (default 14) — applying to
    * stale postings is mostly wasted effort. Jobs without a date are kept. */
   sinceDays: z.number().int().positive().optional(),
+  /** Strict freshness: only RETURN (and score) jobs posted within this many
+   * days, and drop ones with no known posted date. Use for "fresh jobs only"
+   * (e.g. 2). Overrides sinceDays for scoring when set. */
+  freshDays: z.number().int().positive().optional(),
   resumeId: z.string().optional()
 });
 
@@ -53,11 +57,19 @@ export async function topMatches(
     : resumes[0];
   if (!resume) return { matches: [], scored: 0 };
 
+  // Strict freshness cutoff (when freshDays is set): jobs must have a known
+  // posted date within the window — no stale, no unknown.
+  const freshCutoff = input.freshDays !== undefined
+    ? new Date(Date.now() - input.freshDays * 86400_000).toISOString()
+    : null;
+  const isFresh = (postedAt?: string): boolean =>
+    !freshCutoff || (!!postedAt && postedAt >= freshCutoff);
+
   let scored = 0;
   if (input.scoreMissing) {
     const have = new Set(listCachedFits(ctx.db).filter(f => f.resumeId === resume.id).map(f => f.jobId));
-    const candidates = listJobs(ctx.db, { sinceDays: input.sinceDays ?? 14 })
-      .filter(j => !have.has(j.id))
+    const candidates = listJobs(ctx.db, { sinceDays: input.freshDays ?? input.sinceDays ?? 14 })
+      .filter(j => !have.has(j.id) && isFresh(j.postedAt))
       .slice(0, input.maxToScore ?? 6);
     for (const job of candidates) {
       try {
@@ -72,10 +84,9 @@ export async function topMatches(
   const matches = listCachedFits(ctx.db)
     .filter(f => f.resumeId === resume.id)
     .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
     .flatMap<TopMatch>(f => {
       const job = getJob(ctx.db, f.jobId);
-      if (!job) return [];
+      if (!job || !isFresh(job.postedAt)) return [];
       const company = getCompany(ctx.db, job.companyId);
       return [{
         jobId: f.jobId,
@@ -89,7 +100,8 @@ export async function topMatches(
         topStrengths: f.topStrengths,
         topGaps: f.topGaps
       }];
-    });
+    })
+    .slice(0, limit);
 
   return { matches, scored };
 }
