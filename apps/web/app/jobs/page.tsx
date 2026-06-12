@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Card, Button, Input, Field, PageHeader, ErrorNote, Pill } from '@/components/ui';
 import { runTool, getSettings } from '@/lib/api';
 
+const JOB_TINTS = ['var(--tint-butter)', 'var(--tint-sky)', 'var(--tint-mint)', 'var(--tint-lav)', 'var(--tint-blush)'];
+
 type AutoApplySummary = { total: number; submitted: number; applied: number; drafted: number; skipped: number; results: { jobId: string; status: string; applicationId?: string; message?: string }[] };
 
 type SavedSearch = { id: string; name: string; filters: Record<string, unknown>; source?: string; autoApply?: boolean; resumeId?: string; minFit?: number; weeklyCap?: number; autoSubmit?: boolean; lastCheckedAt?: string };
@@ -315,24 +317,32 @@ export default function JobsPage() {
           {result.jobs.length === 0 ? (
             <p className="text-sm text-[var(--muted)]">No matches. Try broader filters.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-[var(--muted)] text-xs">
-                  <tr><th className="py-2">Title</th><th>Company</th><th>Location</th><th>H-1B</th><th></th><th></th></tr>
-                </thead>
-                <tbody>
-                  {result.jobs.map(j => (
-                    <tr key={j.id} className="border-t border-[var(--border)]">
-                      <td className="py-2.5 pr-3">{j.title}</td>
-                      <td className="pr-3">{j.company}</td>
-                      <td className="pr-3 text-[var(--muted)]">{j.location ?? '—'}{j.locationType ? ` · ${j.locationType}` : ''}</td>
-                      <td className="pr-3">{typeof j.h1bConfidence === 'number' ? <Pill tone={j.h1bConfidence >= 0.5 ? 'ok' : 'muted'}>{j.h1bConfidence.toFixed(2)}</Pill> : '—'}</td>
-                      <td className="pr-3"><a href={j.url} target="_blank" rel="noreferrer" className="text-[var(--accent)]">open ↗</a></td>
-                      <td><button onClick={() => draft(j.id)} disabled={drafting === j.id} className="text-[var(--accent)] disabled:opacity-50">{drafting === j.id ? 'drafting…' : 'draft →'}</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {result.jobs.map((j, i) => (
+                <div key={j.id}
+                  className="flex flex-col rounded-2xl border border-[var(--border)] p-4 shadow-[var(--shadow-sm)] transition-transform hover:-translate-y-0.5"
+                  style={{ background: JOB_TINTS[i % JOB_TINTS.length] }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="text-[12px] text-[var(--muted)]">
+                      {j.location ?? 'Location N/A'}{j.locationType ? ` · ${j.locationType}` : ''}
+                    </div>
+                    {typeof j.h1bConfidence === 'number' && j.h1bConfidence >= 0.5 && (
+                      <Pill tone="ok">H‑1B</Pill>
+                    )}
+                  </div>
+                  <a href={j.url} target="_blank" rel="noreferrer"
+                    className="mt-2.5 font-display text-[16px] font-semibold leading-tight hover:underline">
+                    {j.title}
+                  </a>
+                  <div className="mt-1 text-[13px] text-[var(--muted)]">{j.company}</div>
+                  <div className="mt-auto flex items-center gap-2 pt-4">
+                    <Button size="sm" onClick={() => draft(j.id)} disabled={drafting === j.id}>
+                      {drafting === j.id ? 'Drafting…' : 'Apply →'}
+                    </Button>
+                    <a href={j.url} target="_blank" rel="noreferrer" className="text-xs text-[var(--muted)] hover:text-[var(--text)]">open ↗</a>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Card>
